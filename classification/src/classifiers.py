@@ -10,11 +10,14 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 
-def load_features(file_path):
-    features = pd.read_csv(file_path)
-    return features
+def applySVM(feat_train, feat_test, y):
+    model = SVC()
+    model.fit(feat_train, y)
+    ypred = model.predict(feat_test)
+    return ypred
 
-
-
-
-
+def applyLogR(feat_train, feat_test, y):
+    model = LogisticRegression()
+    model.fit(feat_train, y)
+    ypred = model.predict(feat_test)
+    return ypred
