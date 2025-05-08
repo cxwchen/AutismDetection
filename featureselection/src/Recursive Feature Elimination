@@ -1,0 +1,57 @@
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+import matplotlib.pyplot as plt
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.feature_selection import RFE
+
+# Load with encoding fix
+data = pd.read_csv('ABIDEII_Composite_Phenotypic.csv', encoding='ISO-8859-1')
+
+# Choose relevant features
+columns_to_use = ['DX_GROUP', 'AGE_AT_SCAN ', 'SEX', 'FIQ', 'VIQ', 'PIQ', 'HANDEDNESS_CATEGORY'] #change to wanted features
+data = data[columns_to_use]
+
+# Drop rows where DX_GROUP is missing
+data = data[data['DX_GROUP'].notna()]
+
+# Separate X and y
+X = data.drop(columns=['DX_GROUP'])
+y = data['DX_GROUP']
+
+# Encode categorical
+X = pd.get_dummies(X, drop_first=True)
+
+# Impute missing values
+imputer = SimpleImputer(strategy='median')
+X = pd.DataFrame(imputer.fit_transform(X), columns=X.columns)
+
+# Make training set
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=40)
+
+# Wrapper-based feature selection using RFE
+svc = SVC(kernel='linear')  # Base model
+rfe = RFE(estimator=svc, n_features_to_select=5)  # Select top 5 features
+X_train_rfe = rfe.fit_transform(X_train, y_train)
+X_test_rfe = rfe.transform(X_test)
+
+# Train SVC on selected features
+model = SVC(kernel='linear')
+model.fit(X_train_rfe, y_train)
+
+# Evaluate the model
+y_pred = model.predict(X_test_rfe)
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Accuracy of SVC with RFE-selected features: {accuracy:.4f}")
+
+# Show selected feature names
+selected_features = X.columns[rfe.support_]
+print("Selected features:", list(selected_features))
+
+# Plot feature importances (based on selected features)
+coefficients = pd.Series(model.coef_[0], index=selected_features)
+coefficients.nlargest(10).plot(kind='barh')
+plt.title('Top RFE-Selected Features for Predicting Autism (SVC)')
+plt.show()
