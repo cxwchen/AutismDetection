@@ -26,7 +26,7 @@ param_grid = [
         'coef0': [0.0, 0.1, 0.5, 1.0]}
 ]
 
-def default_svm(Xtrain, Xtest, ytrain, ytest):
+def defaultSVM(Xtrain, Xtest, ytrain, ytest):
     svc_default = SVC()
     # Train the model
     svc_default.fit(Xtrain, ytrain)
@@ -56,4 +56,27 @@ def default_svm(Xtrain, Xtest, ytrain, ytest):
     plt.title('Confusion Matrix')
     plt.show()
 
-gridsearch = GridSearchCV(SVC, param_grid)
+def bestSVM(Xtrain, Xtest, ytrain, ytest, paramgrid):
+    gridsearch = GridSearchCV(SVC, paramgrid)
+    gridsearch.fit(Xtrain, ytrain)
+
+    model = gridsearch.best_estimator_
+    y_pred = model.predict(Xtest)
+
+    accuracy = accuracy_score(ytest, y_pred)
+    recall = recall_score(ytest, y_pred)
+    precision = precision_score(ytest, y_pred)
+    f1 = f1_score(ytest, y_pred)
+
+    print(f"Accuracy:  {accuracy:.4f}")
+    print(f"Recall:    {recall:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"F1 Score:  {f1:.4f}")
+
+    confmat = confusion_matrix(ytest, y_pred)
+    plt.figure(figsize=(8,6))
+    sns.heatmap(confmat, annot=True, fmt='d', cmap='flare')
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
+    plt.title('Confusion Matrix using GridSearchCV')
+    plt.show()
