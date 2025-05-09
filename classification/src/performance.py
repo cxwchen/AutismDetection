@@ -17,3 +17,4 @@ def get_specificity(ytrue, ypred): #in binary classification, the specificity is
 def get_metrics(ytrue, ypred):
     confmatr = confusion_matrix(ytrue, ypred)
     class_report = classification_report(ytrue, ypred)
+    print("Classification report: ", class_report)
