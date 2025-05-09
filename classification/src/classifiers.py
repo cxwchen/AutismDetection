@@ -13,17 +13,23 @@ from sklearn.ensemble import RandomForestClassifier
 def applySVM(feat_train, feat_test, y):
     model = SVC() #here we should use the parameters we found in hyperparametertuning.py
     model.fit(feat_train, y)
-    ypred = model.predict(feat_test)
-    return ypred
+    # ypred = model.predict(feat_test)
+    return model
 
 def applyLogR(feat_train, feat_test, y):
     model = LogisticRegression()
     model.fit(feat_train, y)
-    ypred = model.predict(feat_test)
-    return ypred
+    # ypred = model.predict(feat_test)
+    return model
 
 def applyRandForest(feat_train, feat_test,y):
     model = RandomForestClassifier()
     model.fit(feat_train, y)
-    ypred = model.predict(feat_test)
-    return ypred
+    # ypred = model.predict(feat_test)
+    return model
+
+def applyDT(feat_train, feat_test, y):
+    model = DecisionTreeClassifier()
+    model.fit(feat_train, y)
+    # ypred = model.predict(feat_test)
+    return model
