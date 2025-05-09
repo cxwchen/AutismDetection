@@ -144,7 +144,7 @@ def applyMLP(feat_train, y):
     model.fit(feat_train, y)
     return model
 
-def WiSARD(feat_train, y):
+def clusWiSARD(feat_train, y):
     input_size = len(feat_train[0]) ## feat_train should just have one sample but we don't know the format of our input yet
     addressSize = max(1, input_size // 64)
     model = ClusWisard(addressSize, minScore=..., discriminatorLimit=4) #minScore will be added after hyperparameter tuning
