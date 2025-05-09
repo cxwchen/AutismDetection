@@ -18,6 +18,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
+from wisardpkg import ClusWisard
 
 
 def applySVM(feat_train, y):
@@ -140,6 +141,13 @@ def applyMLP(feat_train, y):
     """
 
     model = MLPClassifier() #default: one layer with 100 units
+    model.fit(feat_train, y)
+    return model
+
+def WiSARD(feat_train, y):
+    input_size = len(feat_train[0]) ## feat_train should just have one sample but we don't know the format of our input yet
+    addressSize = max(1, input_size // 64)
+    model = ClusWisard(addressSize, minScore=..., discriminatorLimit=4) #minScore will be added after hyperparameter tuning
     model.fit(feat_train, y)
     return model
 
