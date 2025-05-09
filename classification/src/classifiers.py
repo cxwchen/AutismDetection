@@ -22,7 +22,7 @@ def applyLogR(feat_train, feat_test, y):
     ypred = model.predict(feat_test)
     return ypred
 
-def applyRandForrest(feat_train, feat_test,y):
+def applyRandForest(feat_train, feat_test,y):
     model = RandomForestClassifier()
     model.fit(feat_train, y)
     ypred = model.predict(feat_test)
