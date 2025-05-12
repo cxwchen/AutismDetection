@@ -1,0 +1,76 @@
+# Importing necessary libraries
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
+from sklearn.inspection import permutation_importance
+from sklearn.metrics import accuracy_score
+import pandas as pd
+import numpy as np
+
+def main():
+    # Load data
+    data = pd.read_csv('ABIDEII_Composite_Phenotypic.csv', encoding='ISO-8859-1')
+    data = data[data['DX_GROUP'].notna()]
+
+    # Separate features (X) and target (y)
+    X = data.drop(columns=['DX_GROUP'])
+    y = data['DX_GROUP']
+    
+    # Encode categorical variables (if any)
+    X = pd.get_dummies(X, drop_first=True)
+
+    #drop the columns where all values are missing before the imputer
+    X = X.dropna(axis=1, how='all')
+    
+    # Impute missing values
+    imputer = SimpleImputer(strategy='median')
+    X = pd.DataFrame(imputer.fit_transform(X), columns=X.columns)
+    
+    # Split data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=40)
+
+    # Scale features
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    # Train Random Forest model
+    model = RandomForestClassifier(random_state=42)
+    model.fit(X_train_scaled, y_train)
+
+    # Get predictions and calculate accuracy
+    y_pred = model.predict(X_test_scaled)
+    acc = accuracy_score(y_test, y_pred)
+    print(f'Accuracy: {acc:.4f}')
+    
+    # Calculate Permutation Importance
+    result = permutation_importance(model, X_test_scaled, y_test, n_repeats=10, random_state=42, n_jobs=-1)
+
+    # Get the importances and sort them from most to least important
+    importances = result.importances_mean
+    indices = np.argsort(importances)[::-1]
+    
+    # Select features based on importance (threshold: features that have positive importance)
+    selected_features = [i for i in indices if importances[i] > 0]  # Select features that have positive importance
+
+    # Create a new dataset with the most important features
+    X_train_selected = X_train.iloc[:, selected_features]
+    X_test_selected = X_test.iloc[:, selected_features]
+
+    # Print selected feature names
+    print("\nSelected Features Based on Permutation Importance:")
+    for i in selected_features:
+        print(f"{X.columns[i]}: {importances[i]:.4f}")
+
+    # Train a new Random Forest model using only the most important features
+    model_selected = RandomForestClassifier(random_state=42)
+    model_selected.fit(X_train_selected, y_train)
+
+    # Get predictions and calculate accuracy with the selected features
+    y_pred_selected = model_selected.predict(X_test_selected)
+    acc_selected = accuracy_score(y_test, y_pred_selected)
+    print(f'Accuracy with Selected Features: {acc_selected:.4f}')
+
+if __name__ == '__main__':
+    main()
