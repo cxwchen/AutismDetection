@@ -3,16 +3,15 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
-from loaddata import load_features
 from sklearn.metrics import make_scorer, precision_score, recall_score, f1_score, accuracy_score, classification_report, confusion_matrix, balanced_accuracy_score
 import seaborn as sns
 
-traindata = load_features(file_path=...)
-testdata = load_features(file_path=...)
-feat_train = traindata.iloc(:, [...])
-ytrain = traindata.iloc(:, blablab)
-feat_test = testdata.iloc(:, [])
-ytest = testdata.iloc(:, jlfd)
+# traindata = load_features(file_path=...)
+# testdata = load_features(file_path=...)
+# feat_train = traindata.iloc(:, [...])
+# ytrain = traindata.iloc(:, blablab)
+# feat_test = testdata.iloc(:, [])
+# ytest = testdata.iloc(:, jlfd)
 
 param_grid = [
     {   'kernel': ['linear'], 'C': [0.1, 1, 10, 100]}, #Here I didn't use gamma, because gamma is not used for the linear kernel
@@ -81,6 +80,8 @@ def bestSVM_GS(Xtrain, Xtest, ytrain, ytest, paramgrid, svcdefault):
     plt.title('Confusion Matrix using GridSearchCV')
     plt.show()
 
+    return gridsearch.best_params_
+
 def bestSVM_RS(Xtrain, Xtest, ytrain, ytest, paramgrid, svcdefault):
     rsearch = RandomizedSearchCV(svcdefault, paramgrid, cv=5, random_state=19, n_iter=50)
     rsearch.fit(Xtrain, ytrain)
@@ -98,10 +99,12 @@ def bestSVM_RS(Xtrain, Xtest, ytrain, ytest, paramgrid, svcdefault):
     print(f"Precision: {precision:.4f}")
     print(f"F1 Score:  {f1:.4f}")
 
-    confmat = confusion_matrix(y_test_2c, y_pred)
+    confmat = confusion_matrix(ytest, y_pred)
     plt.figure(figsize=(8,6))
-    sn.heatmap(confmat, annot=True, fmt='d', cmap='flare')
+    sns.heatmap(confmat, annot=True, fmt='d', cmap='flare')
     plt.xlabel('Predicted')
     plt.ylabel('True')
     plt.title('Confusion Matrix using RandomizedSearchCV')
     plt.show()
+
+    return rsearch.best_params_
