@@ -31,7 +31,7 @@ def defaultSVM(Xtrain, Xtest, ytrain, ytest):
     svc_default.fit(Xtrain, ytrain)
 
     # Make predictions on the test data
-    y_pred = svc_default.predict(feat_test)
+    y_pred = svc_default.predict(Xtest)
 
     # Calculate performance metrics
     accuracy = accuracy_score(ytest, y_pred)

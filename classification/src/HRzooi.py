@@ -1,0 +1,295 @@
+import tkinter as tk
+from tkinter import ttk
+from PIL import Image, ImageTk 
+from ctypes import windll
+from classification import *
+from classifiers import *
+import code
+import io
+import contextlib
+import platform
+import time
+
+if platform.system() == "Windows":
+    try:
+        from ctypes import windll
+        windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        pass
+
+try:
+    root.destroy()
+except:
+    pass
+
+root = tk.Tk()
+root.title('NASDA')
+
+# Get the screen width and height
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
+width = int(screen_width * 0.8)
+height = int(screen_height * 0.8)
+
+# Center the window on the screen
+x = (screen_width - width) // 2
+y = (screen_height - height) // 2
+
+# Apply the geometry
+root.geometry(f'{width}x{height}+{x}+{y}')
+root.iconbitmap("logo.ico")
+
+# ====== Configure Grid ======
+root.grid_rowconfigure(1, weight=1)
+#root.grid_columnconfigure(1, weight=1)
+#root.grid_columnconfigure(2, weight=2)
+
+# ====== Toolbar ======
+toolbar = tk.Frame(root, bg="#2c3e50", height=40, relief="raised", bd=2)
+toolbar.grid(row=0, column=0, columnspan=3, sticky="ew")  # stretch across full width
+toolbar.grid_propagate(False)  # prevent shrinking to fit buttons
+
+# Configure root's columns to expand
+root.grid_columnconfigure(0, weight=1)
+root.grid_columnconfigure(1, weight=1)
+
+# Add toolbar buttons
+btn_open = tk.Button(toolbar, text="Open")
+btn_save = tk.Button(toolbar, text="Save")
+stats = "stats"; steps = 11; acuracy = 76.4; stat2 = 2; stat3 = 3;  # default values for demonstration
+
+def simulate_run_command():
+    command_input.delete(0, "end")  # clear previous input
+    command_input.insert(0, f"runanalysis({stats})")
+    execute_command()  # simulate pressing <Return>
+
+btn_run = tk.Button(toolbar, text="Run", command=simulate_run_command)
+
+# Pack buttons in toolbar
+btn_open.pack(side="left", padx=5, pady=5)
+btn_save.pack(side="left", padx=5, pady=5)
+btn_run.pack(side="left", padx=5, pady=5)
+
+
+# ====== PanedWindow (Left + Right Resizable) ======
+main_pane = tk.PanedWindow(root, orient=tk.HORIZONTAL)
+main_pane.grid(row=1, column=0, columnspan=3, sticky="nsew")
+
+# Left frame (2/3 width initially)
+left = tk.Frame(main_pane, bg="lightblue")
+left.grid_rowconfigure(0, weight=1)
+left.grid_rowconfigure(1, weight=1)
+left.grid_rowconfigure(2, weight=1)
+left.grid_columnconfigure(0, weight=1)
+main_pane.add(left)
+
+# Subjects Frame
+subjects_frame = tk.LabelFrame(left, text="Subjects", bg="lightyellow")
+subjects_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+# Classifier Frame
+classifier_frame = tk.LabelFrame(left, text="Classifier", bg="lavender")
+classifier_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+
+# Features Frame
+features_frame = tk.LabelFrame(left, text="Features", bg="mistyrose")
+features_frame.grid(row=2, column=0, sticky="nsew", padx=5, pady=5)
+
+# Right frame (1/3 width initially)
+right = tk.Frame(main_pane, bg="lightgreen")
+main_pane.add(right)
+
+# Grid
+right.grid_rowconfigure(0, weight=0)  # fixed height for square
+right.grid_rowconfigure(1, weight=1)  # tabs get the remaining space
+right.grid_columnconfigure(0, weight=1)
+
+# Brain Overview Area
+overview_frame = tk.Frame(right, bg="lightgray")
+overview_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+right.grid_rowconfigure(0, weight=0, minsize=250)
+
+# You can use Canvas or Label here to draw/display the brain image
+tk.Label(overview_frame, text="[Brain Image Here]").pack()
+
+# Tabs for Command / Logs / Dataset
+style = ttk.Style()
+style.configure("TNotebook.Tab", padding=[15, 5]) 
+tabs = ttk.Notebook(right)
+tabs.grid(row=1, column=0, sticky="nsew")
+
+command_tab = tk.Frame(tabs)
+logs_tab = tk.Frame(tabs, bg="white")
+dataset_tab = tk.Frame(tabs, bg="lightcyan")
+
+
+tabs.add(command_tab, text="COMMAND")
+tabs.add(logs_tab, text="LOGS")
+tabs.add(dataset_tab, text="DATA SET")
+
+# Example content in tabs
+tk.Text(logs_tab).pack(expand=True, fill="both")
+
+    # ====== Command Tab ======
+# Text widget to display command history and output
+console_display = tk.Text(command_tab, height=20, wrap="word", bg="black", fg="white", insertbackground="white")
+console_display.pack(fill="both", expand=True)
+
+# Entry widget for typing commands
+command_input = tk.Entry(command_tab, bg="black", fg="white", insertbackground="white")
+command_input.pack(fill="x", side="bottom")
+
+# Command history list
+command_history = []
+history_index = -1
+
+# Function to execute Python code and display output
+def execute_command(event=None):
+    global history_index
+    cmd = command_input.get()
+    command_history.append(cmd)
+    history_index = len(command_history)
+    
+    # Display the command in the console
+    console_display.tag_configure("cmd_prompt", foreground="lime", font=("Courier", 10, "bold"))
+    prompt_text = f"Input [{len(command_history)}]: "
+    console_display.insert("end", prompt_text, "cmd_prompt")
+    
+    # Insert the command content (unstyled)
+    console_display.insert("end", f"{cmd}\n")
+    
+    # Redirect stdout and stderr
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+        try:
+            # Try eval first (to return values like 2+2)
+            result = eval(cmd, globals(), locals())
+            if result is not None:
+                print(result)
+        except SyntaxError:
+            try:
+                exec(cmd, globals(), locals())
+            except Exception as e:
+                print(e)
+        except Exception as e:
+            print(e)
+
+    # Display output
+    console_display.tag_configure("stderr", foreground="cyan")
+    output_text = output.getvalue()
+    # Insert with error styling if it looks like an error
+    if "NameError" in output_text or "is not defined" in output_text:
+        console_display.insert("end", output_text, "stderr")
+    else:
+        console_display.insert("end", output_text)
+        
+    console_display.see("end")
+    command_input.delete(0, "end")
+
+# Keyboard bindings
+command_input.bind("<Return>", execute_command)
+
+# Optional: up/down arrow for navigating history
+def show_previous_command(event):
+    global history_index
+    if command_history and history_index > 0:
+        history_index -= 1
+        command_input.delete(0, "end")
+        command_input.insert(0, command_history[history_index])
+
+def show_next_command(event):
+    global history_index
+    if command_history and history_index < len(command_history) - 1:
+        history_index += 1
+        command_input.delete(0, "end")
+        command_input.insert(0, command_history[history_index])
+    else:
+        command_input.delete(0, "end")
+
+command_input.bind("<Up>", show_previous_command)
+command_input.bind("<Down>", show_next_command)
+
+# Write to the console_display widget
+def log(text, tag=None):
+    console_display.insert("end", text + "\n", tag)
+    console_display.see("end")
+    console_display.update_idletasks()
+
+def type_text(widget, text, delay=30, tag=None):
+    def _type(index=0):
+        if index < len(text):
+            widget.insert("end", text[index], tag)
+            widget.see("end")
+            widget.update_idletasks()
+            widget.after(delay, _type, index + 1)
+        else:
+            widget.insert("end", "\n", tag)
+
+    _type()
+
+
+def runanalysis(stats):
+        
+    log(f"Analysing: {stats}")
+    progress = ttk.Progressbar(command_tab, orient="horizontal", length=200, mode="determinate")
+    progress["value"] = 0
+    progress.pack(fill="x", padx=5, pady=5)
+    
+    def step_loop(step=0):
+        for stepcount in range(1,steps+1):
+            time.sleep(0.5)
+            progress["value"] = 100 * stepcount / steps
+            log(f"[{stepcount}/{steps}]")
+            root.update_idletasks()
+        
+        time.sleep(0.5)
+        if 1!=1:
+            log("Run failed")
+        else:
+            log("Run completed")
+            time.sleep(0.8)
+            type_text(console_display, f"Acuracy:\t {acuracy}%\t Stat2:\t {stat2}\t Stat3:\t {stat3}\n")
+        progress.pack_forget()
+
+    root.after(1000, step_loop)
+
+#Classifier function mapping
+classifier_functions = {
+    "SVM": applySVM,
+    "Logistic Regression": applyLogR,
+    "Random Forest": applyRandForest,
+    "Decision Tree": applyDT,
+    "Multilayer Perceptron": applyMLP,
+    "ClusWiSARD": applyClusWiSARD
+}
+
+#Run selected classifier
+def run_classifier():
+    selected = classifier_var.get()
+    func = classifier_functions.get(selected)
+    if func:
+        func()
+
+# message = tk.Label(root, text="Hello, World!")
+# message.pack()
+
+def set_initial_sash_position():
+    root.update_idletasks()
+    total_width = main_pane.winfo_width()
+    main_pane.sash_place(0, int(total_width * (2/3)), 0)
+
+def set_min_height_relative_to_right():
+    right.update_idletasks()  # Ensure layout is measured
+    total_height = right.winfo_height()
+    third_height = (total_height * 3) // 7
+    right.grid_rowconfigure(0, weight=0, minsize=third_height)
+
+
+# Bind to window resize
+root.after(100, set_initial_sash_position)
+root.after(100, set_min_height_relative_to_right)
+
+# Start the update loop
+
+root.mainloop()
+
