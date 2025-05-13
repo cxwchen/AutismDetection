@@ -3,5 +3,7 @@ import pandas as pd
 
 from classifiers import *
 from hyperparametertuning import *
+from loaddata import *
+
 
 
