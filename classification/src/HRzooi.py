@@ -126,6 +126,8 @@ def load_default_image():
         root.update_idletasks()
         filepath = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png")])
         if not filepath:
+            # Restore the export button
+            export_button.place(relx=1.0, rely=0.0, anchor="ne")
             return  # user cancelled
     
         root.update_idletasks()
