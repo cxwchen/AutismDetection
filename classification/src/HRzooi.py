@@ -1,6 +1,6 @@
 import tkinter as tk
-from tkinter import ttk
-from PIL import Image, ImageTk 
+from tkinter import ttk, filedialog
+from PIL import Image, ImageTk, ImageGrab
 from ctypes import windll
 from classification import *
 from classifiers import *
@@ -63,8 +63,7 @@ def simulate_run_command():
     command_input.insert(0, f"runanalysis({stats})")
     execute_command()  # simulate pressing <Return>
 
-btn_run = tk.Button(toolbar, text="Run", command=simulate_run_command)
-
+btn_run = tk.Button(toolbar, text="Run", command=simulate_run_command)    
 # Pack buttons in toolbar
 btn_open.pack(side="left", padx=5, pady=5)
 btn_save.pack(side="left", padx=5, pady=5)
@@ -105,12 +104,60 @@ right.grid_rowconfigure(1, weight=1)  # tabs get the remaining space
 right.grid_columnconfigure(0, weight=1)
 
 # Brain Overview Area
-overview_frame = tk.Frame(right, bg="lightgray")
+overview_frame = tk.Frame(right, bg="#030e3a")
 overview_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 right.grid_rowconfigure(0, weight=0, minsize=250)
 
-# You can use Canvas or Label here to draw/display the brain image
-tk.Label(overview_frame, text="[Brain Image Here]").pack()
+# Brain Overview Size
+def set_min_height_relative_to_right():
+    right.update_idletasks()  # Ensure layout is measured
+    total_height = right.winfo_height()
+    third_height = (total_height * 3) // 7
+    right.grid_rowconfigure(0, weight=0, minsize=third_height)
+    return third_height
+
+# Default stats
+subjects_set = "subjects_set"; classifiers_set = "classifiers_set"; features_set = "features_set"; dataset_fit = "dataset_fit";
+# Load the default image (once)
+def load_default_image():
+    def export_overview_to_png():
+        # Temporarily hide the export button BEFORE the file dialog opens
+        export_button.place_forget()
+        root.update_idletasks()
+        filepath = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png")])
+        if not filepath:
+            return  # user cancelled
+    
+        root.update_idletasks()
+        x = overview_frame.winfo_rootx()
+        y = overview_frame.winfo_rooty()
+        w = x + overview_frame.winfo_width()
+        h = y + overview_frame.winfo_height()
+    
+        img = ImageGrab.grab(bbox=(x, y, w, h))
+        img.save(filepath)
+        # Restore the export button
+        export_button.place(relx=1.0, rely=0.0, anchor="ne")
+        print(f"Saved to {filepath}")
+
+    canvas = tk.Canvas(overview_frame, bg="#030e3a", highlightthickness=0)
+    canvas.pack(expand=True, fill="both")
+    
+    # Load and place image
+    size = set_min_height_relative_to_right()
+    default_img = Image.open("Brain_background.png").resize((size, size))
+    default_photo = ImageTk.PhotoImage(default_img)
+    canvas.create_image(canvas.winfo_reqwidth() // 2, 0, anchor="n", image=default_photo)
+    canvas.image = default_photo  # keep reference
+    
+    # Add text overlay
+    canvas.create_text(10, size - 10, anchor="sw", text=f"Target:\{subjects_set}\{classifiers_set}\{features_set}\{dataset_fit}",
+                       fill="white", font=("Arial", 9, "italic"))
+    
+    export_button = tk.Button(overview_frame, text="  ⤓  ", command=export_overview_to_png)
+    export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)  # Top-right with slight padding
+
+root.after(100, load_default_image)
 
 # Tabs for Command / Logs / Dataset
 style = ttk.Style()
@@ -277,12 +324,6 @@ def set_initial_sash_position():
     root.update_idletasks()
     total_width = main_pane.winfo_width()
     main_pane.sash_place(0, int(total_width * (2/3)), 0)
-
-def set_min_height_relative_to_right():
-    right.update_idletasks()  # Ensure layout is measured
-    total_height = right.winfo_height()
-    third_height = (total_height * 3) // 7
-    right.grid_rowconfigure(0, weight=0, minsize=third_height)
 
 
 # Bind to window resize
