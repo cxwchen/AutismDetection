@@ -19,7 +19,7 @@ from sklearn.preprocessing import StandardScaler
 
 from sklearn.feature_selection import mutual_info_regression
 
-def graphing(A, super=False, feats=False):
+def graphing(A, super=False, feats=False, deg_trh=0):
     """
     Function converting Adjacency matrix to a Graph
     It has an input parameter 'super' to select supernodes
@@ -44,36 +44,47 @@ def graphing(A, super=False, feats=False):
         opacities = []
 
     # Remove nodes with degree < 2
-    low_degree_nodes = [node for node, degree in G.degree() if degree < 2]
+    low_degree_nodes = [node for node, degree in G.degree() if degree < deg_trh]
     G.remove_nodes_from(low_degree_nodes)
 
     if super:
-        communities = community.greedy_modularity_communities(G) # Combines nodes that are close together
-        for i, c in enumerate(communities):
-            print(f"Community {i}: {sorted(c)}")
+        # Detect communities
+        #communities = list(community.greedy_modularity_communities(G))
+        communities = nx_comm.louvain_communities(G, resolution=0.8)
+        print(f"Found {len(communities)} communities: {communities}")  # Debug
+        communities = [comm for comm in communities if len(comm) >= 2]  # Keep only size >= 2
+        print(f"Filtered communities: {communities}")
 
-        node_to_community = {}
-        for i, comm in enumerate(communities):
-            for node in comm:
-               node_to_community[node] = i
+        # Map original nodes to their community IDs
+        node_to_community = {node: i for i, comm in enumerate(communities) for node in comm}
 
-        # 4. Initialize a new graph for the supernodes
-        G = nx.Graph()
+        # Create supernode graph
+        superG = nx.Graph()
+        superG.add_nodes_from(range(len(communities)))  # One node per community
 
-        # Add one node per community
-        for i in range(len(communities)):
-            G.add_node(i)
+        # Track edges between communities
+        inter_community_edges = set()
 
-        # 5. Add edges between supernodes (if any original edge connects nodes in different communities)
-        for u, v in G.edges():
-           cu = node_to_community[u]
-           cv = node_to_community[v]
-           if cu != cv:
-               G.add_edge(cu, cv)
+        # Check ALL original edges for inter-community connections
+        for u, v in nx.from_numpy_array(A).edges():  # Use original adjacency matrix
+            cu = node_to_community.get(u, -1)
+            cv = node_to_community.get(v, -1)
+            if cu != cv and cu != -1 and cv != -1:
+                # Add edge between communities (sorted to avoid duplicates like (1,0) vs (0,1))
+                edge = tuple(sorted((cu, cv)))
+                inter_community_edges.add(edge)
+
+        # Add edges to superG
+        superG.add_edges_from(inter_community_edges)
+        print(f"Supernode edges: {superG.edges()}")
+
+        # Update references for visualization
+        G = superG
+        edges = list(superG.edges())
+        opacities = [0.6] * len(edges)  # Uniform opacity for superedges
 
     # Create label dictionary: show node + 1
     labels = {node: node + 1 for node in G.nodes()}
-
     # 6. Visualize the coarsened graph
     pos = nx.spring_layout(G, k=0.5, seed=42, iterations=50)
     plt.figure(figsize=(6, 6))
@@ -82,7 +93,8 @@ def graphing(A, super=False, feats=False):
                     node_color='skyblue',
                     node_size=300,
                     font_weight='bold')
-    nx.draw_networkx_edges(G, pos, edgelist=edges, alpha=opacities,)
+    if edges:
+        nx.draw_networkx_edges(G, pos, edgelist=edges, alpha=opacities,)
     plt.show()
 
     # 7. Compute Graph features
@@ -141,7 +153,7 @@ def load_files(folder_path):
     return all_data, file_list, file_info
 
 
-def build_correlation_graph(time_series_data, threshold=0.5, absolute_value=True):
+def pearson_corr(time_series_data, threshold=0.5, absolute_value=True):
     """
     Build a graph based on Pearson correlation between time series.
 
@@ -177,9 +189,12 @@ def build_correlation_graph(time_series_data, threshold=0.5, absolute_value=True
                 adj_matrix[i, j] = 1
                 adj_matrix[j, i] = 1
 
+    # Remove self-loops
+    np.fill_diagonal(adj_matrix, 0)
+
     return adj_matrix, corr_matrix
 
-def partial_correlation(ts_data, method = "ledoit", alpha=0.1):
+def partial_corr(ts_data, method = "ledoit", alpha=0.1):
     """
     alpha: regularization parameter (smaller = denser connections)
     """
@@ -194,7 +209,7 @@ def partial_correlation(ts_data, method = "ledoit", alpha=0.1):
         np.fill_diagonal(W, 0)
     return W
 
-def mutual_information(data):
+def mutual_info(data):
     N = data.shape[1]
     mi_matrix = np.zeros((N, N))
 
@@ -259,51 +274,7 @@ def multiset_feats(data_list, filenames, output_dir="feature_outputs"):
         df.to_csv(save_path, index=False)
         print(f"Saved: {save_path}")
 
-data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aal_data_test")
-data_arrays, file_paths, metadata = load_files(data_path)
-
-print(data_arrays[0])
-
-# Standardize data
-scaler = StandardScaler()
-time_series_data_scaled = scaler.fit_transform(data_arrays[0])
-
-print(data_arrays[0])
-
-x = data_arrays[0]
-t = np.arange(len(x))
-
-corr_matrix = np.corrcoef(x)
-# Set a correlation threshold
-threshold = 0.8
-
-# Create an adjacency matrix (binary graph)
-adj_matrix = (np.abs(corr_matrix) > threshold).astype(int)
-
-# Remove self-loops
-np.fill_diagonal(adj_matrix, 0)
-
-# Compute functions
-print(adj_matrix)
-#S_parc = partial_correlation(x)
-#S_mi = mutual_information(x)
-
-# Plotting
-plt.plot(t,x)
-plt.xlabel("Time Index")
-plt.ylabel("Magnitude")
-plt.show()
-#plot_connectivity(S_mi)
-#graphing(adj_matrix)
-
-from nilearn import datasets
-# Fetch AAL atlas
-#aal = datasets.fetch_atlas_aal()
-#atlas_labels = aal['labels']  # e.g., ['Precentral_L', 'Frontal_Sup_L', ...]
-# = aal['maps']       # nifti file with labeled ROIs
-
-#stat_feats(x)
-
-print(datasets)
+folder_path = r"C:\Users\Jochem\Documents\GitHub\AutismDetection\abide\female-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
+data_arrays, file_paths, metadata = load_files(folder_path)
 
 multiset_feats(data_arrays, file_paths)
