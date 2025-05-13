@@ -302,6 +302,9 @@ def runanalysis(stats):
 
     root.after(1000, step_loop)
 
+def run(stats=stats):
+    runanalysis(stats)
+
 #Classifier function mapping
 classifier_functions = {
     "SVM": applySVM,
@@ -327,6 +330,27 @@ def set_initial_sash_position():
     total_width = main_pane.winfo_width()
     main_pane.sash_place(0, int(total_width * (2/3)), 0)
 
+def help(topic=None):
+    if topic is None:
+        print("NASDA Help Menu:")
+        print("- help('commands') – Show available commands")
+        print("- help('classifier') – Explain the classifier options")
+        print("- help('data') – Info about dataset structure")
+        print("- help('export') – How to export results")
+    elif topic == "commands":
+        print("Available commands:")
+        print("- runanalysis(stats) or run() for a demo")
+        print("- export_overview_to_png()")
+        print("- log('message')")
+    elif topic == "classifier":
+        print("Classifier options:")
+        print("- SVM, Logistic Regression, Random Forest, Decision Tree, MLP, ClusWiSARD")
+    elif topic == "data":
+        print("Expected dataset format: subjects × features. Use loaddata() to load.")
+    elif topic == "export":
+        print("Use the ⤓ button or call export_overview_to_png() to save the overview.")
+    else:
+        print(f"No help available for topic '{topic}'. Try help() for options.")
 
 # Bind to window resize
 root.after(100, set_initial_sash_position)
