@@ -11,7 +11,7 @@ import nibabel as nib
 import scipy as sp
 import pandas as pd
 import re
-
+import Normalized_laplacian 
 import seaborn as sns
 from scipy.stats import pearsonr
 from networkx.algorithms import community
@@ -251,6 +251,8 @@ def stat_feats(x, n_rois = 116):
             'SNR': np.average(np.divide(np.mean(x, axis=0), np.std(x, axis=0), where=np.std(x, axis=0) != 0, out=np.zeros_like(np.mean(x, axis=0))))
         }
         feature_list.append(features)
+    
+    Laplacian = learn_normalized_laplacian(X, epsilon=5e-1, alpha=0.1)
     # Convert to DataFrame
     df = pd.DataFrame(feature_list)
     df.insert(0, 'ROI', [f'ROI_{i + 1}' for i in range(len(df))])

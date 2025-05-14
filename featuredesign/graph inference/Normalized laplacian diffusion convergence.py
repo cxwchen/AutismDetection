@@ -150,9 +150,9 @@ def plot_graphs(S_true, S_learned):
 # --------- Main Pipeline ---------
 if __name__ == "__main__":
     N = 20
-    P_values = [100,200,300,400,500,600,700,800,900,1000]
+    P_values = [100,200,300,400,500,600,700,800,900,1000,10000]
     
-    graph_type = "star"  # Choose: "ring", "star", "community"
+    graph_type = "community"  # Choose: "ring", "star", "community"
 
     frob_errors = []
     rel_errors = []
@@ -161,7 +161,7 @@ if __name__ == "__main__":
     L_true = compute_normalized_laplacian(W)
     for P in P_values:   
         X = simulate_diffused_graph_signals(L_true, P=P)
-        L_learned = learn_normalized_laplacian(X, epsilon=0.1, alpha=0.01)
+        L_learned = learn_normalized_laplacian(X, epsilon=0.3, alpha=0.01)
         frob_error = norm(L_true - L_learned, 'fro')
         rel_error = frob_error / norm(L_true, 'fro')
         frob_errors.append(frob_error)
