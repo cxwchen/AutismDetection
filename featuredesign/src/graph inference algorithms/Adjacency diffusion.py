@@ -66,7 +66,7 @@ def compute_sample_covariance(X):
     return sample_cov, X_centered
 
 # --------- Adjacency Learning ---------
-def learn_adjacency_matrix(X, tau=1.0, delta=1e-6, epsilon=0.1, max_iter=10, binarize_threshold=0.3):
+def learn_adjacency_matrix(X, tau=1.0, delta=1e-6, epsilon=0.1, max_iter=10, binarize_threshold=0.1):
     sample_cov, _ = compute_sample_covariance(X)
     _, V_hat = eigh(sample_cov)
     N = V_hat.shape[0]
@@ -80,7 +80,7 @@ def learn_adjacency_matrix(X, tau=1.0, delta=1e-6, epsilon=0.1, max_iter=10, bin
         S_prime = sum([lambda_vec[k] * np.outer(V_hat[:, k], V_hat[:, k]) for k in range(N)])
 
         constraints = [
-            S >= 0,
+            #S >= 0,
             cp.diag(S) == 0,
             #cp.sum(S[:, 0]) == 1,
             S == S.T,
