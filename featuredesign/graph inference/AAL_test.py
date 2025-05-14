@@ -11,36 +11,52 @@ import nibabel as nib
 import scipy as sp
 import pandas as pd
 import re
-import Normalized_laplacian 
 import seaborn as sns
+import networkx.algorithms.community as nx_comm
+
 from scipy.stats import pearsonr
 from networkx.algorithms import community
 from sklearn.covariance import GraphicalLasso, LedoitWolf
 from sklearn.preprocessing import StandardScaler
-
 from sklearn.feature_selection import mutual_info_regression
+from Normalized_laplacian import learn_normalized_laplacian
 
-def graphing(A, super=False, feats=False, deg_trh=0):
+def graphing(A, super=False, feats=False, deg_trh=0, alpha=0e-0):
     """
     Function converting Adjacency matrix to a Graph
-    It has an input parameter 'super' to select supernodes
+
+    Parameters:
+    - It has an input parameter 'super' to select supernodes
+    - It has an input parameter 'feats' to compute features
+    - deg_thr = degree threshold, removes any nodes with a degree value less than this threshold
+    - alpha = sparsity factor, acts as a percentage from the maximum weight used for thresholding
+
     Note that A is a binary matrix and a type of shift operator(S)
     Therefore A can be modeled as some image data consisting of a pixel grid
     """
+
+    np.fill_diagonal(A, 0) # remove self-loops
     G = nx.from_numpy_array(A)
 
     # Extract edge weights and normalize for linewidth
     edges = G.edges()
     weights = [G[u][v]['weight'] for u, v in edges]
 
-    # Normalize weights to range [1, 5] for opacities
-    if len(weights) > 0:
-        min_w = min(weights)
-        max_w = max(weights)
-        if max_w != min_w:
-            opacities = [0.2 + 0.8 * (w - min_w) / (max_w - min_w) for w in weights]
+    # Filter weights to promote sparsity (=weight/edge removal)
+    filtered_data = [(u, v, G[u][v]['weight']) for u, v in edges if G[u][v]['weight'] >= alpha * max(weights)]
+    edges_filt = [(u, v) for u, v, w in filtered_data]  # Just the edges
+    weights_filt = [w for u, v, w in filtered_data]  # Just the weights
+
+    # Compute opacities (normalized weights)
+    if weights_filt:
+        min_w = min(weights_filt)
+        max_w = max(weights_filt)
+
+        # Handle case where all weights are equal
+        if max_w == min_w:
+            opacities = [0.5 for _ in weights_filt]  # Set uniform opacity
         else:
-            opacities = [0.6] * len(weights)  # All equal if no variation
+            opacities = [0.2 + 0.8 * (w - min_w) / (max_w - min_w) for w in weights_filt]
     else:
         opacities = []
 
@@ -89,13 +105,10 @@ def graphing(A, super=False, feats=False, deg_trh=0):
     # 6. Visualize the coarsened graph
     pos = nx.spring_layout(G, k=0.5, seed=42, iterations=50)
     plt.figure(figsize=(6, 6))
-    nx.draw(G, pos, labels=labels,
-                    with_labels=True,
-                    node_color='skyblue',
-                    node_size=300,
-                    font_weight='bold')
-    if edges:
-        nx.draw_networkx_edges(G, pos, edgelist=edges, alpha=opacities,)
+    nx.draw_networkx_nodes(G, pos, node_color='skyblue', node_size=100)
+    nx.draw_networkx_labels(G, pos, labels=labels, font_weight='bold')
+    if edges_filt:
+        nx.draw_networkx_edges(G, pos, edgelist=edges_filt, alpha=opacities,)
     plt.show()
 
     # 7. Compute Graph features
@@ -221,7 +234,7 @@ def mutual_info(data):
             mi_matrix[i, j] = mi_matrix[j, i] = mi
     return mi_matrix
 
-def plot_connectivity(W):
+def Adj_heatmap(W):
     plt.figure(figsize=(8, 6))
     sns.heatmap(W,
                 cmap='coolwarm',
@@ -251,8 +264,7 @@ def stat_feats(x, n_rois = 116):
             'SNR': np.average(np.divide(np.mean(x, axis=0), np.std(x, axis=0), where=np.std(x, axis=0) != 0, out=np.zeros_like(np.mean(x, axis=0))))
         }
         feature_list.append(features)
-    
-    Laplacian = learn_normalized_laplacian(X, epsilon=5e-1, alpha=0.1)
+
     # Convert to DataFrame
     df = pd.DataFrame(feature_list)
     df.insert(0, 'ROI', [f'ROI_{i + 1}' for i in range(len(df))])
@@ -273,8 +285,8 @@ def multiset_feats(data_list, filenames, output_dir="feature_outputs"):
             df_app = df  # First iteration: set df_app = df
         else:
             df_app = pd.concat([df_app, df], ignore_index=True)
-        print(df)
-        print(df_app)
+
+    print(df_app)
 
     df_app['subject_id'] = df_app.index // 116
     df_wide = df_app.pivot(index='subject_id', columns='ROI', values=['mean', 'std', 'SNR'])
@@ -300,11 +312,22 @@ def multiset_feats(data_list, filenames, output_dir="feature_outputs"):
     ordered_cols = subject_col + features_grouped
     df_wide = df_wide[ordered_cols]
 
-    return df_wide.head()
+    return df_wide
 
+#-------{Main for testing}-------#
 folder_path = r"C:\Users\Jochem\Documents\GitHub\AutismDetection\abide\female-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
 data_arrays, file_paths, metadata = load_files(folder_path)
 
 output = multiset_feats(data_arrays, file_paths)
 #stat_feats(data_arrays[0])
+#print(output)
+#print(data_arrays[0])
+#Laplacian = learn_normalized_laplacian(data_arrays[0], epsilon=5e-1, alpha=0.1)
+#print(Laplacian.shape)
+#S = mutual_info(data_arrays[2])
+#A, C = pearson_corr(data_arrays[2])
+#print(C)
+#Adj_heatmap(C)
+#graphing(Laplacian, alpha=0.1)
 print(output)
+print(len(data_arrays))
