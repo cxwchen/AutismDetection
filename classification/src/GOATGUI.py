@@ -126,7 +126,7 @@ def build_gui(root, filepath=None):
             filepath = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png")])
             if not filepath:
                 # Restore the export button
-                export_button.place(relx=1.0, rely=0.0, anchor="ne")
+                export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
                 expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)  # top-right, left of export
                 return  # user cancelled
         
@@ -139,7 +139,7 @@ def build_gui(root, filepath=None):
             img = ImageGrab.grab(bbox=(x, y, w, h))
             img.save(filepath)
             # Restore the export button
-            export_button.place(relx=1.0, rely=0.0, anchor="ne")
+            export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
             expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)  # top-right, left of export
             print(f"Saved to {filepath}")
 
