@@ -1,4 +1,4 @@
-# %%
+#%%
 import numpy as np
 import cvxpy as cp
 from numpy.linalg import eigh, norm
@@ -94,10 +94,10 @@ def refine_normalized_laplacian_with_spectrum(V_hat, epsilon=1e-1, alpha=0.01):
     constraints = [
         S >> 0,                                   # PSD
         cp.diag(S) == 1,                          # Diagonal = 1
-        off_diag_entries <= 0,                    # Off-diagonal ≤ 0
+        #off_diag_entries <= 0,                    # Off-diagonal ≤ 0
         off_diag_entries >= -1,                   # Off-diagonal ≥ -1
         cp.norm(S - S_prime, 'fro') <= epsilon,   # Spectral similarity
-        lambda_vec[0] == 0                        # λ₁(S') = 0, right eigenvector picked?
+        lambda_vec[0] == 0,                       # λ₁(S') = 0, right eigenvector picked?
     ]
 
     # Objective: sparsity in S
@@ -115,7 +115,7 @@ def learn_normalized_laplacian(X, epsilon=1e-1, alpha=0.1):
     print("Step 1: Covariance and Eigendecomposition")
     sample_cov, _ = compute_sample_covariance(X)
     eigvals, V_hat = eigh(sample_cov)
-    print(V_hat)
+#   print(V_hat)
     print("Step 2: Learning Laplacian")
     return refine_normalized_laplacian_with_spectrum(V_hat, epsilon, alpha)
 
@@ -149,17 +149,34 @@ def plot_graphs(S_true, S_learned):
 
 # --------- Main Pipeline ---------
 if __name__ == "__main__":
-    np.random.seed(0)
-    N = 10
-    P = 100000
+    N = 20
+    P_values = [100,200,300,400,500,600,700,800,900,1000]
+    
     graph_type = "star"  # Choose: "ring", "star", "community"
 
+    frob_errors = []
+    rel_errors = []
+    
     W = select_graph(graph_type, N)
     L_true = compute_normalized_laplacian(W)
-    X = simulate_diffused_graph_signals(L_true, P=P)
-    L_learned = learn_normalized_laplacian(X, epsilon=0.3, alpha=0.01)
+    for P in P_values:   
+        X = simulate_diffused_graph_signals(L_true, P=P)
+        L_learned = learn_normalized_laplacian(X, epsilon=0.1, alpha=0.01)
+        frob_error = norm(L_true - L_learned, 'fro')
+        rel_error = frob_error / norm(L_true, 'fro')
+        frob_errors.append(frob_error)
+        rel_errors.append(rel_error)        
+
 
     compare_graphs(L_true, L_learned)
     plot_graphs(L_true, L_learned)
-
+    plt.figure(figsize=(8, 5))
+    plt.plot(P_values, rel_errors, label="Relative Error", marker='s', color='red')
+    plt.xlabel("Number of Samples P")
+    plt.ylabel("Error")
+    plt.title("Convergence of Learned Laplacian to True Laplacian")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 # %%

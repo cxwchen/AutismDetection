@@ -72,52 +72,60 @@ def compute_sample_covariance(X):
     return sample_cov, X_centered
 
 # --------- Laplacian Learning ---------
-def refine_normalized_laplacian_with_spectrum(V_hat, epsilon=1e-1, alpha=0.01):
+def refine_normalized_laplacian_with_spectrum(V_hat, tau=1.0, delta=1e-6, epsilon=1e-1, max_iter=10):
     """
-    Learns a normalized Laplacian S such that:
-    - S is PSD, symmetric, with 1s on diagonal
-    - Off-diagonal entries in [-1, 0]
-    - S approximates spectral form S' = ∑ λ_k v_k v_kᵀ
-    - S' has smallest eigenvalue (λ₁) = 0, enforced via λ₀ = 0
+    Iteratively reweighted L1 minimization to learn sparse normalized Laplacian S
+    satisfying:
+    - PSD
+    - symmetric
+    - diag(S) = 1
+    - off-diagonal ∈ [-1, 0]
+    - λ₀ = 0 via λ_vec[0] = 0
     """
     N = V_hat.shape[0]
-    S = cp.Variable((N, N), symmetric=True)
-    lambda_vec = cp.Variable(N)
+    S_est = np.eye(N)
+    weights = np.ones((N, N))
+    off_diag_mask = np.ones((N, N)) - np.eye(N)
 
-    # S' = V Λ Vᵀ
-    S_prime = sum([lambda_vec[k] * np.outer(V_hat[:, k], V_hat[:, k]) for k in range(N)])
+    for p in range(max_iter):
+        S = cp.Variable((N, N), symmetric=True)
+        lambda_vec = cp.Variable(N)
+        S_prime = sum([lambda_vec[k] * np.outer(V_hat[:, k], V_hat[:, k]) for k in range(N)])
 
-    I = np.eye(N)
-    off_diag_mask = np.ones((N, N)) - I
-    off_diag_entries = cp.multiply(off_diag_mask, S)
+        off_diag_entries = cp.multiply(off_diag_mask, S)
 
-    constraints = [
-        S >> 0,                                   # PSD
-        cp.diag(S) == 1,                          # Diagonal = 1
-        off_diag_entries <= 0,                    # Off-diagonal ≤ 0
-        off_diag_entries >= -1,                   # Off-diagonal ≥ -1
-        cp.norm(S - S_prime, 'fro') <= epsilon,   # Spectral similarity
-        lambda_vec[0] == 0                        # λ₁(S') = 0, right eigenvector picked?
-    ]
+        constraints = [
+            S >> 0,                                 # PSD
+            cp.diag(S) == 1,                        # Diagonal = 1
+            #off_diag_entries <= 0,
+            off_diag_entries >= -1,
+            cp.norm(S - S_prime, 'fro') <= epsilon, # spectral similarity
+            lambda_vec[0] == 0,                     # enforce λ₀ = 0
+        ]
 
-    # Objective: sparsity in S
-    objective = cp.Minimize(alpha * cp.norm(S, 1))
+        # Weighted L1 on off-diagonals
+        objective = cp.Minimize(cp.sum(cp.multiply(weights, cp.abs(S))))
+        problem = cp.Problem(objective, constraints)
+        problem.solve(solver=cp.SCS)
 
-    problem = cp.Problem(objective, constraints)
-    problem.solve(solver=cp.SCS)
+        if S.value is None:
+            print(f"Iteration {p}: optimization failed.")
+            break
 
-    print("Step 2 Optimization Status:", problem.status)
-    return S.value
+        S_est = S.value
+        weights = tau / (np.abs(S_est) + delta)
 
+        nnz = (np.abs(S_est[off_diag_mask == 1]) > 1e-3).sum()
+        print(f"Iter {p+1:>2}: status = {problem.status}, nonzeros (off-diagonal): {nnz}")
 
+    return S_est
 
-def learn_normalized_laplacian(X, epsilon=1e-1, alpha=0.1):
+def learn_normalized_laplacian(X, tau=1.0, delta=1e-6, epsilon=1e-1, max_iter=10):
     print("Step 1: Covariance and Eigendecomposition")
     sample_cov, _ = compute_sample_covariance(X)
     eigvals, V_hat = eigh(sample_cov)
-    print(V_hat)
     print("Step 2: Learning Laplacian")
-    return refine_normalized_laplacian_with_spectrum(V_hat, epsilon, alpha)
+    return refine_normalized_laplacian_with_spectrum(V_hat, tau, delta, epsilon, max_iter)
 
 # --------- Evaluation ---------
 def compare_graphs(S_true, S_learned):
@@ -152,12 +160,12 @@ if __name__ == "__main__":
     np.random.seed(0)
     N = 10
     P = 1000
-    graph_type = "community"  # Choose: "ring", "star", "community"
+    graph_type = "ring"  # Choose: "ring", "star", "community"
 
     W = select_graph(graph_type, N)
     L_true = compute_normalized_laplacian(W)
     X = simulate_diffused_graph_signals(L_true, P=P)
-    L_learned = learn_normalized_laplacian(X, epsilon=0.1, alpha=0.01)
+    L_learned = learn_normalized_laplacian(X, tau=1.0, delta=1e-6, epsilon=2e-1, max_iter=10)
 
     compare_graphs(L_true, L_learned)
     plot_graphs(L_true, L_learned)
