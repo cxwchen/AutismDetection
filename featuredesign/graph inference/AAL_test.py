@@ -11,7 +11,7 @@ import nibabel as nib
 import scipy as sp
 import pandas as pd
 import re
-import Normalized_laplacian 
+from Normalized_laplacian import learn_normalized_laplacian
 import seaborn as sns
 from scipy.stats import pearsonr
 from networkx.algorithms import community
@@ -251,8 +251,7 @@ def stat_feats(x, n_rois = 116):
             'SNR': np.average(np.divide(np.mean(x, axis=0), np.std(x, axis=0), where=np.std(x, axis=0) != 0, out=np.zeros_like(np.mean(x, axis=0))))
         }
         feature_list.append(features)
-    
-    Laplacian = learn_normalized_laplacian(X, epsilon=5e-1, alpha=0.1)
+
     # Convert to DataFrame
     df = pd.DataFrame(feature_list)
     df.insert(0, 'ROI', [f'ROI_{i + 1}' for i in range(len(df))])
@@ -305,6 +304,9 @@ def multiset_feats(data_list, filenames, output_dir="feature_outputs"):
 folder_path = r"C:\Users\Jochem\Documents\GitHub\AutismDetection\abide\female-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
 data_arrays, file_paths, metadata = load_files(folder_path)
 
-output = multiset_feats(data_arrays, file_paths)
+#output = multiset_feats(data_arrays, file_paths)
 #stat_feats(data_arrays[0])
-print(output)
+
+Laplacian = learn_normalized_laplacian(data_arrays[0], epsilon=1, alpha=0.1)
+print(Laplacian)
+graphing(Laplacian, feats=True)
