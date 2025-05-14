@@ -125,7 +125,7 @@ def build_gui(root, filepath=None):
             filepath = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png")])
             if not filepath:
                 # Restore the export button
-                export_button.place(relx=1.0, rely=0.0, anchor="ne")
+                export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
                 expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)  # top-right, left of export
                 return  # user cancelled
         
@@ -138,7 +138,7 @@ def build_gui(root, filepath=None):
             img = ImageGrab.grab(bbox=(x, y, w, h))
             img.save(filepath)
             # Restore the export button
-            export_button.place(relx=1.0, rely=0.0, anchor="ne")
+            export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
             expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)  # top-right, left of export
             print(f"Saved to {filepath}")
 
@@ -397,12 +397,6 @@ def open_new_window():
     build_gui(new_win, filepath)
 
 def expand_overview():
-    def set_min_height_relative_to_right():
-        right.update_idletasks()  # Ensure layout is measured
-        total_height = right.winfo_height()
-        third_height = (total_height * 3) // 7
-        right.grid_rowconfigure(0, weight=0, minsize=third_height)
-        return third_height
     
     expand_win = tk.Toplevel()
     expand_win.title(f"Overview – {filepath.split('/')[-1]}")
@@ -412,21 +406,65 @@ def expand_overview():
     # Optional: full screen
     # expand_win.attributes("-fullscreen", True)
 
-    size = set_min_height_relative_to_right() * 2  # double size
+    # Get the screen width and height
+    screen_width = expand_win.winfo_screenwidth()
+    screen_height = expand_win.winfo_screenheight()
+    width = int(screen_width * 0.7)
+    height = int(screen_height * 0.7)
+
+    # Center the window on the screen
+    x = (screen_width - width) // 2
+    y = (screen_height - height) // 2
+
+    # Apply the geometry
+    expand_win.geometry(f'{width}x{height}+{x}+{y}')
 
     # Load image again, larger
-    img = Image.open("Brain_background.png").resize((size, size))
-    big_photo = ImageTk.PhotoImage(img)
+    def load_default_image():
+        def export_overview_to_png():
+            expand_button.place_forget()
+            export_button.place_forget()
+            expand_win.update_idletasks()
+            path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png")])
+            if not path:
+                export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
+                expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)
+                return
+            x = expand_win.winfo_rootx()
+            y = expand_win.winfo_rooty()
+            w = x + expand_win.winfo_width()
+            h = y + expand_win.winfo_height()
+            img = ImageGrab.grab(bbox=(x, y, w, h))
+            img.save(path)
+            export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
+            expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)
+            print(f"Saved to {path}")
+    
+        canvas = tk.Canvas(expand_win, bg="#030e3a", highlightthickness=0)
+        canvas.pack(expand=True, fill="both")
+    
+        # Get height of window (after rendering)
+        expand_win.update_idletasks()
+        canvas_height = expand_win.winfo_height()
+    
+        # Resize image to square based on window height
+        img = Image.open("Brain_background.png").resize((canvas_height, canvas_height))
+        photo = ImageTk.PhotoImage(img)
+    
+        canvas.create_image(canvas.winfo_width() // 2, 0, anchor="n", image=photo)
+        canvas.image = photo  # prevent garbage collection
+    
+        canvas.create_text(10, canvas_height - 10, anchor="sw",
+                           text=f"Target:\n{subjects_set}\n{classifiers_set}\n{features_set}\n{dataset_fit}",
+                           fill="white", font=("Arial", 11, "italic"))
+    
+        global export_button, expand_button
+        export_button = tk.Button(expand_win, text="  ⤓  ", command=export_overview_to_png)
+        export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
+        expand_button = tk.Button(expand_win, text=" ⛶ ", command=expand_overview)
+        expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)
 
-    canvas = tk.Canvas(expand_win, bg="#030e3a", highlightthickness=0)
-    canvas.pack(expand=True, fill="both")
-
-    canvas.create_image(canvas.winfo_reqwidth() // 2, 0, anchor="n", image=big_photo)
-    canvas.image = big_photo  # keep reference
-
-    canvas.create_text(10, size - 10, anchor="sw",
-                       text=f"Target:\n{subjects_set}\n{classifiers_set}\n{features_set}\n{dataset_fit}",
-                       fill="white", font=("Arial", 11, "italic"))
+    root.after(100, load_default_image)
 
 
 # Start Calling the system
