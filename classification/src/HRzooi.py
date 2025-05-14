@@ -54,7 +54,13 @@ root.grid_columnconfigure(0, weight=1)
 root.grid_columnconfigure(1, weight=1)
 
 # Add toolbar buttons
-btn_open = tk.Button(toolbar, text="Open")
+def open_new_window():
+    new_win = tk.Toplevel(root)
+    new_win.title("NASDA - Clone")
+    new_win.geometry("800x600")
+    build_gui(new_win) 
+
+btn_open = tk.Button(toolbar, text="Open", command=open_new_window)
 btn_save = tk.Button(toolbar, text="Save")
 stats = "stats"; steps = 11; acuracy = 76.4; stat2 = 2; stat3 = 3;  # default values for demonstration
 
@@ -174,7 +180,7 @@ dataset_tab = tk.Frame(tabs, bg="lightcyan")
 
 tabs.add(command_tab, text="COMMAND")
 tabs.add(logs_tab, text="LOGS")
-tabs.add(dataset_tab, text="DATA SET")
+tabs.add(dataset_tab, text="FIT")
 
 # Example content in tabs
 tk.Text(logs_tab).pack(expand=True, fill="both")
