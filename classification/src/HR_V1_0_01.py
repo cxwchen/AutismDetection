@@ -119,12 +119,14 @@ def build_gui(root, filepath=None):
     def load_default_image():
         def export_overview_to_png():
             # Temporarily hide the export button BEFORE the file dialog opens
+            expand_button.place_forget()
             export_button.place_forget()
             root.update_idletasks()
             filepath = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png")])
             if not filepath:
                 # Restore the export button
                 export_button.place(relx=1.0, rely=0.0, anchor="ne")
+                expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)  # top-right, left of export
                 return  # user cancelled
         
             root.update_idletasks()
@@ -137,6 +139,7 @@ def build_gui(root, filepath=None):
             img.save(filepath)
             # Restore the export button
             export_button.place(relx=1.0, rely=0.0, anchor="ne")
+            expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)  # top-right, left of export
             print(f"Saved to {filepath}")
 
         canvas = tk.Canvas(overview_frame, bg="#030e3a", highlightthickness=0)
@@ -155,6 +158,8 @@ def build_gui(root, filepath=None):
         
         export_button = tk.Button(overview_frame, text="  ⤓  ", command=export_overview_to_png)
         export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)  # Top-right with slight padding
+        expand_button = tk.Button(overview_frame, text=" ⛶ ", command=expand_overview)
+        expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)  # top-right, left of export
 
     root.after(100, load_default_image)
 
@@ -361,6 +366,7 @@ def build_gui(root, filepath=None):
     globals()["run"] = run
     globals()["log"] = log
     globals()["help"] = help
+    globals()["right"] = right
 
 def open_new_window():
     filepath = filedialog.askopenfilename(
@@ -390,6 +396,37 @@ def open_new_window():
     new_win.iconbitmap("logo.ico")
     build_gui(new_win, filepath)
 
+def expand_overview():
+    def set_min_height_relative_to_right():
+        right.update_idletasks()  # Ensure layout is measured
+        total_height = right.winfo_height()
+        third_height = (total_height * 3) // 7
+        right.grid_rowconfigure(0, weight=0, minsize=third_height)
+        return third_height
+    
+    expand_win = tk.Toplevel()
+    expand_win.title(f"Overview – {filepath.split('/')[-1]}")
+    expand_win.configure(bg="#030e3a")
+    expand_win.iconbitmap("logo.ico")
+
+    # Optional: full screen
+    # expand_win.attributes("-fullscreen", True)
+
+    size = set_min_height_relative_to_right() * 2  # double size
+
+    # Load image again, larger
+    img = Image.open("Brain_background.png").resize((size, size))
+    big_photo = ImageTk.PhotoImage(img)
+
+    canvas = tk.Canvas(expand_win, bg="#030e3a", highlightthickness=0)
+    canvas.pack(expand=True, fill="both")
+
+    canvas.create_image(canvas.winfo_reqwidth() // 2, 0, anchor="n", image=big_photo)
+    canvas.image = big_photo  # keep reference
+
+    canvas.create_text(10, size - 10, anchor="sw",
+                       text=f"Target:\n{subjects_set}\n{classifiers_set}\n{features_set}\n{dataset_fit}",
+                       fill="white", font=("Arial", 11, "italic"))
 
 
 # Start Calling the system
