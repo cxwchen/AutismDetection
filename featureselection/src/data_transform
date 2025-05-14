@@ -1,0 +1,33 @@
+import pandas as pd
+import re
+
+# Load and pivot as before
+df = pd.read_csv("aal_feats.csv")
+df['subject_id'] = df.index // 116
+df_wide = df.pivot(index='subject_id', columns='ROI', values=['mean', 'std', 'SNR'])
+
+# Flatten column names
+df_wide.columns = [f"{stat}_{roi}" for stat, roi in df_wide.columns]
+df_wide = df_wide.reset_index()
+
+# Function to extract ROI number for sorting
+def extract_roi_num(col):
+    match = re.search(r'_(\d+)$', col)
+    return int(match.group(1)) if match else -1
+
+# Sort columns: keep subject_id first, then group by ROI
+cols = df_wide.columns.tolist()
+subject_col = ['subject_id']
+feature_cols = [col for col in cols if col != 'subject_id']
+
+# Group by ROI number
+features_grouped = sorted(feature_cols, key=lambda x: (extract_roi_num(x), x.split('_')[0]))
+
+# Reorder columns
+ordered_cols = subject_col + features_grouped
+df_wide = df_wide[ordered_cols]
+
+# View the result
+print(df_wide.head())
+# Optionally save
+df_wide.to_csv("cleaned_data.csv", index=False)
