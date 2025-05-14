@@ -322,6 +322,9 @@ def build_gui(root, filepath=None):
 
     classifier_var = tk.StringVar(value="SVM")  # Default selection
 
+    # tk.Label(classifier_frame, text="Please choose a classifier:", bg="lavender",
+    #         font=("Segoe UI", 9, "italic")).pack(anchor="w", padx=10, pady=(5, 2))
+
     for clf in classifier_functions.keys():
         tk.Radiobutton(classifier_frame, text=clf, variable=classifier_var, value=clf,
                         bg="lavender", anchor="w", font=("Segoe UI", 9), selectcolor="lightblue").pack(anchor="w", padx=10, pady=2)
@@ -339,6 +342,9 @@ def build_gui(root, filepath=None):
             log(f"Ran {selected}")
         else:
             log("Please select a classifier", tag="stderr")
+
+    # voor fitten: either hele abide gebruiken om te trainen en dan test op eigen ingevoerde set. 
+    # OF als je alleen abide hebt dan doet hij een train-test split op abide
 
     # message = tk.Label(root, text="Hello, World!")
     # message.pack()
