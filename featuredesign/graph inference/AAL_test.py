@@ -10,6 +10,7 @@ import glob
 import nibabel as nib
 import scipy as sp
 import pandas as pd
+import re
 
 import seaborn as sns
 from scipy.stats import pearsonr
@@ -241,40 +242,67 @@ def stat_feats(x, n_rois = 116):
     if x.shape[0] > x.shape[1]:
         x = x.T
 
-    print(f"Shape used for feature extraction: {x.shape}")
-
     # Extract features for each time series
     feature_list = []
     for ts in x:
         features = {
             'mean': np.mean(ts),
             'std': np.std(ts),
-            'SNR': np.divide(np.mean(x, axis=0), np.std(x, axis=0), where=np.std(x, axis=0) != 0, out=np.zeros_like(np.mean(x, axis=0)))
+            'SNR': np.average(np.divide(np.mean(x, axis=0), np.std(x, axis=0), where=np.std(x, axis=0) != 0, out=np.zeros_like(np.mean(x, axis=0))))
         }
         feature_list.append(features)
-
     # Convert to DataFrame
     df = pd.DataFrame(feature_list)
     df.insert(0, 'ROI', [f'ROI_{i + 1}' for i in range(len(df))])
-    df.to_csv('aal_feats.csv', index=False)
+    #df.to_csv('aal_feats.csv', index=False)
+    #print(df)
     return df
 
 def multiset_feats(data_list, filenames, output_dir="feature_outputs"):
     os.makedirs(output_dir, exist_ok=True)
+    df_app = pd.DataFrame(columns=stat_feats(data_list[0]).columns) # Initialize dataframe
 
     for data, path in zip(data_list, filenames):
         if data is None:
             continue  # Skip if loading failed
 
         df = stat_feats(data)
+        if df_app.empty:
+            df_app = df  # First iteration: set df_app = df
+        else:
+            df_app = pd.concat([df_app, df], ignore_index=True)
+        print(df)
+        print(df_app)
 
-        # Use base filename without extension
-        base_name = os.path.splitext(os.path.basename(path))[0]
-        save_path = os.path.join(output_dir, f"{base_name}_features.csv")
-        df.to_csv(save_path, index=False)
-        print(f"Saved: {save_path}")
+    df_app['subject_id'] = df_app.index // 116
+    df_wide = df_app.pivot(index='subject_id', columns='ROI', values=['mean', 'std', 'SNR'])
+
+    # Flatten column names
+    df_wide.columns = [f"{stat}_{roi}" for stat, roi in df_wide.columns]
+    df_wide = df_wide.reset_index()
+
+    # Function to extract ROI number for sorting
+    def extract_roi_num(col):
+        match = re.search(r'_(\d+)$', col)
+        return int(match.group(1)) if match else -1
+
+    # Sort columns: keep subject_id first, then group by ROI
+    cols = df_wide.columns.tolist()
+    subject_col = ['subject_id']
+    feature_cols = [col for col in cols if col != 'subject_id']
+
+    # Group by ROI number
+    features_grouped = sorted(feature_cols, key=lambda x: (extract_roi_num(x), x.split('_')[0]))
+
+    # Reorder columns
+    ordered_cols = subject_col + features_grouped
+    df_wide = df_wide[ordered_cols]
+
+    return df_wide.head()
 
 folder_path = r"C:\Users\Jochem\Documents\GitHub\AutismDetection\abide\female-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
 data_arrays, file_paths, metadata = load_files(folder_path)
 
-multiset_feats(data_arrays, file_paths)
+output = multiset_feats(data_arrays, file_paths)
+#stat_feats(data_arrays[0])
+print(output)
