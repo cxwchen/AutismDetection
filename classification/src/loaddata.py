@@ -19,33 +19,33 @@ AAL_test = importlib.import_module('AAL_test')
 
 print("Loading Jochems functions successfully!")
 
-def load_data():
-    load_dotenv()
-    male_path = os.getenv('ABIDE_MALE_PATH')
-    female_path = os.getenv('ABIDE_FEMALE_PATH')
+def load_data(filepath):
+    data_arrays, file_paths, subject_ids, metadata = AAL_test.load_files(filepath)
+    df = AAL_test.multiset_feats(data_arrays[:5], file_paths, subject_ids) #currently 5 for testing purposes
+    return df
 
-    if not male_path or not female_path:
-        raise EnvironmentError(
-            "Please set ABIDE_MALE_PATH and ABIDE_FEMALE_PATH environment variables!"
-        )
-
-    print("Male data path:", male_path)
-    print("Female data path:", female_path)
-
-    mdata_arrays, mfile_paths, mmetadata = AAL_test.load_files(male_path)
-    fdata_arrays, ffile_paths, fmetadata = AAL_test.load_files(female_path)
-
-    # only 50 of each for testing purposes
-    male_df = AAL_test.multiset_feats(mdata_arrays[:50], mfile_paths, output_dir="feature_outputs_male")
-    female_df = AAL_test.multiset_feats(fdata_arrays[:50], ffile_paths, output_dir="feature_outputs_female")
-
-    return male_df, female_df, mfile_paths, ffile_paths
-
-def add_phenotypic_info(male_df, female_df, mfile_paths, ffile_paths):
+def add_phenotypic_info(df):
     load_dotenv()
     pheno_path = os.getenv('ABIDE_PHENOTYPIC_PATH')
+    df_labels = pd.read_csv(pheno_path)
 
-    return male_df, female_df
+    # Convert SUB_ID to match subject_id format
+    df_labels['SUB_ID'] = df_labels['SUB_ID'].astype(str).str.zfill(7)
+    df['subject_id'] = df['subject_id'].astype(str).str.zfill(7)
+
+    # Select desired phenotypic columns
+    df_pheno = df_labels[['SUB_ID', 'DX_GROUP', 'SEX']]
+
+    # Merge and drop SUB_ID
+    df_merged = df.merge(df_pheno, left_on='subject_id', right_on='SUB_ID', how='left')
+    df_merged.drop(columns='SUB_ID', inplace=True)
+
+    # Reorder phenotypic columns
+    phenotype_cols = ['DX_GROUP', 'SEX']
+    cols = phenotype_cols + [col for col in df_merged.columns if col not in phenotype_cols]
+    df_merged = df_merged[cols]
+
+    return df_merged
 
 def performsplit(features, y): #perform train test split for model evaluation
     Xtrain, Xtest, ytrain, ytest = train_test_split(features, y, test_size=0.3,shuffle=True, random_state=42)
@@ -60,9 +60,16 @@ def normalizer(feat_train, feat_test):
 
 
 # testing the functions, remove later
-male_df, female_df, mpaths, fpaths = load_data()
-male_df, female_df = add_phenotypic_info(male_df, female_df, mpaths, fpaths)
+load_dotenv()
+male_path = os.getenv('ABIDE_MALE_PATH')
+female_path = os.getenv('ABIDE_FEMALE_PATH')
 
-male_df.head(10)
+if not male_path or not female_path:
+    raise EnvironmentError(
+        "Please set ABIDE_MALE_PATH and ABIDE_FEMALE_PATH environment variables!"
+    )
 
-female_df.head(10)
+# print("Male data path:", male_path)
+# print("Female data path:", female_path)
+female_df = load_data(female_path)
+female_df_merged = add_phenotypic_info(female_df)
