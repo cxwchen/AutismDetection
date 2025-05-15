@@ -59,9 +59,9 @@ def applyLogR(feat_train, y):
 
     Parameters
     ----------
-    feat_train : 
+    feat_train : array-like
         The training features
-    y : 
+    y : array-like
         The true labels
     
     Returns
@@ -84,9 +84,9 @@ def applyRandForest(feat_train, y):
 
     Parameters
     ----------
-    feat_train : 
+    feat_train : array-like
         The training features
-    y : 
+    y : array-like
         The true labels
     
     Returns
@@ -108,9 +108,9 @@ def applyDT(feat_train, y):
 
     Parameters
     ----------
-    feat_train : 
+    feat_train : array-like
         The training features
-    y : 
+    y : array-like
         The true labels
     
     Returns
@@ -133,9 +133,9 @@ def applyMLP(feat_train, y):
 
     Parameters
     ----------
-    feat_train : 
+    feat_train : array-like
         The training features
-    y : 
+    y : array-like
         The true labels
     
     Returns
@@ -149,17 +149,19 @@ def applyMLP(feat_train, y):
     model.fit(feat_train, y)
     return model
 
-def applyClusWiSARD(feat_train, y):
+def applyClusWiSARD(feat_train, y, minScore):
     """
     -----------------------------------------------------------------------------------------
-    This function applies ClusWiSARD on the training features
+    This function applies ClusWiSARD on the training features. 
     -----------------------------------------------------------------------------------------
+
+    To perform ClusWiSARD the features first need to be binarized
 
     Parameters
     ----------
-    feat_train : 
+    feat_train : array-like
         The training features
-    y : 
+    y : array-like
         The true labels
     
     Returns
@@ -168,9 +170,18 @@ def applyClusWiSARD(feat_train, y):
         The trained MLP model
     
     """
-    input_size = len(feat_train[0]) ## feat_train should just have one sample but we don't know the format of our input yet
+    if not isinstance(feat_train, np.ndarray):
+        feat_train = np.array(feat_train)
+
+    
+    # ClusWiSARD expects binary input
+    medians = np.median(feat_train, axis=0)
+    binarized_feat = (feat_train > medians).astype(int)
+
+    input_size = binarized_feat.shape[1]
     addressSize = max(1, input_size // 64)
-    model = ClusWisard(addressSize, minScore=..., discriminatorLimit=4) #minScore will be added after hyperparameter tuning
+
+    model = ClusWisard(addressSize, minScore=minScore, discriminatorLimit=4) #minScore will be added after hyperparameter tuning
     model.fit(feat_train, y)
     return model
 
