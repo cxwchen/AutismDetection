@@ -216,6 +216,7 @@ def load_files(folder_path):
     file_list = sorted(glob.glob(os.path.join(folder_path, '*.1D')))
 
     all_data = []
+    subject_ids = []
     file_info = {
         'total_files': len(file_list),
         'timepoints_per_file': [],
@@ -226,20 +227,23 @@ def load_files(folder_path):
         try:
             # Load all columns from the file
             data = np.loadtxt(file_path)
-
             all_data.append(data)
+            filename = os.path.basename(file_path)
 
+            # Store subject IDs
+            subject_id = '005' + filename.split('_005')[1].split('_')[0]
+            subject_ids.append(subject_id)
             # Store metadata
             file_info['timepoints_per_file'].append(data.shape[0])
             file_info['series_per_file'].append(data.shape[1])
 
-            print(f"Loaded {os.path.basename(file_path)}: {data.shape[0]} timepoints × {data.shape[1]} series")
+            print(f"Loaded {filename}: {data.shape[0]} timepoints × {data.shape[1]} series")
 
         except Exception as e:
             print(f"Error loading {file_path}: {str(e)}")
             all_data.append(None)
 
-    return all_data, file_list, file_info
+    return all_data, file_list, subject_ids, file_info
 
 
 def pearson_corr(time_series_data, threshold=0.5, absolute_value=True):
@@ -357,8 +361,9 @@ def multiset_feats(data_list, filenames, output_dir="feature_outputs"):
     """
     os.makedirs(output_dir, exist_ok=True)
     df_app = pd.DataFrame(columns=stat_feats(data_list[0]).columns) # Initialize dataframe
+    expanded_ids = []
 
-    for data, path in zip(data_list, filenames):
+    for data, sid in zip(data_list, subject_ids):
         if data is None:
             continue  # Skip if loading failed
 
@@ -370,10 +375,14 @@ def multiset_feats(data_list, filenames, output_dir="feature_outputs"):
         else:
             df_app = pd.concat([df_app, df_conc], ignore_index=True)
 
-    print("The appended dataframe:\n", df_app) # Appended dataframe for all inviduals in the dataset
+        expanded_ids.extend([sid] * 116) # Pad subject IDs with copies for all ROIs
 
-    df_app['subject_id'] = df_app.index // 116
-    df_wide = df_app.pivot(index='subject_id', columns='ROI', values=df_app.columns.difference(['ROI', 'subject_id'])) # Automatically pivots all feature columns
+    print("The appended dataframe:\n", df_app) # Appended dataframe for all inviduals in the dataset
+    # Assign to dataframe
+    df_app['subject_id'] = expanded_ids
+
+    # Automatically pivots all feature columns
+    df_wide = df_app.pivot(index='subject_id', columns='ROI', values=df_app.columns.difference(['ROI', 'subject_id']))
 
     # Flatten column names
     df_wide.columns = [f"{stat}_{roi}" for stat, roi in df_wide.columns]
@@ -398,11 +407,39 @@ def multiset_feats(data_list, filenames, output_dir="feature_outputs"):
 
     return df_wide
 
+def multiset_pheno(df_wide):
+    """
+    Function that loads phenotypic data and merges it into the input dataframe.
+
+    - DX_GROUP: 1=Allistic,2=ASD
+    - SEX: 1=Male,2=Female
+
+    """
+    df_labels = pd.read_csv(r"C:\Users\Jochem\Documents\GitHub\AutismDetection\abide\Phenotypic_V1_0b_preprocessed1.csv")
+
+    # Convert SUB_ID to match subject_id format
+    df_labels['SUB_ID'] = df_labels['SUB_ID'].astype(str).str.zfill(7)
+    df_wide['subject_id'] = df_wide['subject_id'].astype(str).str.zfill(7)
+
+    # Select desired phenotypic columns
+    df_pheno = df_labels[['SUB_ID', 'DX_GROUP', 'SEX']]
+
+    # Merge and drop SUB_ID
+    df_merged = df_wide.merge(df_pheno, left_on='subject_id', right_on='SUB_ID', how='left')
+    df_merged.drop(columns='SUB_ID', inplace=True)
+
+    # Reorder phenotypic columns
+    phenotype_cols = ['DX_GROUP', 'SEX']
+    cols = phenotype_cols + [col for col in df_merged.columns if col not in phenotype_cols]
+    df_merged = df_merged[cols]
+
+    return df_merged
+
 
 
 #-------{Main for testing}-------#
 folder_path = r"C:\Users\Jochem\Documents\GitHub\AutismDetection\abide\female-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
-data_arrays, file_paths, metadata = load_files(folder_path)
+data_arrays, file_paths, subject_ids, metadata = load_files(folder_path)
 
 #stat_feats(data_arrays[0])
 #print(output)
@@ -418,3 +455,8 @@ data_arrays, file_paths, metadata = load_files(folder_path)
 output = multiset_feats(data_arrays[:5], file_paths)
 print(output)
 print(len(data_arrays))
+
+print("subject ids: ", subject_ids)
+
+output = multiset_pheno(output)
+print("Output data:\n", output)
