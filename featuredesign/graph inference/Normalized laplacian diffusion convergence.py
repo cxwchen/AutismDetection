@@ -1,4 +1,4 @@
-# %%
+#%%
 import numpy as np
 import cvxpy as cp
 from numpy.linalg import eigh, norm
@@ -72,60 +72,52 @@ def compute_sample_covariance(X):
     return sample_cov, X_centered
 
 # --------- Laplacian Learning ---------
-def refine_normalized_laplacian_with_spectrum(V_hat, tau=1.0, delta=1e-6, epsilon=1e-1, max_iter=10):
+def refine_normalized_laplacian_with_spectrum(V_hat, epsilon=1e-1, alpha=0.01):
     """
-    Iteratively reweighted L1 minimization to learn sparse normalized Laplacian S
-    satisfying:
-    - PSD
-    - symmetric
-    - diag(S) = 1
-    - off-diagonal ∈ [-1, 0]
-    - λ₀ = 0 via λ_vec[0] = 0
+    Learns a normalized Laplacian S such that:
+    - S is PSD, symmetric, with 1s on diagonal
+    - Off-diagonal entries in [-1, 0]
+    - S approximates spectral form S' = ∑ λ_k v_k v_kᵀ
+    - S' has smallest eigenvalue (λ₁) = 0, enforced via λ₀ = 0
     """
     N = V_hat.shape[0]
-    S_est = np.eye(N)
-    weights = np.ones((N, N))
-    off_diag_mask = np.ones((N, N)) - np.eye(N)
+    S = cp.Variable((N, N), symmetric=True)
+    lambda_vec = cp.Variable(N)
 
-    for p in range(max_iter):
-        S = cp.Variable((N, N), symmetric=True)
-        lambda_vec = cp.Variable(N)
-        S_prime = sum([lambda_vec[k] * np.outer(V_hat[:, k], V_hat[:, k]) for k in range(N)])
+    # S' = V Λ Vᵀ
+    S_prime = sum([lambda_vec[k] * np.outer(V_hat[:, k], V_hat[:, k]) for k in range(N)])
 
-        off_diag_entries = cp.multiply(off_diag_mask, S)
+    I = np.eye(N)
+    off_diag_mask = np.ones((N, N)) - I
+    off_diag_entries = cp.multiply(off_diag_mask, S)
 
-        constraints = [
-            S >> 0,                                 # PSD
-            cp.diag(S) == 1,                        # Diagonal = 1
-            #off_diag_entries <= 0,
-            off_diag_entries >= -1,
-            cp.norm(S - S_prime, 'fro') <= epsilon, # spectral similarity
-            lambda_vec[0] == 0,                     # enforce λ₀ = 0
-        ]
+    constraints = [
+        S >> 0,                                   # PSD
+        cp.diag(S) == 1,                          # Diagonal = 1
+        #off_diag_entries <= 0,                    # Off-diagonal ≤ 0
+        off_diag_entries >= -1,                   # Off-diagonal ≥ -1
+        cp.norm(S - S_prime, 'fro') <= epsilon,   # Spectral similarity
+        lambda_vec[0] == 0,                       # λ₁(S') = 0, right eigenvector picked?
+    ]
 
-        # Weighted L1 on off-diagonals
-        objective = cp.Minimize(cp.sum(cp.multiply(weights, cp.abs(S))))
-        problem = cp.Problem(objective, constraints)
-        problem.solve(solver=cp.SCS)
+    # Objective: sparsity in S
+    objective = cp.Minimize(alpha * cp.norm(S, 1))
 
-        if S.value is None:
-            print(f"Iteration {p}: optimization failed.")
-            break
+    problem = cp.Problem(objective, constraints)
+    problem.solve(solver=cp.SCS)
 
-        S_est = S.value
-        weights = tau / (np.abs(S_est) + delta)
+    print("Step 2 Optimization Status:", problem.status)
+    return S.value
 
-        nnz = (np.abs(S_est[off_diag_mask == 1]) > 1e-3).sum()
-        print(f"Iter {p+1:>2}: status = {problem.status}, nonzeros (off-diagonal): {nnz}")
 
-    return S_est
 
-def learn_normalized_laplacian(X, tau=1.0, delta=1e-6, epsilon=1e-1, max_iter=10):
+def learn_normalized_laplacian(X, epsilon=1e-1, alpha=0.1):
     print("Step 1: Covariance and Eigendecomposition")
     sample_cov, _ = compute_sample_covariance(X)
     eigvals, V_hat = eigh(sample_cov)
+#   print(V_hat)
     print("Step 2: Learning Laplacian")
-    return refine_normalized_laplacian_with_spectrum(V_hat, tau, delta, epsilon, max_iter)
+    return refine_normalized_laplacian_with_spectrum(V_hat, epsilon, alpha)
 
 # --------- Evaluation ---------
 def compare_graphs(S_true, S_learned):
@@ -157,17 +149,34 @@ def plot_graphs(S_true, S_learned):
 
 # --------- Main Pipeline ---------
 if __name__ == "__main__":
-    np.random.seed(0)
-    N = 10
-    P = 1000
-    graph_type = "ring"  # Choose: "ring", "star", "community"
+    N = 20
+    P_values = [100,200,300,400,500,600,700,800,900,1000,10000]
+    
+    graph_type = "community"  # Choose: "ring", "star", "community"
 
+    frob_errors = []
+    rel_errors = []
+    
     W = select_graph(graph_type, N)
     L_true = compute_normalized_laplacian(W)
-    X = simulate_diffused_graph_signals(L_true, P=P)
-    L_learned = learn_normalized_laplacian(X, tau=1.0, delta=1e-6, epsilon=2e-1, max_iter=10)
+    for P in P_values:   
+        X = simulate_diffused_graph_signals(L_true, P=P)
+        L_learned = learn_normalized_laplacian(X, epsilon=0.3, alpha=0.01)
+        frob_error = norm(L_true - L_learned, 'fro')
+        rel_error = frob_error / norm(L_true, 'fro')
+        frob_errors.append(frob_error)
+        rel_errors.append(rel_error)        
+
 
     compare_graphs(L_true, L_learned)
     plot_graphs(L_true, L_learned)
-
+    plt.figure(figsize=(8, 5))
+    plt.plot(P_values, rel_errors, label="Relative Error", marker='s', color='red')
+    plt.xlabel("Number of Samples P")
+    plt.ylabel("Error")
+    plt.title("Convergence of Learned Laplacian to True Laplacian")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 # %%
