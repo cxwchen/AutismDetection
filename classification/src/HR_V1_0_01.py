@@ -578,3 +578,37 @@ if __name__ == "__main__":
     # Start the update loop
     root.mainloop()
     
+def start():
+    root = tk.Tk()
+    root.title("NASDA")
+    build_gui(root)
+    filepath = filedialog.askopenfilename(
+    title="Select a data file",
+    filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")])
+    
+    if not filepath:
+        print("No file selected.")
+        # Start the update loop
+        root.mainloop()
+    
+    root.destroy()
+    root = tk.Tk()
+    root.title(f"NASDA – {filepath.split('/')[-1]}")
+    build_gui(root, filepath)
+    
+    # Start the update loop
+    root.mainloop()
+
+def check():
+    if platform.system() == "Windows":
+        try:
+            from ctypes import windll
+            windll.shcore.SetProcessDpiAwareness(1)
+        except Exception:
+            pass
+
+    try:
+        root.destroy()
+    except:
+        pass
+    
