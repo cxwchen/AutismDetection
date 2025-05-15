@@ -18,32 +18,38 @@ from sklearn.neural_network import MLPClassifier
 from wisardpkg import ClusWisard
 
 
-def applySVM(feat_train, y, params):
+def applySVM(feat_train, y, params=None, use_probabilities=True):
     """
     -----------------------------------------------------------------------------------------
-    This function applies Support Vector Machine (SVM) from sklearn on the training features
+    Applies Support Vector Machine (SVM) from sklearn on the training features
     -----------------------------------------------------------------------------------------
 
     Parameters
     ----------
-    feat_train : 
+    feat_train : array-like
         The training features
-    y : 
+    y : array-like
         The true labels
-    params : dict
-        The best parameters found using random search hyperparameter tuning
-    
+    params : dict, optional
+        The best parameters found using hyperparameter tuning
+    use_probabilities : bool, default=True
+        Whether to enable probability estimation (enables predict_proba)
+
     Returns
     -------
     model : object
         The trained SVM model
-    
     """
+    if params is None:
+        params = {}
+
+    # Override or inject probability setting
+    params['probability'] = use_probabilities
 
     model = SVC(**params)
     model.fit(feat_train, y)
-    # ypred = model.predict(feat_test)
     return model
+
 
 def applyLogR(feat_train, y):
     """
