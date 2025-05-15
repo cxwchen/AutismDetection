@@ -21,10 +21,10 @@ print("Loading Jochems functions successfully!")
 
 def load_data(filepath):
     data_arrays, file_paths, subject_ids, metadata = AAL_test.load_files(filepath)
-    df = AAL_test.multiset_feats(data_arrays[:5], file_paths, subject_ids) #currently 5 for testing purposes
+    df = AAL_test.multiset_feats(data_arrays, file_paths, subject_ids)
     return df
 
-def add_phenotypic_info(df):
+def add_phenotypic_info(df, save_as=None):
     load_dotenv()
     pheno_path = os.getenv('ABIDE_PHENOTYPIC_PATH')
     df_labels = pd.read_csv(pheno_path)
@@ -48,10 +48,13 @@ def add_phenotypic_info(df):
     # Convert DX_GROUP from (1 = autism, 2 = control) to (1 = autism, 0 = control)
     df_merged['DX_GROUP'] = df_merged['DX_GROUP'].map({1: 1, 2: 0})
 
+    if save_as:
+        df_merged.to_csv(f"{save_as}.csv", index=False)
+
     return df_merged
 
 def performsplit(features, y): #perform train test split for model evaluation
-    Xtrain, Xtest, ytrain, ytest = train_test_split(features, y, test_size=0.3,shuffle=True, random_state=42)
+    Xtrain, Xtest, ytrain, ytest = train_test_split(features, y, stratify=y, test_size=0.3,shuffle=True, random_state=42)
     return Xtrain, Xtest, ytrain, ytest
 
 def normalizer(feat_train, feat_test):
@@ -62,17 +65,22 @@ def normalizer(feat_train, feat_test):
 
 
 
-# testing the functions, remove later
-load_dotenv()
-male_path = os.getenv('ABIDE_MALE_PATH')
-female_path = os.getenv('ABIDE_FEMALE_PATH')
+# Perform the feature extraction and save in CSV so we won't have to keep reloading for research purposes
+# For the GUI version it is not saved in a CSV but the dataframe is used directly.
+if __name__ == "__main__":
+    load_dotenv()
+    male_path = os.getenv('ABIDE_MALE_PATH')
+    female_path = os.getenv('ABIDE_FEMALE_PATH')
 
-if not male_path or not female_path:
-    raise EnvironmentError(
-        "Please set ABIDE_MALE_PATH and ABIDE_FEMALE_PATH environment variables!"
-    )
+    if not male_path or not female_path:
+        raise EnvironmentError(
+            "Please set ABIDE_MALE_PATH and ABIDE_FEMALE_PATH environment variables!"
+        )
 
-print("Male data path:", male_path)
-print("Female data path:", female_path)
-female_df = load_data(female_path)
-female_df_merged = add_phenotypic_info(female_df)
+    print("Male data path:", male_path)
+    print("Female data path:", female_path)
+    female_df = load_data(female_path)
+    female_df_merged = add_phenotypic_info(female_df, save_as="female_df_merged")
+
+    male_df = load_data(male_path)
+    male_df_merged = add_phenotypic_info(male_df, save_as="male_df_merged")
