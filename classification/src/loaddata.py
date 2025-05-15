@@ -45,6 +45,9 @@ def add_phenotypic_info(df):
     cols = phenotype_cols + [col for col in df_merged.columns if col not in phenotype_cols]
     df_merged = df_merged[cols]
 
+    # Convert DX_GROUP from (1 = autism, 2 = control) to (1 = autism, 0 = control)
+    df_merged['DX_GROUP'] = df_merged['DX_GROUP'].map({1: 1, 2: 0})
+
     return df_merged
 
 def performsplit(features, y): #perform train test split for model evaluation
@@ -69,7 +72,7 @@ if not male_path or not female_path:
         "Please set ABIDE_MALE_PATH and ABIDE_FEMALE_PATH environment variables!"
     )
 
-# print("Male data path:", male_path)
-# print("Female data path:", female_path)
+print("Male data path:", male_path)
+print("Female data path:", female_path)
 female_df = load_data(female_path)
 female_df_merged = add_phenotypic_info(female_df)
