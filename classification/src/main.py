@@ -1,3 +1,6 @@
+import sys
+import os
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,6 +12,9 @@ from keras.layers import Flatten
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'featuredesign', 'graph inference')))
+from 
 
 
 
