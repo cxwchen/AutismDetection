@@ -1,8 +1,8 @@
 # This option uses combobox instead of listbox
 import tkinter as tk
 from ctypes import windll
-from classification import *
-from classifiers import *
+from classificationGUI import *
+from classifiersGUI import *
 from tkinter import messagebox, ttk
 
 try:

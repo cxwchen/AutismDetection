@@ -9,8 +9,8 @@ import pandas as pd
 from tkinter import ttk, filedialog
 from PIL import Image, ImageTk, ImageGrab
 from ctypes import windll
-from classification import *
-from classifiers import *
+from classificationGUI import *
+from classifiersGUI import *
 import code
 import io
 import contextlib

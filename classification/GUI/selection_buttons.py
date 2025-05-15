@@ -4,7 +4,7 @@ Created on Thu May 15 16:07:02 2025
 
 @author: kakis
 """
-from classifiers import *
+from classifiersGUI import *
 import tkinter as tk
 #======= These below are the just all files where I have run it from
 from HR_V1_0_03 import *
