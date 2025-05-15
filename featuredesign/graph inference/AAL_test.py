@@ -14,20 +14,63 @@ import re
 import seaborn as sns
 import networkx.algorithms.community as nx_comm
 
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr,skew, kurtosis
 from networkx.algorithms import community
 from sklearn.covariance import GraphicalLasso, LedoitWolf
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import mutual_info_regression
 from Normalized_laplacian import learn_normalized_laplacian
 
-def graphing(A, super=False, feats=False, deg_trh=0, alpha=0e-0):
+
+def eig_centrality(G, max_attempts=3):
+    """
+    Compute eigenvector centrality with robust convergence handling.
+    """
+    # First attempt with default parameters
+    try:
+        return nx.eigenvector_centrality(G, max_iter=1000, tol=1e-6)
+    except nx.PowerIterationFailedConvergence:
+        pass
+
+    # Retry with relaxed parameters
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return nx.eigenvector_centrality(
+                G,
+                max_iter=5000 * (attempt + 1),
+                tol=1e-4 * (attempt + 1)
+            )
+        except nx.PowerIterationFailedConvergence:
+            continue
+
+    # Final fallback to degree centrality
+    return nx.degree_centrality(G)
+
+def graph_diameter(G):
+    """
+    Compute graph diameter with robust handling of disconnected graphs.
+    """
+    if len(G) == 0:
+        return np.nan
+
+    if nx.is_connected(G):
+        return nx.diameter(G)
+    else:
+        try:
+            # Get diameter of largest connected component
+            largest_cc = max(nx.connected_components(G), key=len)
+            return nx.diameter(G.subgraph(largest_cc))
+        except:
+            return np.nan
+
+def graphing(A, super=False, feats=False, plot=True, deg_trh=0, alpha=0e-0):
     """
     Function converting Adjacency matrix to a Graph
 
     Parameters:
     - It has an input parameter 'super' to select supernodes
     - It has an input parameter 'feats' to compute features
+    - It has an input parameter 'plot' to plot the graph
     - deg_thr = degree threshold, removes any nodes with a degree value less than this threshold
     - alpha = sparsity factor, acts as a percentage from the maximum weight used for thresholding
 
@@ -37,6 +80,7 @@ def graphing(A, super=False, feats=False, deg_trh=0, alpha=0e-0):
 
     np.fill_diagonal(A, 0) # remove self-loops
     G = nx.from_numpy_array(A)
+    G.remove_nodes_from(list(nx.isolates(G)))  # Remove isolated nodes
 
     # Extract edge weights and normalize for linewidth
     edges = G.edges()
@@ -60,7 +104,7 @@ def graphing(A, super=False, feats=False, deg_trh=0, alpha=0e-0):
     else:
         opacities = []
 
-    # Remove nodes with degree < 2
+    # Remove nodes with degree < degree threshold
     low_degree_nodes = [node for node, degree in G.degree() if degree < deg_trh]
     G.remove_nodes_from(low_degree_nodes)
 
@@ -100,33 +144,64 @@ def graphing(A, super=False, feats=False, deg_trh=0, alpha=0e-0):
         edges = list(superG.edges())
         opacities = [0.6] * len(edges)  # Uniform opacity for superedges
 
-    # Create label dictionary: show node + 1
-    labels = {node: node + 1 for node in G.nodes()}
-    # 6. Visualize the coarsened graph
-    pos = nx.spring_layout(G, k=0.5, seed=42, iterations=50)
-    plt.figure(figsize=(6, 6))
-    nx.draw_networkx_nodes(G, pos, node_color='skyblue', node_size=100)
-    nx.draw_networkx_labels(G, pos, labels=labels, font_weight='bold')
-    if edges_filt:
-        nx.draw_networkx_edges(G, pos, edgelist=edges_filt, alpha=opacities,)
-    plt.show()
+    if plot:
+        # Create label dictionary: show node + 1
+        labels = {node: node + 1 for node in G.nodes()}
+        # 6. Visualize the coarsened graph
+        pos = nx.spring_layout(G, k=0.5, seed=42, iterations=50)
+        plt.figure(figsize=(6, 6))
+        nx.draw_networkx_nodes(G, pos, node_color='skyblue', node_size=100)
+        nx.draw_networkx_labels(G, pos, labels=labels, font_weight='bold')
+        if edges_filt:
+            nx.draw_networkx_edges(G, pos, edgelist=edges_filt, alpha=opacities,)
+        plt.show()
 
     # 7. Compute Graph features
     if feats:
-        degree_centrality = nx.degree_centrality(G)
-        print("Degree Centrality:", degree_centrality)
-        closeness = nx.closeness_centrality(G)
-        print("Closeness Centrality:", closeness)
-        eigenvector = nx.eigenvector_centrality(G)
-        print("Eigenvector Centrality:", eigenvector)
-        clustering = nx.clustering(G)
-        print("Clustering Coefficient:", clustering)
-        shortest_paths = dict(nx.all_pairs_shortest_path_length(G))
-        print("Shortest Path from Node 0:", shortest_paths[0])
-        print("Average Clustering:", nx.average_clustering(G))
-        print("Diameter:", nx.diameter(G))  # Longest shortest path
-        edge_betweenness = nx.edge_betweenness_centrality(G)
-        print("Edge Betweenness:", edge_betweenness)
+        G.remove_nodes_from(list(nx.isolates(G)))  # Remove isolated nodes
+        feature_list = []
+
+        # Compute all features
+        features = {
+            "Degree Centrality": nx.degree_centrality(G),
+            "Closeness Centrality": nx.closeness_centrality(G),
+            "Eigenvector Centrality": eig_centrality(G),
+            "Clustering Coefficient": nx.clustering(G),
+            "Shortest Paths": dict(nx.all_pairs_shortest_path_length(G)),
+            "Average Clustering": nx.average_clustering(G),
+            "Edge Betweenness": nx.edge_betweenness_centrality(G),
+            "Diameter": graph_diameter(G)
+        }
+
+        # Node-level features
+        for node in G.nodes():
+            node_features = {
+                "Node": node,
+                "Degree Centrality": features["Degree Centrality"][node],
+                "Closeness Centrality": features["Closeness Centrality"][node],
+                "Eigenvector Centrality": features["Eigenvector Centrality"][node],
+                "Clustering Coefficient": features["Clustering Coefficient"][node]
+            }
+            feature_list.append(node_features)
+
+        # Graph-level features
+        graph_features = {
+            "Average Clustering": features["Average Clustering"],
+            "Diameter": features["Diameter"]
+        }
+
+        # Create DataFrames
+        node_df = pd.DataFrame(feature_list)
+        node_df['ROI'] = node_df['Node'].apply(lambda x: f'ROI_{x + 1}')    # Set nodes equal to ROIs in dataframe and remove nodes index
+        node_df = node_df.drop(columns=['Node'])
+        roi_col = node_df.pop('ROI')
+        node_df.insert(0, 'ROI', roi_col)
+        graph_df = pd.DataFrame([graph_features])
+
+        print(node_df)
+        print(graph_df)
+
+        return node_df, graph_df
 
 def load_files(folder_path):
     """
@@ -186,25 +261,26 @@ def pearson_corr(time_series_data, threshold=0.5, absolute_value=True):
 
     # Calculate pairwise correlations
     for i in range(n_series):
-        for j in range(i, n_series):
+        for j in range(i, n_series):  # Include diagonal for corr_matrix
+            x = time_series_data[:, i]
+            y = time_series_data[:, j]
+
+            # Handle constant series cases
             if i == j:
-                corr = 1.0  # correlation with self is 1
+                corr = 1.0  # Diagonal
+            elif np.all(x == x[0]) or np.all(y == y[0]):
+                corr = 0.0  # Constant series
             else:
-                corr, _ = pearsonr(time_series_data[:, i], time_series_data[:, j])
+                corr = pearsonr(x, y)[0]
 
             if absolute_value:
                 corr = abs(corr)
 
-            corr_matrix[i, j] = corr
-            corr_matrix[j, i] = corr
+            corr_matrix[i, j] = corr_matrix[j, i] = corr
 
-            # Create edge if correlation exceeds threshold
-            if corr > threshold:
-                adj_matrix[i, j] = 1
-                adj_matrix[j, i] = 1
-
-    # Remove self-loops
-    np.fill_diagonal(adj_matrix, 0)
+            # Threshold for adjacency (skip diagonal)
+            if i != j and corr > threshold:
+                adj_matrix[i, j] = adj_matrix[j, i] = 1
 
     return adj_matrix, corr_matrix
 
@@ -246,7 +322,7 @@ def Adj_heatmap(W):
 
 def stat_feats(x, n_rois = 116):
     """
-    Compute classic statistical features based on some time series data and stores it to a csv file.
+    Compute classic statistical features based on some time series data and stores it to a panda dataframe.
 
     Features:
     - Mean, Standard Deviation, Skewness, Kurtosis, Slope, Correlation, Covariance, Signal-to-noise ratio etc.
@@ -261,7 +337,9 @@ def stat_feats(x, n_rois = 116):
         features = {
             'mean': np.mean(ts),
             'std': np.std(ts),
-            'SNR': np.average(np.divide(np.mean(x, axis=0), np.std(x, axis=0), where=np.std(x, axis=0) != 0, out=np.zeros_like(np.mean(x, axis=0))))
+            'SNR': np.average(np.divide(np.mean(x, axis=0), np.std(x, axis=0), where=np.std(x, axis=0) != 0, out=np.zeros_like(np.mean(x, axis=0)))),
+            'Skewness': skew(ts),
+            'Kurtosis': kurtosis(ts)
         }
         feature_list.append(features)
 
@@ -273,6 +351,10 @@ def stat_feats(x, n_rois = 116):
     return df
 
 def multiset_feats(data_list, filenames, output_dir="feature_outputs"):
+    """
+    Loops over all data recursively to compute specific features and stores them in a dataframe indexed per individual (subject ID).
+
+    """
     os.makedirs(output_dir, exist_ok=True)
     df_app = pd.DataFrame(columns=stat_feats(data_list[0]).columns) # Initialize dataframe
 
@@ -280,16 +362,18 @@ def multiset_feats(data_list, filenames, output_dir="feature_outputs"):
         if data is None:
             continue  # Skip if loading failed
 
-        df = stat_feats(data)
+        df_stat = stat_feats(data) # Compute the statistical features
+        df_graph,df_ex = graphing(A= pearson_corr(data)[0], feats=True, plot=False) # Compute the graphical features using pearson correlation adjacency matrix
+        df_conc = pd.merge(df_stat, df_graph, on='ROI', how='left') # Merge both region of interests of statistical and graph feature dataframes.
         if df_app.empty:
-            df_app = df  # First iteration: set df_app = df
+            df_app = df_conc  # First iteration in case df_app=empty: set df_app = df
         else:
-            df_app = pd.concat([df_app, df], ignore_index=True)
+            df_app = pd.concat([df_app, df_conc], ignore_index=True)
 
-    print(df_app)
+    print("The appended dataframe:\n", df_app) # Appended dataframe for all inviduals in the dataset
 
     df_app['subject_id'] = df_app.index // 116
-    df_wide = df_app.pivot(index='subject_id', columns='ROI', values=['mean', 'std', 'SNR'])
+    df_wide = df_app.pivot(index='subject_id', columns='ROI', values=df_app.columns.difference(['ROI', 'subject_id'])) # Automatically pivots all feature columns
 
     # Flatten column names
     df_wide.columns = [f"{stat}_{roi}" for stat, roi in df_wide.columns]
@@ -314,11 +398,12 @@ def multiset_feats(data_list, filenames, output_dir="feature_outputs"):
 
     return df_wide
 
+
+
 #-------{Main for testing}-------#
 folder_path = r"C:\Users\Jochem\Documents\GitHub\AutismDetection\abide\female-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
 data_arrays, file_paths, metadata = load_files(folder_path)
 
-output = multiset_feats(data_arrays, file_paths)
 #stat_feats(data_arrays[0])
 #print(output)
 #print(data_arrays[0])
@@ -329,5 +414,7 @@ output = multiset_feats(data_arrays, file_paths)
 #print(C)
 #Adj_heatmap(C)
 #graphing(Laplacian, alpha=0.1)
+
+output = multiset_feats(data_arrays[:5], file_paths)
 print(output)
 print(len(data_arrays))
