@@ -6,6 +6,8 @@ from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.metrics import make_scorer, precision_score, recall_score, f1_score, accuracy_score, classification_report, confusion_matrix, balanced_accuracy_score
 import seaborn as sns
 from wisardpkg import ClusWisard
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
 
 
 # traindata = load_features(file_path=...)
@@ -84,9 +86,24 @@ def bestSVM_GS(Xtrain, Xtest, ytrain, ytest, paramgrid, svcdefault):
 
     return gridsearch.best_params_
 
-def bestSVM_RS(Xtrain, Xtest, ytrain, ytest, paramgrid, svcdefault):
-    rsearch = RandomizedSearchCV(svcdefault, paramgrid, cv=5, random_state=19, n_iter=50)
+def weighted_recall(y_true, y_pred):
+    recall_pos = recall_score(y_true, y_pred, pos_label=1)
+    recall_neg = recall_score(y_true, y_pred, pos_label=0)
+    # Adjust weights as you prefer
+    return 0.7 * recall_pos + 0.3 * recall_neg
+
+def bestSVM_RS(Xtrain, Xtest, ytrain, ytest, svcdefault, paramgrid=param_grid):
+    
+    # # Update paramgrid keys to include 'svc__' prefix for SVC params
+    # paramgrid_prefixed = []
+    # for param_dict in paramgrid:
+    #     paramgrid_prefixed.append({f'svc__{key}': val for key, val in param_dict.items()})
+    weighted_recall_scorer = make_scorer(weighted_recall)
+    rsearch = RandomizedSearchCV(svcdefault, paramgrid, scoring=weighted_recall_scorer, cv=5, random_state=19, n_iter=50, verbose=2)
+    print("Starting RandomizedSearchCV fitting...")
     rsearch.fit(Xtrain, ytrain)
+    print("RandomizedSearchCV fitting completed.")
+    print(f"Best Parameters Found: {rsearch.best_params_}")
 
     model = rsearch.best_estimator_
     y_pred = model.predict(Xtest)
@@ -106,8 +123,8 @@ def bestSVM_RS(Xtrain, Xtest, ytrain, ytest, paramgrid, svcdefault):
     sns.heatmap(confmat, annot=True, fmt='d', cmap='flare')
     plt.xlabel('Predicted')
     plt.ylabel('True')
-    plt.title('Confusion Matrix using RandomizedSearchCV')
-    plt.show()
+    plt.title('Confusion Matrix of SVM using RandomizedSearchCV')
+    plt.show(block=False)
 
     return rsearch.best_params_
 
@@ -148,7 +165,7 @@ def tune_minScore(Xtrain, Xtest, ytrain, ytest, addressSize, discriminatorLimit,
     best_minScore = None
     
     for score in minScore_values:
-        model = ClusWisard(addressSize, minScore=score, discriminatorLimit=discriminatorLimit)
+        model = ClusWisard(addressSize, score, discriminatorLimit, tupleLength=1)
         model.fit(Xtrain, ytrain)
         
         y_pred = model.predict(Xtest)

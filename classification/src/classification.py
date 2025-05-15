@@ -18,6 +18,11 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, **kwargs):
     # yprob = model.predict_proba(feat_test)
 
     metrics = get_metrics(ytest, ypred, yprob)
+
+    clf_name = model.__class__.__name__
+    plot_confusion_matrix(ytest, ypred, model)
+    print_metrics(metrics, clf_name)
+
     
 
 ## separate function for ClusWiSARD
