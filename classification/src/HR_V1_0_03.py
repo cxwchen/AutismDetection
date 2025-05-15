@@ -8,8 +8,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 from PIL import Image, ImageTk, ImageGrab
 from ctypes import windll
-from classification import *
-from classifiers import *
+from selection_buttons import*
 import code
 import io
 import contextlib
@@ -90,6 +89,7 @@ def build_gui(root, filepath=None):
     # Classifier Frame
     classifier_frame = tk.LabelFrame(left, text="Classifier", bg="lavender")
     classifier_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+    class_btn(classifier_frame)
 
     # Features Frame
     features_frame = tk.LabelFrame(left, text="Features", bg="mistyrose")
