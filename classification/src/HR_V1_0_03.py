@@ -8,8 +8,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 from PIL import Image, ImageTk, ImageGrab
 from ctypes import windll
-from classification import *
-from classifiers import *
+from selection_buttons import*
 import code
 import io
 import contextlib
@@ -51,8 +50,10 @@ def build_gui(root, filepath=None):
     root.grid_columnconfigure(1, weight=1)
 
     # Add toolbar buttons
-    btn_open = tk.Button(toolbar, text="Open", command=open_new_window)
-    btn_save = tk.Button(toolbar, text="Save")
+    btn_open = tk.Button(toolbar, text="\U0001F4C2", command=open_new_window)
+    ###TO DO: if a project file is opened it will have to load the stats from it instead of loading it as data to be analysed
+    btn_save = tk.Button(toolbar, text="\U0001F4BE Save")
+    ###TO DO: make a document structure that can safe the project settings / make projects
     stats = "stats"; steps = 11; acuracy = 76.4; stat2 = 2; stat3 = 3;  # default values for demonstration
 
     def simulate_run_command():
@@ -60,11 +61,13 @@ def build_gui(root, filepath=None):
         command_input.insert(0, f"runanalysis({stats})")
         execute_command()  # simulate pressing <Return>
 
-    btn_run = tk.Button(toolbar, text="Run", command=simulate_run_command)    
+    btn_run = tk.Button(toolbar, text="\u23F5 Run", command=simulate_run_command) 
+    btn_settings = tk.Button(toolbar, text="\U0001F6E0 Settings", command=open_settings) 
     # Pack buttons in toolbar
     btn_open.pack(side="left", padx=5, pady=5)
     btn_save.pack(side="left", padx=5, pady=5)
     btn_run.pack(side="left", padx=5, pady=5)
+    btn_settings.pack(side="left", padx=5, pady=5)
 
 
     # ====== PanedWindow (Left + Right Resizable) ======
@@ -86,6 +89,7 @@ def build_gui(root, filepath=None):
     # Classifier Frame
     classifier_frame = tk.LabelFrame(left, text="Classifier", bg="lavender")
     classifier_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+    class_btn(classifier_frame)
 
     # Features Frame
     features_frame = tk.LabelFrame(left, text="Features", bg="mistyrose")
@@ -114,7 +118,9 @@ def build_gui(root, filepath=None):
         return third_height
 
     # Default stats
+    run_stats = []      ##TO DO: Adjust this later to match the other stats
     subjects_set = "subjects_set"; classifiers_set = "classifiers_set"; features_set = "features_set"; dataset_fit = "dataset_fit";
+    
     # Load the default image (once)
     def load_default_image():
         def export_overview_to_png():
@@ -125,7 +131,7 @@ def build_gui(root, filepath=None):
             filepath = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png")])
             if not filepath:
                 # Restore the export button
-                export_button.place(relx=1.0, rely=0.0, anchor="ne")
+                export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
                 expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)  # top-right, left of export
                 return  # user cancelled
         
@@ -138,7 +144,7 @@ def build_gui(root, filepath=None):
             img = ImageGrab.grab(bbox=(x, y, w, h))
             img.save(filepath)
             # Restore the export button
-            export_button.place(relx=1.0, rely=0.0, anchor="ne")
+            export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
             expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)  # top-right, left of export
             print(f"Saved to {filepath}")
 
@@ -163,7 +169,7 @@ def build_gui(root, filepath=None):
 
     root.after(100, load_default_image)
 
-    # Tabs for Command / Logs / Dataset
+    # Tabs for Command / Logs / Dataset / Performance
     style = ttk.Style()
     style.configure("TNotebook.Tab", padding=[15, 5]) 
     tabs = ttk.Notebook(right)
@@ -172,11 +178,12 @@ def build_gui(root, filepath=None):
     command_tab = tk.Frame(tabs)
     logs_tab = tk.Frame(tabs, bg="white")
     dataset_tab = tk.Frame(tabs, bg="lightcyan")
-
+    performance_tab = tk.Frame(tabs, bg="#2c3e50")
 
     tabs.add(command_tab, text="COMMAND")
-    tabs.add(logs_tab, text="LOGS")
-    tabs.add(dataset_tab, text="FIT")
+    tabs.add(logs_tab, text="ERROR LOG")
+    tabs.add(dataset_tab, text="FITTING")
+    tabs.add(performance_tab, text="PERFORMANCE")
 
     # Example content in tabs
     tk.Text(logs_tab).pack(expand=True, fill="both")
@@ -277,8 +284,39 @@ def build_gui(root, filepath=None):
                 widget.insert("end", "\n", tag)
 
         _type()
+    
+    
+        # ====== Performance Tab ======
+    tk.Label(performance_tab, text="Command number:", fg="white",  bg="#2c3e50").grid(row=0, column=0, padx=10, pady=10, sticky="w")
 
+    metrics = [] # Add more to force scroll
+    
+    def update_performance_display(event=None):
+        selection = metric_combo.get()
+        if selection.startswith("Run"):
+            index = int(selection.split()[1]) - 1
+            if 0 <= index < len(run_stats):
+                acc, s2, s3 = run_stats[index]
+                perf_output.config(state="normal")
+                perf_output.delete("1.0", "end")
+                perf_output.insert("end", f"Accuracy:\t{acc}%\nStat 2:\t{s2}\nStat 3:\t{s3}")
+                perf_output.config(state="disabled")
+    
+    metric_var = tk.StringVar()
+    metric_combo = ttk.Combobox(performance_tab, textvariable=metric_var, values=metrics, state="readonly", height=10, width=20)
+    metric_combo.grid(row=0, column=1, padx=(0,10), pady=10, sticky="w")
+    
+    #metric_combo.bind("<<ComboboxSelected>>", update_performance_display)
 
+    # Allow resizing only of the second row (Text output)
+    performance_tab.grid_rowconfigure(1, weight=1)
+    performance_tab.grid_columnconfigure(0, weight=0)
+    performance_tab.grid_columnconfigure(1, weight=0)  # prevent stretch
+
+    # Add output display area below dropdown
+    perf_output = tk.Text(performance_tab, height=5, bg="#fefefe", state="disabled")
+    perf_output.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=10, pady=5)
+    
     def runanalysis(stats):
             
         log(f"Analysing: {stats}")
@@ -300,6 +338,12 @@ def build_gui(root, filepath=None):
                 log("Run completed")
                 time.sleep(0.8)
                 type_text(console_display, f"Acuracy:\t {acuracy}%\t Stat2:\t {stat2}\t Stat3:\t {stat3}\n")
+                run_stats.append((acuracy, stat2, stat3)) # Saving for Performance Tab
+                # Update metrics combo
+                metric_combo["values"] = [f"Run {i+1}" for i in range(len(run_stats))]
+                metric_var.set(f"Run {len(run_stats)}")  # auto-select the latest
+                # Show performance data
+                update_performance_display()
             progress.pack_forget()
 
         root.after(1000, step_loop)
@@ -395,14 +439,40 @@ def open_new_window():
     new_win.geometry(f'{width}x{height}+{x}+{y}')
     new_win.iconbitmap("logo.ico")
     build_gui(new_win, filepath)
+    
+def open_settings():
+    
+    # Create a new window after selection
+    settings = tk.Toplevel()
+    settings.title(f"NASDA: Settings")
+    
+    # Get the screen width and height
+    screen_width = settings.winfo_screenwidth()
+    screen_height = settings.winfo_screenheight()
+    width = int(screen_width * 0.5)
+    height = int(screen_height * 0.5)
 
+    # Center the window on the screen
+    x = (screen_width - width) // 2
+    y = (screen_height - height) // 2
+
+    # Apply the geometry
+    settings.geometry(f'{width}x{height}+{x}+{y}')
+    settings.iconbitmap("logo.ico")
+    
+    # Add a LabelFrame inside the settings window
+    settings_frame = tk.LabelFrame(settings, text="Settings", padx=10, pady=10)
+    settings.grid_rowconfigure(0, weight=1)
+    settings.grid_columnconfigure(0, weight=1)
+    settings_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+
+    # Optional: add content
+    tk.Label(settings_frame, text="Option 1:").grid(row=0, column=0, sticky="w")
+    tk.Entry(settings_frame).grid(row=0, column=1, sticky="ew")
+    
 def expand_overview():
-    def set_min_height_relative_to_right():
-        right.update_idletasks()  # Ensure layout is measured
-        total_height = right.winfo_height()
-        third_height = (total_height * 3) // 7
-        right.grid_rowconfigure(0, weight=0, minsize=third_height)
-        return third_height
+    
+    ### TO DO: Add dynamic scaling of the image and allow to zoom in and navigate across the image
     
     expand_win = tk.Toplevel()
     expand_win.title(f"Overview – {filepath.split('/')[-1]}")
@@ -412,21 +482,65 @@ def expand_overview():
     # Optional: full screen
     # expand_win.attributes("-fullscreen", True)
 
-    size = set_min_height_relative_to_right() * 2  # double size
+    # Get the screen width and height
+    screen_width = expand_win.winfo_screenwidth()
+    screen_height = expand_win.winfo_screenheight()
+    width = int(screen_width * 0.7)
+    height = int(screen_height * 0.7)
+
+    # Center the window on the screen
+    x = (screen_width - width) // 2
+    y = (screen_height - height) // 2
+
+    # Apply the geometry
+    expand_win.geometry(f'{width}x{height}+{x}+{y}')
 
     # Load image again, larger
-    img = Image.open("Brain_background.png").resize((size, size))
-    big_photo = ImageTk.PhotoImage(img)
+    def load_default_image():
+        def export_overview_to_png():
+            expand_button.place_forget()
+            export_button.place_forget()
+            expand_win.update_idletasks()
+            path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png")])
+            if not path:
+                export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
+                expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)
+                return
+            x = expand_win.winfo_rootx()
+            y = expand_win.winfo_rooty()
+            w = x + expand_win.winfo_width()
+            h = y + expand_win.winfo_height()
+            img = ImageGrab.grab(bbox=(x, y, w, h))
+            img.save(path)
+            export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
+            expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)
+            print(f"Saved to {path}")
+    
+        canvas = tk.Canvas(expand_win, bg="#030e3a", highlightthickness=0)
+        canvas.pack(expand=True, fill="both")
+    
+        # Get height of window (after rendering)
+        expand_win.update_idletasks()
+        canvas_height = expand_win.winfo_height()
+    
+        # Resize image to square based on window height
+        img = Image.open("Brain_background.png").resize((canvas_height, canvas_height))
+        photo = ImageTk.PhotoImage(img)
+    
+        canvas.create_image(canvas.winfo_width() // 2, 0, anchor="n", image=photo)
+        canvas.image = photo  # prevent garbage collection
+    
+        canvas.create_text(10, canvas_height - 10, anchor="sw",
+                           text=f"Target:\n{subjects_set}\n{classifiers_set}\n{features_set}\n{dataset_fit}",
+                           fill="white", font=("Arial", 11, "italic"))
+    
+        global export_button, expand_button
+        export_button = tk.Button(expand_win, text="  ⤓  ", command=export_overview_to_png)
+        export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
+        expand_button = tk.Button(expand_win, text=" ⛶ ", command=expand_overview)
+        expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)
 
-    canvas = tk.Canvas(expand_win, bg="#030e3a", highlightthickness=0)
-    canvas.pack(expand=True, fill="both")
-
-    canvas.create_image(canvas.winfo_reqwidth() // 2, 0, anchor="n", image=big_photo)
-    canvas.image = big_photo  # keep reference
-
-    canvas.create_text(10, size - 10, anchor="sw",
-                       text=f"Target:\n{subjects_set}\n{classifiers_set}\n{features_set}\n{dataset_fit}",
-                       fill="white", font=("Arial", 11, "italic"))
+    root.after(100, load_default_image)
 
 
 # Start Calling the system
@@ -463,4 +577,38 @@ if __name__ == "__main__":
     
     # Start the update loop
     root.mainloop()
+    
+def start():
+    root = tk.Tk()
+    root.title("NASDA")
+    build_gui(root)
+    filepath = filedialog.askopenfilename(
+    title="Select a data file",
+    filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")])
+    
+    if not filepath:
+        print("No file selected.")
+        # Start the update loop
+        root.mainloop()
+    
+    root.destroy()
+    root = tk.Tk()
+    root.title(f"NASDA – {filepath.split('/')[-1]}")
+    build_gui(root, filepath)
+    
+    # Start the update loop
+    root.mainloop()
+
+def check():
+    if platform.system() == "Windows":
+        try:
+            from ctypes import windll
+            windll.shcore.SetProcessDpiAwareness(1)
+        except Exception:
+            pass
+
+    try:
+        root.destroy()
+    except:
+        pass
     
