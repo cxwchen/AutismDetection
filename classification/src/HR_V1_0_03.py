@@ -8,14 +8,83 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 from PIL import Image, ImageTk, ImageGrab
 from ctypes import windll
+from classifiers import *
 from selection_buttons import*
+import selection_buttons
+from functionality_buttons import *
+from hyperparametertuning import *
+from sklearn.svm import SVC
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+import hyperparametertuning
 import code
 import io
 import contextlib
 import platform
 import time
 
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.datasets import make_classification
+
+#==== DEMO: The data will be done in an other file ====
+
+X, y = make_classification(
+    n_samples=100,
+    n_features=10,
+    n_informative=5,
+    n_redundant=2,
+    n_classes=2,
+    random_state=42
+)
+
+# === Split data ===
+Xtrain, Xtest, ytrain, ytest = train_test_split(X, y, test_size=0.2, random_state=42)
+
+svcdefault=SVC()
+params = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, hyperparametertuning.param_grid, svcdefault)
+model = applySVM(Xtrain, ytrain, params)
+#======================================================
+
+
+class AppContext:
+    def __init__(self, root, canvas, subjects_set, classifiers_set, features_set, dataset_fit, filepath):
+        self.root = root
+        self.canvas = canvas
+        self.subjects_set = subjects_set
+        self.classifiers_set = classifiers_set
+        self.features_set = features_set
+        self.dataset_fit = dataset_fit
+        self.model = None
+        self.filepath = filepath
+
+def update_overview_text(context):
+    context.canvas.delete("overlay_text")
+    context.canvas.create_text(
+        10,
+        context.canvas.winfo_height() - 10,
+        anchor="sw",
+        text=f"Target:\\{context.subjects_set}\\{context.classifiers_set}\\{context.features_set}\\{context.dataset_fit}",
+        fill="white",
+        font=("Arial", 9, "italic"),
+        tags="overlay_text"
+    )
+
 def build_gui(root, filepath=None):
+    # Default stats
+    run_stats = []      ##TO DO: Adjust this later to match the other stats
+    subjects_set = "subjects_set"; classifiers_set = "SVM"; features_set = "features_set"; dataset_fit = "dataset_fit";
+    
+    context = AppContext(
+        root=root,
+        canvas=None,  # canvas is created later
+        subjects_set=subjects_set,
+        classifiers_set=classifiers_set,
+        features_set=features_set,
+        dataset_fit=dataset_fit,
+        filepath=filepath
+    )
+    
     # Use the filepath as needed
     if filepath:
         print(f"Loaded file: {filepath}")
@@ -89,7 +158,7 @@ def build_gui(root, filepath=None):
     # Classifier Frame
     classifier_frame = tk.LabelFrame(left, text="Classifier", bg="lavender")
     classifier_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-    class_btn(classifier_frame)
+    selection_buttons.class_btn(classifier_frame, context)
 
     # Features Frame
     features_frame = tk.LabelFrame(left, text="Features", bg="mistyrose")
@@ -117,10 +186,6 @@ def build_gui(root, filepath=None):
         right.grid_rowconfigure(0, weight=0, minsize=third_height)
         return third_height
 
-    # Default stats
-    run_stats = []      ##TO DO: Adjust this later to match the other stats
-    subjects_set = "subjects_set"; classifiers_set = "classifiers_set"; features_set = "features_set"; dataset_fit = "dataset_fit";
-    
     # Load the default image (once)
     def load_default_image():
         def export_overview_to_png():
@@ -148,23 +213,25 @@ def build_gui(root, filepath=None):
             expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)  # top-right, left of export
             print(f"Saved to {filepath}")
 
-        canvas = tk.Canvas(overview_frame, bg="#030e3a", highlightthickness=0)
-        canvas.pack(expand=True, fill="both")
+        root.canvas = tk.Canvas(overview_frame, bg="#030e3a", highlightthickness=0)
+        root.canvas.pack(expand=True, fill="both")
+        context.canvas = root.canvas
         
         # Load and place image
         size = set_min_height_relative_to_right()
         default_img = Image.open("Brain_background.png").resize((size, size))
         default_photo = ImageTk.PhotoImage(default_img)
-        canvas.create_image(canvas.winfo_reqwidth() // 2, 0, anchor="n", image=default_photo)
-        canvas.image = default_photo  # keep reference
+        root.canvas.create_image(root.canvas.winfo_reqwidth() // 2, 0, anchor="n", image=default_photo)
+        root.canvas.image = default_photo  # keep reference
         
         # Add text overlay
-        canvas.create_text(10, size - 10, anchor="sw", text=f"Target:\{subjects_set}\{classifiers_set}\{features_set}\{dataset_fit}",
-                           fill="white", font=("Arial", 9, "italic"))
+        update_overview_text(context)
+        #root.canvas.create_text(10, size - 10, anchor="sw", text=f"Target:\{subjects_set}\{classifiers_set}\{features_set}\{dataset_fit}",
+                           #fill="white", font=("Arial", 9, "italic"), tags="overlay_text")
         
         export_button = tk.Button(overview_frame, text="  ⤓  ", command=export_overview_to_png)
         export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)  # Top-right with slight padding
-        expand_button = tk.Button(overview_frame, text=" ⛶ ", command=expand_overview)
+        expand_button = tk.Button(overview_frame, text=" ⛶ ", command=lambda: expand_overview(context))
         expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)  # top-right, left of export
 
     root.after(100, load_default_image)
@@ -351,22 +418,6 @@ def build_gui(root, filepath=None):
     def run(stats=stats):
         runanalysis(stats)
 
-    #Classifier function mapping
-    classifier_functions = {
-        "SVM": applySVM,
-        "Logistic Regression": applyLogR,
-        "Random Forest": applyRandForest,
-        "Decision Tree": applyDT,
-        "Multilayer Perceptron": applyMLP,
-        "ClusWiSARD": applyClusWiSARD
-    }
-
-    #Run selected classifier
-    def run_classifier():
-        selected = classifier_var.get()
-        func = classifier_functions.get(selected)
-        if func:
-            func()
 
     # message = tk.Label(root, text="Hello, World!")
     # message.pack()
@@ -411,137 +462,8 @@ def build_gui(root, filepath=None):
     globals()["log"] = log
     globals()["help"] = help
     globals()["right"] = right
-
-def open_new_window():
-    filepath = filedialog.askopenfilename(
-    title="Select a data file",
-    filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")])
     
-    if not filepath:
-        print("No file selected.")
-        return  # User canceled
-
-    # Create a new window after selection
-    new_win = tk.Toplevel()
-    new_win.title(f"NASDA – {filepath.split('/')[-1]}")
     
-    # Get the screen width and height
-    screen_width = new_win.winfo_screenwidth()
-    screen_height = new_win.winfo_screenheight()
-    width = int(screen_width * 0.8)
-    height = int(screen_height * 0.8)
-
-    # Center the window on the screen
-    x = (screen_width - width) // 2
-    y = (screen_height - height) // 2
-
-    # Apply the geometry
-    new_win.geometry(f'{width}x{height}+{x}+{y}')
-    new_win.iconbitmap("logo.ico")
-    build_gui(new_win, filepath)
-    
-def open_settings():
-    
-    # Create a new window after selection
-    settings = tk.Toplevel()
-    settings.title(f"NASDA: Settings")
-    
-    # Get the screen width and height
-    screen_width = settings.winfo_screenwidth()
-    screen_height = settings.winfo_screenheight()
-    width = int(screen_width * 0.5)
-    height = int(screen_height * 0.5)
-
-    # Center the window on the screen
-    x = (screen_width - width) // 2
-    y = (screen_height - height) // 2
-
-    # Apply the geometry
-    settings.geometry(f'{width}x{height}+{x}+{y}')
-    settings.iconbitmap("logo.ico")
-    
-    # Add a LabelFrame inside the settings window
-    settings_frame = tk.LabelFrame(settings, text="Settings", padx=10, pady=10)
-    settings.grid_rowconfigure(0, weight=1)
-    settings.grid_columnconfigure(0, weight=1)
-    settings_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-
-    # Optional: add content
-    tk.Label(settings_frame, text="Option 1:").grid(row=0, column=0, sticky="w")
-    tk.Entry(settings_frame).grid(row=0, column=1, sticky="ew")
-    
-def expand_overview():
-    
-    ### TO DO: Add dynamic scaling of the image and allow to zoom in and navigate across the image
-    
-    expand_win = tk.Toplevel()
-    expand_win.title(f"Overview – {filepath.split('/')[-1]}")
-    expand_win.configure(bg="#030e3a")
-    expand_win.iconbitmap("logo.ico")
-
-    # Optional: full screen
-    # expand_win.attributes("-fullscreen", True)
-
-    # Get the screen width and height
-    screen_width = expand_win.winfo_screenwidth()
-    screen_height = expand_win.winfo_screenheight()
-    width = int(screen_width * 0.7)
-    height = int(screen_height * 0.7)
-
-    # Center the window on the screen
-    x = (screen_width - width) // 2
-    y = (screen_height - height) // 2
-
-    # Apply the geometry
-    expand_win.geometry(f'{width}x{height}+{x}+{y}')
-
-    # Load image again, larger
-    def load_default_image():
-        def export_overview_to_png():
-            expand_button.place_forget()
-            export_button.place_forget()
-            expand_win.update_idletasks()
-            path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png")])
-            if not path:
-                export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
-                expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)
-                return
-            x = expand_win.winfo_rootx()
-            y = expand_win.winfo_rooty()
-            w = x + expand_win.winfo_width()
-            h = y + expand_win.winfo_height()
-            img = ImageGrab.grab(bbox=(x, y, w, h))
-            img.save(path)
-            export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
-            expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)
-            print(f"Saved to {path}")
-    
-        canvas = tk.Canvas(expand_win, bg="#030e3a", highlightthickness=0)
-        canvas.pack(expand=True, fill="both")
-    
-        # Get height of window (after rendering)
-        expand_win.update_idletasks()
-        canvas_height = expand_win.winfo_height()
-    
-        # Resize image to square based on window height
-        img = Image.open("Brain_background.png").resize((canvas_height, canvas_height))
-        photo = ImageTk.PhotoImage(img)
-    
-        canvas.create_image(canvas.winfo_width() // 2, 0, anchor="n", image=photo)
-        canvas.image = photo  # prevent garbage collection
-    
-        canvas.create_text(10, canvas_height - 10, anchor="sw",
-                           text=f"Target:\n{subjects_set}\n{classifiers_set}\n{features_set}\n{dataset_fit}",
-                           fill="white", font=("Arial", 11, "italic"))
-    
-        global export_button, expand_button
-        export_button = tk.Button(expand_win, text="  ⤓  ", command=export_overview_to_png)
-        export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
-        expand_button = tk.Button(expand_win, text=" ⛶ ", command=expand_overview)
-        expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)
-
-    root.after(100, load_default_image)
-
 
 # Start Calling the system
 
