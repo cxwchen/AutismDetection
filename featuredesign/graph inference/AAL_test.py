@@ -375,7 +375,7 @@ def multiset_feats(data_list, filenames, output_dir="feature_outputs"):
         else:
             df_app = pd.concat([df_app, df_conc], ignore_index=True)
 
-        expanded_ids.extend([sid] * 116) # Pad subject IDs with copies for all ROIs
+        expanded_ids.extend([sid] * len(df_conc)) # Pad subject IDs with copies for all ROIs
 
     print("The appended dataframe:\n", df_app) # Appended dataframe for all inviduals in the dataset
     # Assign to dataframe
@@ -438,7 +438,7 @@ def multiset_pheno(df_wide):
 
 
 #-------{Main for testing}-------#
-folder_path = r"C:\Users\Jochem\Documents\GitHub\AutismDetection\abide\female-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
+folder_path = r"C:\Users\Jochem\Documents\GitHub\AutismDetection\abide\male-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
 data_arrays, file_paths, subject_ids, metadata = load_files(folder_path)
 
 #stat_feats(data_arrays[0])
@@ -452,7 +452,7 @@ data_arrays, file_paths, subject_ids, metadata = load_files(folder_path)
 #Adj_heatmap(C)
 #graphing(Laplacian, alpha=0.1)
 
-output = multiset_feats(data_arrays[:5], file_paths)
+output = multiset_feats(data_arrays[600:], file_paths)
 print(output)
 print(len(data_arrays))
 
