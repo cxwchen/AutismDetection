@@ -84,4 +84,5 @@ def extract_fc_features(male_path_env='ABIDE_MALE_PATH', female_path_env='ABIDE_
 
 if __name__ == "__main__":
     ourfeats = extract_fc_features()
-    ourfeats.to_csv("ourfeats.csv", index=False)
+    ourfeats.to_csv("ourfeats.csv.gz", index=False, compression="gzip")
+

@@ -12,7 +12,7 @@ print(f"Number of control subjects: {counts.get(0, 0)}")
 
 print("Missing values per column:")
 
-ourfeats = pd.read_csv('ourfeats.csv')
+ourfeats = pd.read_csv('ourfeats.csv.gz', compression='gzip')
 print(ourfeats.isnull().sum())
 
 # 2. Count totals for ASD and Control (label 1 = ASD, 0 = control)

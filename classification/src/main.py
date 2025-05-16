@@ -44,7 +44,7 @@ sys.stdout = Tee(sys.stdout, log_file)
 # female_df = pd.read_csv("female_df_merged.csv")
 # X = female_df.iloc[:, 3:]
 # y = female_df.iloc[:, 0]
-data = pd.read_csv("ourfeats.csv")
+data = pd.read_csv("ourfeats.csv.gz", compression='gzip')
 X = data.iloc[:, 3:]
 y = data.iloc[:, 1]
 
