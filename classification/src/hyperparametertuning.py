@@ -232,11 +232,11 @@ def bestRF(Xtrain, Xtest, ytrain, ytest, rfdefault):
 
 def bestMLP(Xtrain, Xtest, ytrain, ytest, MLPdefault):
     param_grid = {
-        'mlp__hidden_layer_sizes': [(50,), (100,), (100, 50), (50, 50, 50)],
-        'mlp__activation': ['relu', 'tanh'],
-        'mlp__alpha': uniform(1e-5, 1e-2),
-        'mlp__learning_rate_init': uniform(1e-4, 1e-1),
-        'mlp__solver': ['adam', 'sgd']
+        'hidden_layer_sizes': [(50,), (100,), (100, 50), (50, 50, 50)],
+        'activation': ['relu', 'tanh'],
+        'alpha': uniform(1e-5, 1e-2),
+        'learning_rate_init': uniform(1e-4, 1e-1),
+        'solver': ['adam', 'sgd']
     }
 
     weighted_recall_scorer = make_scorer(weighted_recall)
