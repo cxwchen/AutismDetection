@@ -54,7 +54,7 @@ def add_phenotypic_info(df, save_as=None):
     return df_merged
 
 def performsplit(features, y): #perform train test split for model evaluation
-    Xtrain, Xtest, ytrain, ytest = train_test_split(features, y, stratify=y, test_size=0.2,shuffle=True, random_state=42)
+    Xtrain, Xtest, ytrain, ytest = train_test_split(features, y, stratify=y, test_size=0.3,shuffle=True, random_state=42)
     return Xtrain, Xtest, ytrain, ytest
 
 def normalizer(feat_train, feat_test):
