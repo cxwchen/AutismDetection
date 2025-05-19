@@ -29,7 +29,7 @@ def plot_confusion_matrix(y_true, y_pred, model):
     plt.title(f'Confusion Matrix ({model.__class__.__name__})')
     os.makedirs('plots', exist_ok=True)
     plt.savefig(f'plots/conf_matrix_{model.__class__.__name__}.png', bbox_inches='tight')
-    plt.show(block=False)  # Non-blocking
+    # plt.show(block=False)  # Non-blocking
     # plt.pause(0.1)
 
 def get_metrics(ytrue, ypred, yprob=None):
@@ -76,32 +76,6 @@ def get_metrics(ytrue, ypred, yprob=None):
 
     return metrics
 
-# def get_metrics(ytrue, ypred, yprob):
-
-#     # Print classification report
-#     print("Classification report:\n", classification_report(ytrue, ypred))
-
-#     # Metrics
-#     precision, recall, f1score, support = precision_recall_fscore_support(ytrue, ypred, zero_division=0)
-#     auroc = roc_auc_score(ytrue, yprob)
-#     spec = get_specificity(ytrue, ypred)
-#     sensi = get_sensitivity(ytrue, ypred)
-#     accuracy = accuracy_score(ytrue, ypred)
-#     balanced_acc = balanced_accuracy_score(ytrue, ypred)
-
-#     metrics = {
-#         "precision": precision,
-#         "recall": recall,
-#         "f1_score": f1score,
-#         "support": support,
-#         "specificity": spec,
-#         "sensitivity": sensi,
-#         "auroc": auroc,
-#         "accuracy": accuracy,
-#         "balanced_accuracy": balanced_acc
-#     }
-
-#     return metrics
 
 def print_metrics(metrics, classifier_name="Classifier"):
     print(f"\n=== Metrics for {classifier_name} ===")

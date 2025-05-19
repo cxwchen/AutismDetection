@@ -46,23 +46,27 @@ sys.stdout = Tee(sys.stdout, log_file)
 # y = female_df.iloc[:, 0]
 data = pd.read_csv("abide_fc_aal.csv.gz", compression='gzip')
 X = data.iloc[:, 4:]
+Xfull = X.loc[:, X.columns.str.endswith('full')]
+Xpart = X.loc[:, X.columns.str.endswith('partial')]
 y = data.iloc[:, 3]
 
-Xtrain, Xtest, ytrain, ytest = performsplit(X, y)
+Xftrain, Xftest, ytrain, ytest = performsplit(Xfull, y)
+Xptrain, Xptest, ytrain, ytest = performsplit(Xpart, y)
+
+Xftrain, Xftest = normalizer(Xftrain, Xftest)
+Xptrain, Xptest = normalizer(Xptrain, Xptest)
+
 # #Mean imputation since the features contain NaN values
 # imputer = SimpleImputer(strategy='mean')
 # Xtrain = imputer.fit_transform(Xtrain)
 # Xtest = imputer.transform(Xtest)
+print("Using the AAL (116 regions) Atlas and nilearn extraction, train-test split of 20%")
+print("=========================================")
 
-Xtrain, Xtest = normalizer(Xtrain, Xtest)
-
-# Try resampling with SMOTE to improve accuracy
-# smote = SMOTE(random_state=42)
-# Xtrain, ytrain = smote.fit_resample(Xtrain, ytrain)
-
+print('Results for the full correlation features')
 
 # perform classification
-performCA(applyLogR, Xtrain, Xtest, ytrain, ytest)
+performCA(applyLogR, Xftrain, Xftest, ytrain, ytest)
 
 # svcdefault = SVC()
 # svcparams = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, svcdefault)
@@ -70,7 +74,7 @@ svcparams = {
     'kernel': 'linear',
     'C': 1
 }
-performCA(applySVM, Xtrain, Xtest, ytrain, ytest, params=svcparams)
+performCA(applySVM, Xftrain, Xftest, ytrain, ytest, params=svcparams)
 
 
 # rfdefault = RandomForestClassifier()
@@ -79,33 +83,42 @@ performCA(applySVM, Xtrain, Xtest, ytrain, ytest, params=svcparams)
 
 
 dtdefault = DecisionTreeClassifier()
-dtparams = bestDT(Xtrain, Xtest, ytrain, ytest, dtdefault)
-performCA(applyDT, Xtrain, Xtest, ytrain, ytest, params=dtparams)
+dtparams = bestDT(Xftrain, Xftest, ytrain, ytest, dtdefault)
+performCA(applyDT, Xftrain, Xftest, ytrain, ytest, params=dtparams)
 
 
-mlpdefault = MLPClassifier()
-mlpparams = bestMLP(Xtrain, Xtest, ytrain, ytest, mlpdefault)
-performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, params=mlpparams)
+# mlpdefault = MLPClassifier()
+# mlpparams = bestMLP(Xftrain, Xftest, ytrain, ytest, mlpdefault)
+# performCA(applyMLP, Xftrain, Xftest, ytrain, ytest, params=mlpparams)
 
-# Binarize features
-# medians = np.median(Xtrain, axis=0)
-# feat_train_bin = (Xtrain > medians).astype(int)
-# feat_test_bin = (Xtest > medians).astype(int)
 
-# # Compute address size
-# input_size = feat_train_bin.shape[1]
-# addressSize = max(1, input_size // 64)
+print('Results for partial correlation')
 
-# # Tune minScore
-# minScore_values = np.linspace(0, 1, 20)
-# best_minScore, _ = tune_minScore(feat_train_bin, feat_test_bin, ytrain, ytest,
-#                                 addressSize=addressSize,
-#                                 discriminatorLimit=4,
-#                                 minScore_values=minScore_values)
+# perform classification
+performCA(applyLogR, Xptrain, Xptest, ytrain, ytest)
 
-# # Run evaluation
-# performCA_cluswisard(applyClusWiSARD, feat_train_bin, feat_test_bin, ytrain, ytest, minScore=best_minScore)
-# metrics blabla
+# svcdefault = SVC()
+# svcparams = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, svcdefault)
+svcparams = {
+    'kernel': 'linear',
+    'C': 1
+}
+performCA(applySVM, Xptrain, Xptest, ytrain, ytest, params=svcparams)
+
+
+# rfdefault = RandomForestClassifier()
+# rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, rfdefault)
+# performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, params=rfparams)
+
+
+dtdefault = DecisionTreeClassifier()
+dtparams = bestDT(Xptrain, Xptest, ytrain, ytest, dtdefault)
+performCA(applyDT, Xptrain, Xptest, ytrain, ytest, params=dtparams)
+
+
+# mlpdefault = MLPClassifier()
+# mlpparams = bestMLP(Xptrain, Xptest, ytrain, ytest, mlpdefault)
+# performCA(applyMLP, Xptrain, Xptest, ytrain, ytest, params=mlpparams)
 
 
 

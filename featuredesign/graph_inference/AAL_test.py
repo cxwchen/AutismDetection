@@ -16,10 +16,12 @@ import networkx.algorithms.community as nx_comm
 
 from scipy.stats import pearsonr,skew, kurtosis
 from networkx.algorithms import community
+from community import community_louvain
 from sklearn.covariance import GraphicalLasso, LedoitWolf
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import mutual_info_regression
 from Normalized_laplacian import learn_normalized_laplacian
+from peak_stat import pk_stats
 
 
 def eig_centrality(G, max_attempts=3):
@@ -63,7 +65,24 @@ def graph_diameter(G):
         except:
             return np.nan
 
-def graphing(A, super=False, feats=False, plot=True, deg_trh=0, alpha=0e-0):
+def detect_communities(G, method='louvain', **kwargs):
+    """Detect communities using various algorithms with proper kwargs handling."""
+    if method == 'louvain':
+        return nx_comm.louvain_communities(G, resolution=kwargs.get('resolution', 1.0))
+    elif method == 'greedy_modularity':
+        return list(nx_comm.greedy_modularity_communities(G))
+    elif method == 'label_propagation':
+        return list(nx_comm.label_propagation_communities(G))
+    elif method == 'asyn_lpa':  # Asynchronous Label Propagation
+        return list(nx_comm.asyn_lpa_communities(G))
+    elif method == 'fluid':  # Fluid Communities
+        return list(nx_comm.fluid_communities(G, k=kwargs.get('k', 2)))
+    elif method == 'girvan_newman':
+        return next(nx_comm.girvan_newman(G))  # Returns 2 communities only
+    else:
+        raise ValueError(f"Unknown method: {method}. Choose: louvain|greedy_modularity|label_propagation|asyn_lpa|fluid|girvan_newman")
+
+def graphing(A, community_method=None, feats=False, plot=True, deg_trh=0, alpha=0e-0):
     """
     Function converting Adjacency matrix to a Graph
 
@@ -93,14 +112,21 @@ def graphing(A, super=False, feats=False, plot=True, deg_trh=0, alpha=0e-0):
 
     # Compute opacities (normalized weights)
     if weights_filt:
-        min_w = min(weights_filt)
-        max_w = max(weights_filt)
+        try:
+            min_w = min(weights_filt)
+            max_w = max(weights_filt)
 
-        # Handle case where all weights are equal
-        if max_w == min_w:
-            opacities = [0.5 for _ in weights_filt]  # Set uniform opacity
-        else:
-            opacities = [0.2 + 0.8 * (w - min_w) / (max_w - min_w) for w in weights_filt]
+            # Handle case where all weights are equal
+            if max_w == min_w:
+                opacities = [0.5 for _ in weights_filt]  # Set uniform opacity
+            else:
+                opacities = [0.2 + 0.8 * (w - min_w) / (max_w - min_w) for w in weights_filt]
+
+            # Ensure all opacities are within [0, 1]
+            opacities = [max(0.0, min(1.0, op)) for op in opacities]
+        except (ValueError, TypeError):
+            # Fallback if there are issues with the weights
+            opacities = [0.5 for _ in weights_filt]
     else:
         opacities = []
 
@@ -108,52 +134,39 @@ def graphing(A, super=False, feats=False, plot=True, deg_trh=0, alpha=0e-0):
     low_degree_nodes = [node for node, degree in G.degree() if degree < deg_trh]
     G.remove_nodes_from(low_degree_nodes)
 
-    if super:
-        # Detect communities
-        #communities = list(community.greedy_modularity_communities(G))
-        communities = nx_comm.louvain_communities(G, resolution=0.8)
-        print(f"Found {len(communities)} communities: {communities}")  # Debug
-        communities = [comm for comm in communities if len(comm) >= 2]  # Keep only size >= 2
-        print(f"Filtered communities: {communities}")
+    # Supergraph/community mode
+    if community_method:
+        communities = detect_communities(G, method=community_method)
+        communities = [c for c in communities if len(c) >= 2]  # Filter small communities
 
-        # Map original nodes to their community IDs
+        # Create supergraph
+        superG = nx.Graph()
         node_to_community = {node: i for i, comm in enumerate(communities) for node in comm}
 
-        # Create supernode graph
-        superG = nx.Graph()
-        superG.add_nodes_from(range(len(communities)))  # One node per community
+        # Add edges between communities
+        inter_edges = set()
+        for u, v in G.edges():
+            cu, cv = node_to_community.get(u), node_to_community.get(v)
+            if cu is not None and cv is not None and cu != cv:
+                inter_edges.add(tuple(sorted((cu, cv))))
 
-        # Track edges between communities
-        inter_community_edges = set()
-
-        # Check ALL original edges for inter-community connections
-        for u, v in nx.from_numpy_array(A).edges():  # Use original adjacency matrix
-            cu = node_to_community.get(u, -1)
-            cv = node_to_community.get(v, -1)
-            if cu != cv and cu != -1 and cv != -1:
-                # Add edge between communities (sorted to avoid duplicates like (1,0) vs (0,1))
-                edge = tuple(sorted((cu, cv)))
-                inter_community_edges.add(edge)
-
-        # Add edges to superG
-        superG.add_edges_from(inter_community_edges)
-        print(f"Supernode edges: {superG.edges()}")
-
-        # Update references for visualization
-        G = superG
-        edges = list(superG.edges())
-        opacities = [0.6] * len(edges)  # Uniform opacity for superedges
+        superG.add_edges_from(inter_edges)
+        G = superG  # Use supergraph for visualization/features
+        edges_filt = list(superG.edges())  # Only use superedges
+        opacities = [0.6] * len(edges_filt)  # Uniform opacity for superedges
 
     if plot:
-        # Create label dictionary: show node + 1
-        labels = {node: node + 1 for node in G.nodes()}
-        # 6. Visualize the coarsened graph
         pos = nx.spring_layout(G, k=0.5, seed=42, iterations=50)
         plt.figure(figsize=(6, 6))
+
+        # Draw nodes and labels
         nx.draw_networkx_nodes(G, pos, node_color='skyblue', node_size=100)
-        nx.draw_networkx_labels(G, pos, labels=labels, font_weight='bold')
-        if edges_filt:
-            nx.draw_networkx_edges(G, pos, edgelist=edges_filt, alpha=opacities,)
+        nx.draw_networkx_labels(G, pos, labels={n: n + 1 for n in G.nodes()}, font_weight='bold')
+
+        # Draw only edges that exist in the current graph
+        valid_edges = [e for e in edges_filt if e[0] in G.nodes() and e[1] in G.nodes()]
+        if valid_edges:
+            nx.draw_networkx_edges(G, pos, edgelist=valid_edges, alpha=opacities)
         plt.show()
 
     # 7. Compute Graph features
@@ -280,12 +293,12 @@ def pearson_corr(time_series_data, threshold=0.5, absolute_value=True):
             if absolute_value:
                 corr = abs(corr)
 
-            corr_matrix[i, j] = corr_matrix[j, i] = corr
-
             # Threshold for adjacency (skip diagonal)
             if i != j and corr > threshold:
                 adj_matrix[i, j] = adj_matrix[j, i] = 1
-
+                corr_matrix[i, j] = corr
+    print("adj:\n",adj_matrix)
+    print("corr:\n",corr_matrix)
     return adj_matrix, corr_matrix
 
 def partial_corr(ts_data, method = "ledoit", alpha=0.1):
@@ -359,7 +372,6 @@ def multiset_feats(data_list, filenames, subject_ids):
     Loops over all data recursively to compute specific features and stores them in a dataframe indexed per individual (subject ID).
 
     """
-    # os.makedirs(output_dir, exist_ok=True)
     df_app = pd.DataFrame(columns=stat_feats(data_list[0]).columns) # Initialize dataframe
     expanded_ids = []
 
@@ -368,14 +380,14 @@ def multiset_feats(data_list, filenames, subject_ids):
             continue  # Skip if loading failed
 
         df_stat = stat_feats(data) # Compute the statistical features
-        df_graph,df_ex = graphing(A= pearson_corr(data)[0], feats=True, plot=False) # Compute the graphical features using pearson correlation adjacency matrix
+        df_graph,df_ex = graphing(A= pearson_corr(data)[1], feats=True, plot=True, community_method="louvain") # Compute the graphical features using an estimation method: {pearson correlation adjacency matrix: [0] for binary, [1] for weighted; partial correlation; mutual info}
         df_conc = pd.merge(df_stat, df_graph, on='ROI', how='left') # Merge both region of interests of statistical and graph feature dataframes.
         if df_app.empty:
             df_app = df_conc  # First iteration in case df_app=empty: set df_app = df
         else:
             df_app = pd.concat([df_app, df_conc], ignore_index=True)
 
-        expanded_ids.extend([sid] * 116) # Pad subject IDs with copies for all ROIs
+        expanded_ids.extend([sid] * len(df_conc)) # Pad subject IDs with copies for all ROIs
 
     print("The appended dataframe:\n", df_app) # Appended dataframe for all inviduals in the dataset
     # Assign to dataframe
@@ -438,8 +450,9 @@ def multiset_pheno(df_wide):
 
 
 #-------{Main for testing}-------#
-# folder_path = r"C:\Users\Jochem\Documents\GitHub\AutismDetection\abide\female-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
-# data_arrays, file_paths, subject_ids, metadata = load_files(folder_path)
+if __name__ == "__main__":
+    folder_path = r"C:\Users\Jochem\Documents\GitHub\AutismDetection\abide\male-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
+    data_arrays, file_paths, subject_ids, metadata = load_files(folder_path)
 
 #stat_feats(data_arrays[0])
 #print(output)
@@ -452,11 +465,11 @@ def multiset_pheno(df_wide):
 #Adj_heatmap(C)
 #graphing(Laplacian, alpha=0.1)
 
-# output = multiset_feats(data_arrays[:5], file_paths)
-# print(output)
-# print(len(data_arrays))
+    output = multiset_feats(data_arrays[:5], file_paths)
+    print(output)
+    print(len(data_arrays))
 
-# print("subject ids: ", subject_ids)
+    print("subject ids: ", subject_ids)
 
-# output = multiset_pheno(output)
-# print("Output data:\n", output)
+    output = multiset_pheno(output)
+    print("Output data:\n", output)
