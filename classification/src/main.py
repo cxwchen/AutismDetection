@@ -59,20 +59,35 @@ Xtrain, Xtest = normalizer(Xtrain, Xtest)
 # Try resampling with SMOTE to improve accuracy
 # smote = SMOTE(random_state=42)
 # Xtrain, ytrain = smote.fit_resample(Xtrain, ytrain)
+print("Using the AAL (116 regions) Atlas and our own extraction, train-test split of 20%")
+print("=========================================")
 
 
 # perform classification
 performCA(applyLogR, Xtrain, Xtest, ytrain, ytest)
 
-svcdefault = SVC()
-params = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, svcdefault)
-performCA(applySVM, Xtrain, Xtest, ytrain, ytest, params=params)
+# svcdefault = SVC()
+# svcparams = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, svcdefault)
+svcparams = {
+    'kernel': 'linear',
+    'C': 1
+}
+performCA(applySVM, Xtrain, Xtest, ytrain, ytest, params=svcparams)
 
-performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest)
 
-performCA(applyDT, Xtrain, Xtest, ytrain, ytest)
+# rfdefault = RandomForestClassifier()
+# rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, rfdefault)
+# performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, params=rfparams)
 
-performCA(applyMLP, Xtrain, Xtest, ytrain, ytest)
+
+dtdefault = DecisionTreeClassifier()
+dtparams = bestDT(Xtrain, Xtest, ytrain, ytest, dtdefault)
+performCA(applyDT, Xtrain, Xtest, ytrain, ytest, params=dtparams)
+
+
+mlpdefault = MLPClassifier()
+mlpparams = bestMLP(Xtrain, Xtest, ytrain, ytest, mlpdefault)
+performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, params=mlpparams)
 
 # Binarize features
 # medians = np.median(Xtrain, axis=0)
