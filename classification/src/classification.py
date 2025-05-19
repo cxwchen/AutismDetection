@@ -1,4 +1,5 @@
 from performance import *
+import numpy as np
 
 
 def performCA(func, feat_train, feat_test, ytrain, ytest, **kwargs):
@@ -26,3 +27,22 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, **kwargs):
     
 
 ## separate function for ClusWiSARD
+def performCA_cluswisard(func, feat_train, feat_test, ytrain, ytest, **kwargs):
+    """
+    Performs classification and evaluation specifically for ClusWiSARD.
+    """
+    model = func(feat_train, ytrain, **kwargs)
+
+    # Predict using ClusWiSARD
+    ypred = model.classify(feat_test)
+
+    # ClusWiSARD doesn't support probabilities -> use dummy values for AUROC
+    # We'll use 1 for predicted class 1 and 0 for class 0
+    yprob = np.array(ypred, dtype=float)
+
+    # Get metrics (robust to missing probability info)
+    metrics = get_metrics(ytest, ypred, yprob)
+
+    clf_name = model.__class__.__name__
+    plot_confusion_matrix(ytest, ypred, model)
+    print_metrics(metrics, clf_name)
