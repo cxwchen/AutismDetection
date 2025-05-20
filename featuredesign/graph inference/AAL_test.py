@@ -21,8 +21,8 @@ from sklearn.covariance import GraphicalLasso, LedoitWolf
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import mutual_info_regression
 from Normalized_laplacian import learn_normalized_laplacian
-from peak_stat import pk_stats,corr_stats
 from itertools import combinations
+from peak_stat import pk_stats
 
 def eig_centrality(G, max_attempts=3):
     """
@@ -368,18 +368,23 @@ def stat_feats(x, n_rois = 116):
         }
         feature_list.append(features)
 
-        # Functional connectivity matrix
+    # Compute peak statistics
+    df_pk = pk_stats(x)
+
+    # Functional connectivity matrix
     fc_matrix = np.corrcoef(x)
     triu_indices = np.triu_indices_from(fc_matrix, k=1)
     fc_vector = fc_matrix[triu_indices]
 
     df = pd.DataFrame(feature_list)
+    df = pd.concat([df, df_pk], axis=1)
     # Generate ROI labels & pairs for upper triangle (exclude diagonal)
     aal_labels = [f"ROI_{i+1}" for i in range(len(df))]
     roi_pairs = list(combinations(aal_labels, 2))
     feature_names = [f"Corr_{r1}-{r2.split('_')[1]}" for r1, r2 in roi_pairs]
     df_fc = pd.DataFrame([fc_vector], columns=feature_names)
     df.insert(0, 'ROI', aal_labels)
+    print("pk:\n", df)
 
     return df, df_fc
 
