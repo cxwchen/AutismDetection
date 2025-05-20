@@ -21,8 +21,8 @@ from sklearn.covariance import GraphicalLasso, LedoitWolf
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import mutual_info_regression
 from Normalized_laplacian import learn_normalized_laplacian
-from peak_stat import pk_stats
-
+from peak_stat import pk_stats,corr_stats
+from itertools import combinations
 
 def eig_centrality(G, max_attempts=3):
     """
@@ -223,6 +223,7 @@ def load_files(folder_path):
     Returns:
     - List of 2D numpy arrays (one per file)
     - List of filenames
+    - List of institute names & subject ids
     - Dictionary with metadata about dimensions
     """
     # Get all .1D files sorted alphabetically
@@ -230,6 +231,7 @@ def load_files(folder_path):
 
     all_data = []
     subject_ids = []
+    institute_names = []
     file_info = {
         'total_files': len(file_list),
         'timepoints_per_file': [],
@@ -243,9 +245,13 @@ def load_files(folder_path):
             all_data.append(data)
             filename = os.path.basename(file_path)
 
-            # Store subject IDs
+            # Extract institute name and subject ID from filename
+            institute = filename.split('_005')[0]
             subject_id = '005' + filename.split('_005')[1].split('_')[0]
+
+            institute_names.append(institute)
             subject_ids.append(subject_id)
+
             # Store metadata
             file_info['timepoints_per_file'].append(data.shape[0])
             file_info['series_per_file'].append(data.shape[1])
@@ -255,9 +261,10 @@ def load_files(folder_path):
         except Exception as e:
             print(f"Error loading {file_path}: {str(e)}")
             all_data.append(None)
+            subject_ids.append(None)
+            institute_names.append(None)
 
-    return all_data, file_list, subject_ids, file_info
-
+    return all_data, file_list, subject_ids, institute_names, file_info
 
 def pearson_corr(time_series_data, threshold=0.5, absolute_value=True):
     """
@@ -351,51 +358,72 @@ def stat_feats(x, n_rois = 116):
     # Extract features for each time series
     feature_list = []
     for ts in x:
+        ts = np.nan_to_num(np.asarray(ts), nan=0.0, posinf=0.0, neginf=0.0)
         features = {
-            'mean': np.mean(ts),
-            'std': np.std(ts),
-            'SNR': np.average(np.divide(np.mean(x, axis=0), np.std(x, axis=0), where=np.std(x, axis=0) != 0, out=np.zeros_like(np.mean(x, axis=0)))),
-            'Skewness': skew(ts),
-            'Kurtosis': kurtosis(ts)
+            'mean': np.mean(ts, axis=0),
+            'std': np.std(ts, axis=0),
+            'SNR': np.mean(ts, axis=0) / (np.std(ts, axis=0) + 1e-10),
+            'Skewness': skew(ts, axis=0),
+            'Kurtosis': kurtosis(ts, axis=0)
         }
         feature_list.append(features)
 
-    # Convert to DataFrame
-    df = pd.DataFrame(feature_list)
-    df.insert(0, 'ROI', [f'ROI_{i + 1}' for i in range(len(df))])
-    #df.to_csv('aal_feats.csv', index=False)
-    #print(df)
-    return df
+        # Functional connectivity matrix
+    fc_matrix = np.corrcoef(x)
+    triu_indices = np.triu_indices_from(fc_matrix, k=1)
+    fc_vector = fc_matrix[triu_indices]
 
-def multiset_feats(data_list, filenames, output_dir="feature_outputs"):
+    df = pd.DataFrame(feature_list)
+    # Generate ROI labels & pairs for upper triangle (exclude diagonal)
+    aal_labels = [f"ROI_{i+1}" for i in range(len(df))]
+    roi_pairs = list(combinations(aal_labels, 2))
+    feature_names = [f"Corr_{r1}-{r2.split('_')[1]}" for r1, r2 in roi_pairs]
+    df_fc = pd.DataFrame([fc_vector], columns=feature_names)
+    df.insert(0, 'ROI', aal_labels)
+
+    return df, df_fc
+
+def multiset_feats(data_list):
     """
     Loops over all data recursively to compute specific features and stores them in a dataframe indexed per individual (subject ID).
 
     """
-    os.makedirs(output_dir, exist_ok=True)
-    df_app = pd.DataFrame(columns=stat_feats(data_list[0]).columns) # Initialize dataframe
+    df_app = pd.DataFrame(columns=stat_feats(data_list[0])[0].columns) # Initialize dataframe
+    df_global_list = []
+    df_fc_list = []
     expanded_ids = []
 
     for data, sid in zip(data_list, subject_ids):
         if data is None:
             continue  # Skip if loading failed
 
-        df_stat = stat_feats(data) # Compute the statistical features
-        df_graph,df_ex = graphing(A= pearson_corr(data)[1], feats=True, plot=True, community_method="louvain") # Compute the graphical features using an estimation method: {pearson correlation adjacency matrix: [0] for binary, [1] for weighted; partial correlation; mutual info}
-        df_conc = pd.merge(df_stat, df_graph, on='ROI', how='left') # Merge both region of interests of statistical and graph feature dataframes.
+        df_stat, df_fc = stat_feats(data) # Compute the statistical features
+        df_graph, df_global = graphing(A= pearson_corr(data)[1], feats=True, plot=True) # Compute the graphical features
+        df_roi = pd.merge(df_stat, df_graph, on='ROI', how='left') # Merge both dataframes
+        df_global_list.append(df_global)
+        df_fc_list.append(df_fc)
         if df_app.empty:
-            df_app = df_conc  # First iteration in case df_app=empty: set df_app = df
+            df_app = df_roi  # First iteration in case df_app=empty: set df_app = df
         else:
-            df_app = pd.concat([df_app, df_conc], ignore_index=True)
+            df_app = pd.concat([df_app, df_roi], ignore_index=True)
 
-        expanded_ids.extend([sid] * len(df_conc)) # Pad subject IDs with copies for all ROIs
 
-    print("The appended dataframe:\n", df_app) # Appended dataframe for all inviduals in the dataset
+        expanded_ids.extend([sid] * len(df_roi)) # Pad subject IDs with copies for all ROIs
+
+    print("appended dataframe:\n",df_app)
+    df_fc = pd.concat(df_fc_list, ignore_index=True)
+    df_global = pd.concat(df_global_list, ignore_index=True)
+    print("fc+glb:\n",pd.concat([df_fc, df_global], axis=1))
+
     # Assign to dataframe
     df_app['subject_id'] = expanded_ids
 
     # Automatically pivots all feature columns
-    df_wide = df_app.pivot(index='subject_id', columns='ROI', values=df_app.columns.difference(['ROI', 'subject_id']))
+    df_wide = df_app.pivot(
+        index=['subject_id'],
+        columns='ROI',
+        values=df_app.columns.difference(['ROI', 'subject_id'])
+    )
 
     # Flatten column names
     df_wide.columns = [f"{stat}_{roi}" for stat, roi in df_wide.columns]
@@ -406,17 +434,15 @@ def multiset_feats(data_list, filenames, output_dir="feature_outputs"):
         match = re.search(r'_(\d+)$', col)
         return int(match.group(1)) if match else -1
 
-    # Sort columns: keep subject_id first, then group by ROI
+    # Sort columns: keep subject_id and institute first, then group by ROI
     cols = df_wide.columns.tolist()
-    subject_col = ['subject_id']
-    feature_cols = [col for col in cols if col != 'subject_id']
+    id_cols = ['subject_id']
+    feature_cols = [col for col in cols if col not in id_cols]
 
     # Group by ROI number
     features_grouped = sorted(feature_cols, key=lambda x: (extract_roi_num(x), x.split('_')[0]))
-
-    # Reorder columns
-    ordered_cols = subject_col + features_grouped
-    df_wide = df_wide[ordered_cols]
+    df = pd.concat([df_fc, df_global], axis=1)
+    df_wide = pd.concat([df_wide[id_cols + features_grouped], df], axis=1)
 
     return df_wide
 
@@ -424,7 +450,7 @@ def multiset_pheno(df_wide):
     """
     Function that loads phenotypic data and merges it into the input dataframe.
 
-    - DX_GROUP: 1=Allistic,2=ASD
+    - DX_GROUP: 1=ASD,2=ALL
     - SEX: 1=Male,2=Female
 
     """
@@ -435,14 +461,14 @@ def multiset_pheno(df_wide):
     df_wide['subject_id'] = df_wide['subject_id'].astype(str).str.zfill(7)
 
     # Select desired phenotypic columns
-    df_pheno = df_labels[['SUB_ID', 'DX_GROUP', 'SEX']]
+    df_pheno = df_labels[['SUB_ID','SITE_ID', 'DX_GROUP', 'SEX']]
 
     # Merge and drop SUB_ID
     df_merged = df_wide.merge(df_pheno, left_on='subject_id', right_on='SUB_ID', how='left')
     df_merged.drop(columns='SUB_ID', inplace=True)
 
     # Reorder phenotypic columns
-    phenotype_cols = ['DX_GROUP', 'SEX']
+    phenotype_cols = ['DX_GROUP', 'SEX', 'SITE_ID']
     cols = phenotype_cols + [col for col in df_merged.columns if col not in phenotype_cols]
     df_merged = df_merged[cols]
 
@@ -452,7 +478,7 @@ def multiset_pheno(df_wide):
 
 #-------{Main for testing}-------#
 folder_path = r"C:\Users\Jochem\Documents\GitHub\AutismDetection\abide\male-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
-data_arrays, file_paths, subject_ids, metadata = load_files(folder_path)
+data_arrays, file_paths, subject_ids, institute_names, metadata = load_files(folder_path)
 
 #stat_feats(data_arrays[0])
 #print(output)
@@ -465,11 +491,12 @@ data_arrays, file_paths, subject_ids, metadata = load_files(folder_path)
 #Adj_heatmap(C)
 #graphing(Laplacian, alpha=0.1)
 
-output = multiset_feats(data_arrays[:5], file_paths)
+output = multiset_feats(data_arrays[:5])
 print(output)
 print(len(data_arrays))
 
 print("subject ids: ", subject_ids)
+print("institute names: ", institute_names)
 
 output = multiset_pheno(output)
 print("Output data:\n", output)
