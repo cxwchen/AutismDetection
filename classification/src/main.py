@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
+from imblearn.over_sampling import SMOTE
 
 from loaddata import *
 from classification import *
@@ -40,50 +41,72 @@ sys.stdout = Tee(sys.stdout, log_file)
 
 
 # load data
-female_df = pd.read_csv("female_df_merged.csv")
-X = female_df.iloc[:, 3:]
-y = female_df.iloc[:, 0]
+# female_df = pd.read_csv("female_df_merged.csv")
+# X = female_df.iloc[:, 3:]
+# y = female_df.iloc[:, 0]
+data = pd.read_csv("ourfeats.csv.gz", compression='gzip')
+X = data.iloc[:, 3:]
+y = data.iloc[:, 1]
 
 Xtrain, Xtest, ytrain, ytest = performsplit(X, y)
+# #Mean imputation since the features contain NaN values
+# imputer = SimpleImputer(strategy='mean')
+# Xtrain = imputer.fit_transform(Xtrain)
+# Xtest = imputer.transform(Xtest)
+
 Xtrain, Xtest = normalizer(Xtrain, Xtest)
 
-#Mean imputation since the features contain NaN values
-imputer = SimpleImputer(strategy='mean')
-Xtrain = imputer.fit_transform(Xtrain)
-Xtest = imputer.transform(Xtest)
+# Try resampling with SMOTE to improve accuracy
+# smote = SMOTE(random_state=42)
+# Xtrain, ytrain = smote.fit_resample(Xtrain, ytrain)
+print("Using the AAL (116 regions) Atlas and our own extraction, train-test split of 20%")
+print("=========================================")
+
 
 # perform classification
-# performCA(applyLogR, Xtrain, Xtest, ytrain, ytest)
+performCA(applyLogR, Xtrain, Xtest, ytrain, ytest)
 
 # svcdefault = SVC()
-# params = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, svcdefault)
-# performCA(applySVM, Xtrain, Xtest, ytrain, ytest, params=params)
+# svcparams = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, svcdefault)
+svcparams = {
+    'kernel': 'linear',
+    'C': 1
+}
+performCA(applySVM, Xtrain, Xtest, ytrain, ytest, params=svcparams)
 
-# performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest)
 
-# performCA(applyDT, Xtrain, Xtest, ytrain, ytest)
+# rfdefault = RandomForestClassifier()
+# rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, rfdefault)
+# performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, params=rfparams)
 
-# performCA(applyMLP, Xtrain, Xtest, ytrain, ytest)
+
+dtdefault = DecisionTreeClassifier()
+dtparams = bestDT(Xtrain, Xtest, ytrain, ytest, dtdefault)
+performCA(applyDT, Xtrain, Xtest, ytrain, ytest, params=dtparams)
+
+
+mlpdefault = MLPClassifier()
+mlpparams = bestMLP(Xtrain, Xtest, ytrain, ytest, mlpdefault)
+performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, params=mlpparams)
 
 # Binarize features
-medians = np.median(Xtrain, axis=0)
-feat_train_bin = (Xtrain > medians).astype(int)
-feat_test_bin = (Xtest > medians).astype(int)
+# medians = np.median(Xtrain, axis=0)
+# feat_train_bin = (Xtrain > medians).astype(int)
+# feat_test_bin = (Xtest > medians).astype(int)
 
-# Compute address size
-input_size = feat_train_bin.shape[1]
-addressSize = max(1, input_size // 64)
+# # Compute address size
+# input_size = feat_train_bin.shape[1]
+# addressSize = max(1, input_size // 64)
 
-# Tune minScore
-minScore_values = np.linspace(0, 1, 20)
-best_minScore, _ = tune_minScore(feat_train_bin, feat_test_bin, ytrain, ytest,
-                                addressSize=addressSize,
-                                discriminatorLimit=4,
-                                minScore_values=minScore_values)
+# # Tune minScore
+# minScore_values = np.linspace(0, 1, 20)
+# best_minScore, _ = tune_minScore(feat_train_bin, feat_test_bin, ytrain, ytest,
+#                                 addressSize=addressSize,
+#                                 discriminatorLimit=4,
+#                                 minScore_values=minScore_values)
 
-# Run evaluation
-performCA(applyClusWiSARD, feat_train_bin, feat_test_bin, ytrain, ytest, minScore=best_minScore)
-
+# # Run evaluation
+# performCA_cluswisard(applyClusWiSARD, feat_train_bin, feat_test_bin, ytrain, ytest, minScore=best_minScore)
 # metrics blabla
 
 

@@ -29,17 +29,34 @@ def plot_confusion_matrix(y_true, y_pred, model):
     plt.title(f'Confusion Matrix ({model.__class__.__name__})')
     os.makedirs('plots', exist_ok=True)
     plt.savefig(f'plots/conf_matrix_{model.__class__.__name__}.png', bbox_inches='tight')
-    plt.show(block=False)  # Non-blocking
+    # plt.show(block=False)  # Non-blocking
     # plt.pause(0.1)
 
-def get_metrics(ytrue, ypred, yprob):
+def get_metrics(ytrue, ypred, yprob=None):
+    """
+    Compute common classification metrics.
 
-    # Print classification report
+    Parameters:
+        ytrue : array-like
+            True class labels
+        ypred : array-like
+            Predicted class labels
+        yprob : array-like or None
+            Probabilities or decision scores (optional for AUROC)
+
+    Returns:
+        metrics : dict
+            Dictionary of computed metrics
+    """
     print("Classification report:\n", classification_report(ytrue, ypred))
 
-    # Metrics
     precision, recall, f1score, support = precision_recall_fscore_support(ytrue, ypred, zero_division=0)
-    auroc = roc_auc_score(ytrue, yprob)
+
+    try:
+        auroc = roc_auc_score(ytrue, yprob)
+    except:
+        auroc = None  # AUROC can't be computed
+
     spec = get_specificity(ytrue, ypred)
     sensi = get_sensitivity(ytrue, ypred)
     accuracy = accuracy_score(ytrue, ypred)
@@ -58,6 +75,7 @@ def get_metrics(ytrue, ypred, yprob):
     }
 
     return metrics
+
 
 def print_metrics(metrics, classifier_name="Classifier"):
     print(f"\n=== Metrics for {classifier_name} ===")

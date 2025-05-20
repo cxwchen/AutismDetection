@@ -1,5 +1,4 @@
 *.spyproject
 __pycache__/
 *.env
-plots/
-logs/
+*.csv*

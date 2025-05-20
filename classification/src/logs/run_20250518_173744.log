@@ -1,0 +1,72 @@
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.74      0.79      0.76        90
+           1       0.74      0.68      0.71        78
+
+    accuracy                           0.74       168
+   macro avg       0.74      0.73      0.74       168
+weighted avg       0.74      0.74      0.74       168
+
+
+=== Metrics for LogisticRegression ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.740
+    Recall:    0.789
+    F1 Score:  0.763
+    Support:   90
+  Autism:
+    Precision: 0.736
+    Recall:    0.679
+    F1 Score:  0.707
+    Support:   78
+
+Overall Metrics:
+  Specificity:          0.789
+  Sensitivity:          0.679
+  AUROC:                0.770
+  Accuracy:             0.738
+  Balanced Accuracy:    0.734
+=====================================
+Starting RandomizedSearchCV fitting...
+Fitting 5 folds for each of 50 candidates, totalling 250 fits
+RandomizedSearchCV fitting completed.
+Best Parameters Found: {'activation': 'tanh', 'alpha': np.float64(0.0006152656745540253), 'hidden_layer_sizes': (50,), 'learning_rate_init': np.float64(0.07405040815107786), 'solver': 'sgd'}
+Accuracy:  0.6786
+Recall:    0.6410
+Precision: 0.6579
+F1 Score:  0.6494
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.74      0.73      0.74        90
+           1       0.70      0.71      0.70        78
+
+    accuracy                           0.72       168
+   macro avg       0.72      0.72      0.72       168
+weighted avg       0.72      0.72      0.72       168
+
+
+=== Metrics for MLPClassifier ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.742
+    Recall:    0.733
+    F1 Score:  0.737
+    Support:   90
+  Autism:
+    Precision: 0.696
+    Recall:    0.705
+    F1 Score:  0.701
+    Support:   78
+
+Overall Metrics:
+  Specificity:          0.733
+  Sensitivity:          0.705
+  AUROC:                0.781
+  Accuracy:             0.720
+  Balanced Accuracy:    0.719
+=====================================

@@ -76,7 +76,7 @@ def applyLogR(feat_train, y):
     # ypred = model.predict(feat_test)
     return model
 
-def applyRandForest(feat_train, y):
+def applyRandForest(feat_train, y, params=None):
     """
     -----------------------------------------------------------------------------------------
     This function applies Random Forest (RF) from sklearn on the training features
@@ -95,12 +95,15 @@ def applyRandForest(feat_train, y):
         The trained RF model
     
     """
-    model = RandomForestClassifier()
+    if params is None:
+            params = {}
+
+    model = RandomForestClassifier(**params)
     model.fit(feat_train, y)
     # ypred = model.predict(feat_test)
     return model
 
-def applyDT(feat_train, y):
+def applyDT(feat_train, y, params=None):
     """
     -----------------------------------------------------------------------------------------
     This function applies Decision Tree (DT) from sklearn on the training features
@@ -119,13 +122,15 @@ def applyDT(feat_train, y):
         The trained DT model
     
     """
+    if params is None:
+        params = {}
         
-    model = DecisionTreeClassifier()
+    model = DecisionTreeClassifier(**params)
     model.fit(feat_train, y)
     # ypred = model.predict(feat_test)
     return model
 
-def applyMLP(feat_train, y):
+def applyMLP(feat_train, y, params=None):
     """
     -----------------------------------------------------------------------------------------
     This function applies Multi-Layer Perceptron (MLP) from sklearn on the training features
@@ -144,8 +149,10 @@ def applyMLP(feat_train, y):
         The trained MLP model
     
     """
+    if params is None:
+        params = {}
 
-    model = MLPClassifier() #default: one layer with 100 units
+    model = MLPClassifier(**params) #default: one layer with 100 units
     model.fit(feat_train, y)
     return model
 
@@ -173,6 +180,15 @@ def applyClusWiSARD(feat_train, y, minScore):
     if not isinstance(feat_train, np.ndarray):
         feat_train = np.array(feat_train)
 
+    if isinstance(y, pd.Series):
+        y = y.to_numpy()
+
+    Xtrain_list = feat_train.astype(int).tolist()
+
+    # Convert labels to list of strings (or keep as strings if already)
+    y_str = [str(label) for label in y]
+
+    # model.train(Xtrain_list, y_str)
     
     # ClusWiSARD expects binary input
     medians = np.median(feat_train, axis=0)
@@ -181,7 +197,7 @@ def applyClusWiSARD(feat_train, y, minScore):
     input_size = binarized_feat.shape[1]
     addressSize = max(1, input_size // 64)
 
-    model = ClusWisard(addressSize, minScore=minScore, discriminatorLimit=4) #minScore will be added after hyperparameter tuning
-    model.fit(feat_train, y)
+    model = ClusWisard(addressSize, minScore, 4, 1) #minScore will be added after hyperparameter tuning
+    model.train(binarized_feat, y_str)
     return model
 
