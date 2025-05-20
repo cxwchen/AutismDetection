@@ -20,7 +20,7 @@ AAL_test = importlib.import_module('AAL_test')
 print("Loading Jochems functions successfully!")
 
 def load_data(filepath):
-    data_arrays, file_paths, subject_ids, metadata = AAL_test.load_files(filepath)
+    data_arrays, file_paths, subject_ids, institute_names, metadata = AAL_test.load_files(filepath)
     df = AAL_test.multiset_feats(data_arrays, file_paths, subject_ids)
     return df
 
@@ -34,14 +34,14 @@ def add_phenotypic_info(df, save_as=None):
     df['subject_id'] = df['subject_id'].astype(str).str.zfill(7)
 
     # Select desired phenotypic columns
-    df_pheno = df_labels[['SUB_ID', 'DX_GROUP', 'SEX']]
+    df_pheno = df_labels[['SUB_ID', 'SITE_ID', 'DX_GROUP', 'SEX']]
 
     # Merge and drop SUB_ID
     df_merged = df.merge(df_pheno, left_on='subject_id', right_on='SUB_ID', how='left')
     df_merged.drop(columns='SUB_ID', inplace=True)
 
     # Reorder phenotypic columns
-    phenotype_cols = ['DX_GROUP', 'SEX']
+    phenotype_cols = ['DX_GROUP', 'SEX', 'SITE_ID']
     cols = phenotype_cols + [col for col in df_merged.columns if col not in phenotype_cols]
     df_merged = df_merged[cols]
 
@@ -49,7 +49,7 @@ def add_phenotypic_info(df, save_as=None):
     df_merged['DX_GROUP'] = df_merged['DX_GROUP'].map({1: 1, 2: 0})
 
     if save_as:
-        df_merged.to_csv(f"{save_as}.csv", index=False)
+        df_merged.to_csv(f"{save_as}.csv.gz", index=False, compression='gzip')
 
     return df_merged
 
