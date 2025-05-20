@@ -5,6 +5,7 @@ female_df = pd.read_csv("female_df_merged.csv.gz")
 
 # Count values in the DX_group column
 fcounts = female_df['DX_GROUP'].value_counts()
+female_df_corr = female_df.loc[: , female_df.columns.str.startswith('Corr')]
 
 # Print the results
 print(f"Number of female subjects with autism: {fcounts.get(1, 0)}")
