@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 from PIL import Image, ImageTk, ImageGrab
 from ctypes import windll
+
 from classifiersGUI import *
 from selection_buttons import*
 import selection_buttons
@@ -16,6 +17,7 @@ from hyperparametertuningGUI import *
 from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 import hyperparametertuningGUI
+
 import code
 import io
 import contextlib
@@ -42,7 +44,9 @@ X, y = make_classification(
 Xtrain, Xtest, ytrain, ytest = train_test_split(X, y, test_size=0.2, random_state=42)
 
 svcdefault=SVC()
+
 params = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, hyperparametertuningGUI.param_grid, svcdefault)
+
 model = applySVM(Xtrain, ytrain, params)
 #======================================================
 
