@@ -1,7 +1,7 @@
 import scipy.io
 from sklearn.model_selection import KFold
 from sklearn.model_selection import train_test_split
-from skfeature.function.wrapper import svm_backward as fs
+from skfeature.function.wrapper import decision_tree_backward as fs
 from sklearn import svm
 import pandas as pd
 from sklearn.metrics import accuracy_score
@@ -12,6 +12,10 @@ from sklearn.impute import SimpleImputer
 def main():
     # Load with encoding fix
     data = pd.read_csv('ABIDEII_Composite_Phenotypic.csv', encoding='ISO-8859-1')
+
+    # Choose relevant features
+    #columns_to_use = ['DX_GROUP', 'AGE_AT_SCAN ', 'SEX', 'FIQ', 'VIQ', 'PIQ', 'HANDEDNESS_CATEGORY'] #change to wanted features
+    #data = data[columns_to_use]
 
     # Drop rows where DX_GROUP is missing
     data = data[data['DX_GROUP'].notna()]
@@ -41,42 +45,41 @@ def main():
     # Use train_test_split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 42)
 
-    max_k = 5
+    max_k = 10
     acc_matrix = [[] for _ in range(max_k)]
+    best_features = []
 
 
-#    for train_idx, test_idx in ss.split(X, y):
+    for train_idx, test_idx in ss.split(X, y):
         
-#        # select features from training data
- #       idx = fs.svm_backward(X[train_idx], y[train_idx], max_k)
-#
-#        for k in range(1, max_k + 1):
-    #        top_k = idx[:k]
-   #         clf.fit(X[train_idx][:, top_k], y[train_idx])
-  #          y_pred = clf.predict(X[test_idx][:, top_k])
- #           acc = accuracy_score(y[test_idx], y_pred)
-#            acc_matrix[k - 1].append(acc)
+        # select features from training data
+        idx = fs.svm_backward(X[train_idx], y[train_idx], max_k)
+
+        for k in range(1, max_k + 1):
+            top_k = idx[:k]
+            model = clas.applySVM(X[train_idx][:, top_k], y[train_idx])
+            y_pred = model.predict(X[test_idx][:, top_k])
+            acc = accuracy_score(y[test_idx], y_pred)
+            acc_matrix[k - 1].append(acc)
 
         
     # select features from training data
-    idx = fs.svm_backward(X_train.values, y_train.values, max_k)
+    #idx = fs.decision_tree_backward(X_train, y_train, max_k)
 
-    best_features = []
-
-    for k in range(1, max_k + 1):
-        top_k = idx[:k]
+    #for k in range(1, max_k + 1):
+    #    top_k = idx[:k]
 
         # Get the feature names corresponding to the selected features
-        top_k_feature_names = X_train.columns[top_k].tolist()
-        best_features.append((k, top_k_feature_names))
+    #    top_k_feature_names = X_train.columns[top_k].tolist()
+    #    best_features.append((k, top_k_feature_names))
 
-        X_train_top_k = X_train.iloc[:, top_k]
-        X_test_top_k = X_test.iloc[:, top_k]
+    #    X_train_top_k = X_train.iloc[:, top_k]
+    #    X_test_top_k = X_test.iloc[:, top_k]
 
-        model = clas.applySVM(X_train_top_k, y_train)
-        y_predict = model.predict(X_test_top_k)
-        acc = accuracy_score(y_test, y_predict)
-        acc_matrix[k - 1].append(acc)
+    #    model = clas.applySVM(X_train_top_k, y_train)
+    #    y_predict = model.predict(X_test_top_k)
+    #    acc = accuracy_score(y_test, y_predict)
+    #    acc_matrix[k - 1].append(acc)
 
     
     avg_acc = [np.mean(accs) for accs in acc_matrix]
