@@ -110,23 +110,23 @@ def bestSVM_RS(Xtrain, Xtest, ytrain, ytest, svcdefault):
     model = rsearch.best_estimator_
     y_pred = model.predict(Xtest)
 
-    accuracy = accuracy_score(ytest, y_pred)
-    recall = recall_score(ytest, y_pred)
-    precision = precision_score(ytest, y_pred)
-    f1 = f1_score(ytest, y_pred)
+    # accuracy = accuracy_score(ytest, y_pred)
+    # recall = recall_score(ytest, y_pred)
+    # precision = precision_score(ytest, y_pred)
+    # f1 = f1_score(ytest, y_pred)
 
-    print(f"Accuracy:  {accuracy:.4f}")
-    print(f"Recall:    {recall:.4f}")
-    print(f"Precision: {precision:.4f}")
-    print(f"F1 Score:  {f1:.4f}")
+    # print(f"Accuracy:  {accuracy:.4f}")
+    # print(f"Recall:    {recall:.4f}")
+    # print(f"Precision: {precision:.4f}")
+    # print(f"F1 Score:  {f1:.4f}")
 
-    confmat = confusion_matrix(ytest, y_pred)
-    plt.figure(figsize=(8,6))
-    sns.heatmap(confmat, annot=True, fmt='d', cmap='flare')
-    plt.xlabel('Predicted')
-    plt.ylabel('True')
-    plt.title('Confusion Matrix of SVM using RandomizedSearchCV')
-    plt.show(block=False)
+    # confmat = confusion_matrix(ytest, y_pred)
+    # plt.figure(figsize=(8,6))
+    # sns.heatmap(confmat, annot=True, fmt='d', cmap='flare')
+    # plt.xlabel('Predicted')
+    # plt.ylabel('True')
+    # plt.title('Confusion Matrix of SVM using RandomizedSearchCV')
+    # plt.show(block=False)
 
     return rsearch.best_params_
 
@@ -159,32 +159,32 @@ def bestDT(Xtrain, Xtest, ytrain, ytest, dtdefault):
     model = rsearch.best_estimator_
     y_pred = model.predict(Xtest)
 
-    accuracy = accuracy_score(ytest, y_pred)
-    recall = recall_score(ytest, y_pred)
-    precision = precision_score(ytest, y_pred)
-    f1 = f1_score(ytest, y_pred)
+    # accuracy = accuracy_score(ytest, y_pred)
+    # recall = recall_score(ytest, y_pred)
+    # precision = precision_score(ytest, y_pred)
+    # f1 = f1_score(ytest, y_pred)
 
-    print(f"Accuracy:  {accuracy:.4f}")
-    print(f"Recall:    {recall:.4f}")
-    print(f"Precision: {precision:.4f}")
-    print(f"F1 Score:  {f1:.4f}")
+    # print(f"Accuracy:  {accuracy:.4f}")
+    # print(f"Recall:    {recall:.4f}")
+    # print(f"Precision: {precision:.4f}")
+    # print(f"F1 Score:  {f1:.4f}")
 
-    confmat = confusion_matrix(ytest, y_pred)
-    plt.figure(figsize=(8,6))
-    sns.heatmap(confmat, annot=True, fmt='d', cmap='flare')
-    plt.xlabel('Predicted')
-    plt.ylabel('True')
-    plt.title('Confusion Matrix of Decision Tree using RandomizedSearchCV')
-    plt.show(block=False)
+    # confmat = confusion_matrix(ytest, y_pred)
+    # plt.figure(figsize=(8,6))
+    # sns.heatmap(confmat, annot=True, fmt='d', cmap='flare')
+    # plt.xlabel('Predicted')
+    # plt.ylabel('True')
+    # plt.title('Confusion Matrix of Decision Tree using RandomizedSearchCV')
+    # plt.show(block=False)
 
     return rsearch.best_params_
 
 def bestRF(Xtrain, Xtest, ytrain, ytest, rfdefault):
     param_grid = {
         'n_estimators': randint(50, 300),
-        'max_depth': [None] + list(np.arange(5, 30)),
-        'min_samples_split': randint(2, 20),
-        'min_samples_leaf': randint(1, 20),
+        'max_depth': [None] + list(np.arange(5, 31, 5)),
+        'min_samples_split': [2, 5, 10],
+        'min_samples_leaf': [1, 2, 4],
         'max_features': ['sqrt', 'log2', None],
         'bootstrap': [True, False]
     }
@@ -210,23 +210,23 @@ def bestRF(Xtrain, Xtest, ytrain, ytest, rfdefault):
     model = rsearch.best_estimator_
     y_pred = model.predict(Xtest)
 
-    accuracy = accuracy_score(ytest, y_pred)
-    recall = recall_score(ytest, y_pred)
-    precision = precision_score(ytest, y_pred)
-    f1 = f1_score(ytest, y_pred)
+    # accuracy = accuracy_score(ytest, y_pred)
+    # recall = recall_score(ytest, y_pred)
+    # precision = precision_score(ytest, y_pred)
+    # f1 = f1_score(ytest, y_pred)
 
-    print(f"Accuracy:  {accuracy:.4f}")
-    print(f"Recall:    {recall:.4f}")
-    print(f"Precision: {precision:.4f}")
-    print(f"F1 Score:  {f1:.4f}")
+    # print(f"Accuracy:  {accuracy:.4f}")
+    # print(f"Recall:    {recall:.4f}")
+    # print(f"Precision: {precision:.4f}")
+    # print(f"F1 Score:  {f1:.4f}")
 
-    confmat = confusion_matrix(ytest, y_pred)
-    plt.figure(figsize=(8,6))
-    sns.heatmap(confmat, annot=True, fmt='d', cmap='flare')
-    plt.xlabel('Predicted')
-    plt.ylabel('True')
-    plt.title('Confusion Matrix of Random Forest using RandomizedSearchCV')
-    plt.show(block=False)
+    # confmat = confusion_matrix(ytest, y_pred)
+    # plt.figure(figsize=(8,6))
+    # sns.heatmap(confmat, annot=True, fmt='d', cmap='flare')
+    # plt.xlabel('Predicted')
+    # plt.ylabel('True')
+    # plt.title('Confusion Matrix of Random Forest using RandomizedSearchCV')
+    # plt.show(block=False)
 
     return rsearch.best_params_
 
@@ -260,23 +260,23 @@ def bestMLP(Xtrain, Xtest, ytrain, ytest, MLPdefault):
     model = rsearch.best_estimator_
     y_pred = model.predict(Xtest)
 
-    accuracy = accuracy_score(ytest, y_pred)
-    recall = recall_score(ytest, y_pred)
-    precision = precision_score(ytest, y_pred)
-    f1 = f1_score(ytest, y_pred)
+    # accuracy = accuracy_score(ytest, y_pred)
+    # recall = recall_score(ytest, y_pred)
+    # precision = precision_score(ytest, y_pred)
+    # f1 = f1_score(ytest, y_pred)
 
-    print(f"Accuracy:  {accuracy:.4f}")
-    print(f"Recall:    {recall:.4f}")
-    print(f"Precision: {precision:.4f}")
-    print(f"F1 Score:  {f1:.4f}")
+    # print(f"Accuracy:  {accuracy:.4f}")
+    # print(f"Recall:    {recall:.4f}")
+    # print(f"Precision: {precision:.4f}")
+    # print(f"F1 Score:  {f1:.4f}")
 
-    confmat = confusion_matrix(ytest, y_pred)
-    plt.figure(figsize=(8,6))
-    sns.heatmap(confmat, annot=True, fmt='d', cmap='flare')
-    plt.xlabel('Predicted')
-    plt.ylabel('True')
-    plt.title('Confusion Matrix of MLP using RandomizedSearchCV')
-    plt.show(block=False)
+    # confmat = confusion_matrix(ytest, y_pred)
+    # plt.figure(figsize=(8,6))
+    # sns.heatmap(confmat, annot=True, fmt='d', cmap='flare')
+    # plt.xlabel('Predicted')
+    # plt.ylabel('True')
+    # plt.title('Confusion Matrix of MLP using RandomizedSearchCV')
+    # plt.show(block=False)
 
     return rsearch.best_params_
 # def tune_minScore(Xtrain, Xtest, ytrain, ytest, addressSize, discriminatorLimit, minScore_values):

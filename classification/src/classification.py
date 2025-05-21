@@ -2,7 +2,7 @@ from performance import *
 import numpy as np
 
 
-def performCA(func, feat_train, feat_test, ytrain, ytest, **kwargs):
+def performCA(func, feat_train, feat_test, ytrain, ytest, fold=None, tag="", meta=None, **kwargs):
     """This function performs the classification, prediction and performance analysis
         
 
@@ -23,6 +23,11 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, **kwargs):
     clf_name = model.__class__.__name__
     plot_confusion_matrix(ytest, ypred, model)
     print_metrics(metrics, clf_name)
+
+    if meta is not None:
+        evaluate_by_group(ytest, ypred, yprob, meta, group_col='SITE_ID', group_name='Site')
+        if 'SEX' in meta.columns:
+            evaluate_by_group(ytest, ypred, yprob, meta, group_col='SEX', group_name='Sex')
 
     
 

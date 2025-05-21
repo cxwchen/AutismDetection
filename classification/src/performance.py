@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import os
 import seaborn as sns
+import numpy as np
 from sklearn.metrics import (
     confusion_matrix,
     classification_report,
@@ -109,3 +110,15 @@ def print_metrics(metrics, classifier_name="Classifier"):
     print(f"  Balanced Accuracy:    {balanced_acc:.3f}")
     print("=====================================")
 
+def evaluate_by_group(ytrue, ypred, yprob, meta, group_col, group_name):
+    print(f"\n=== Metrics by {group_name} ===")
+    groups = meta[group_col].unique()
+    for group in groups:
+        idx = meta[group_col] == group
+        yt = np.array(ytrue)[idx]
+        yp = np.array(ypred)[idx]
+        yp_prob = np.array(yprob)[idx] if yprob is not None else None
+
+        print(f"\n {group_name}: {group}")
+        metrics = get_metrics(yt, yp, yp_prob)
+        print_metrics(metrics, f"{group_name}={group}")
