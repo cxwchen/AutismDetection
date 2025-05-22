@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.signal import find_peaks
 import pandas as pd
-from itertools import combinations
 
 def pk_extract(x, time_values=None, height_threshold=0, prominence=1):
     """

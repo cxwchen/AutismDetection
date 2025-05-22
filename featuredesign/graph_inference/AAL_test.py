@@ -1,29 +1,65 @@
-from nilearn import image, plotting
-from nilearn.glm import first_level
-
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image
 import os
 import glob
-import nibabel as nib
-import scipy as sp
 import pandas as pd
 import re
 import seaborn as sns
 import networkx.algorithms.community as nx_comm
 
 from scipy.stats import pearsonr,skew, kurtosis
-from networkx.algorithms import community
-from community import community_louvain
 from sklearn.covariance import GraphicalLasso, GraphicalLassoCV, LedoitWolf
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import mutual_info_regression
-from Normalized_laplacian import learn_normalized_laplacian
 from itertools import combinations
-from peak_stat import pk_stats
-from sklearn.decomposition import PCA
+from scipy.signal import find_peaks
+
+def pk_extract(x, time_values=None, height_threshold=0, prominence=1):
+    """
+    Extract and Compute statistics of peaks (if peaks exist).
+
+    Returns:
+            'num_peaks': int,
+            'mean_amplitude': float,
+            'max_amplitude': float,
+            'mean_time_interval': float (if time_values provided)
+    """
+    peaks, properties = find_peaks(x, height=height_threshold, prominence=prominence)
+
+    peaks_data = {
+        'peak_amplitudes': x[peaks],
+        'peak_indices': peaks
+    }
+
+    if time_values is not None:
+        peaks_data['peak_times'] = time_values[peaks]
+
+    stats = {
+        'num_peaks': len(peaks_data['peak_amplitudes']),
+        'mean_amplitude': np.mean(peaks_data['peak_amplitudes']) if peaks_data['peak_amplitudes'].size > 0 else 0,
+        'max_amplitude': np.max(peaks_data['peak_amplitudes']) if peaks_data['peak_amplitudes'].size > 0 else 0
+    }
+
+    if 'peak_times' in peaks_data and len(peaks_data['peak_times']) > 1:
+        time_intervals = np.diff(peaks_data['peak_times'])
+        stats['mean_time_interval'] = np.mean(time_intervals)
+
+    return stats, peaks_data
+
+def pk_stats(list_of_timeseries, time_values=None):
+    """
+Takes list of timeseries and returns peak features per timeseries as a dataframe
+
+Features: avg peak interval, max peak, avg peak amplitude
+    """
+    all_stats = []
+    for i, ts in enumerate(list_of_timeseries):
+        stats, peaks = pk_extract(ts, time_values)
+        #stats['ROI'] = i+1  # Track which series these stats belong to
+        all_stats.append(stats)
+
+    return pd.DataFrame(all_stats)
 
 def laplacian(A):
     D = np.diag(np.sum(A, axis=1))
@@ -87,7 +123,7 @@ def detect_communities(G, method='louvain', **kwargs):
     else:
         raise ValueError(f"Unknown method: {method}. Choose: louvain|greedy_modularity|label_propagation|asyn_lpa|fluid|girvan_newman")
 
-def graphing(A, community_method=None, feats=False, plot=True, deg_trh=0, alpha=0e-0):
+def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=0e-0):
     """
     Function converting Adjacency matrix to a Graph
 
@@ -219,12 +255,9 @@ def graphing(A, community_method=None, feats=False, plot=True, deg_trh=0, alpha=
         node_df.insert(0, 'ROI', roi_col)
         graph_df = pd.DataFrame([graph_features])
 
-        print(node_df)
-        print(graph_df)
-
         return node_df, graph_df
 
-def load_files(folder_path):
+def load_files(folder_path = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")), "abide")):
     """
     Load all .1D files from a folder where each file contains multiple time series (columns)
 
@@ -235,7 +268,7 @@ def load_files(folder_path):
     - Dictionary with metadata about dimensions
     """
     # Get all .1D files sorted alphabetically
-    file_list = sorted(glob.glob(os.path.join(folder_path, '*.1D')))
+    file_list = sorted(glob.glob(os.path.join(folder_path,'*', '*.1D')))
 
     all_data = []
     subject_ids = []
@@ -358,7 +391,7 @@ def Adj_heatmap(W):
     plt.tight_layout()
     plt.show()
 
-def stat_feats(x, n_rois = 116):
+def stat_feats(x):
     """
     Compute classic statistical features based on some time series data and stores it to a panda dataframe.
 
@@ -412,12 +445,12 @@ def multiset_feats(data_list):
     df_fc_list = []
     expanded_ids = []
 
-    for data, sid in zip(data_list, subject_ids):
+    for data, sid in zip(data_list, load_files()[2]):
         if data is None:
             continue  # Skip if loading failed
 
         df_stat, df_fc = stat_feats(data) # Compute the statistical features
-        df_graph, df_global = graphing(A= partial_corr(data)[0], feats=True, plot=True) # Compute the graphical features
+        df_graph, df_global = graphing(A= partial_corr(data)[0]) # Compute the graphical features
         df_roi = pd.merge(df_stat, df_graph, on='ROI', how='left') # Merge both dataframes
         df_global_list.append(df_global)
         df_fc_list.append(df_fc)
@@ -463,58 +496,41 @@ def multiset_feats(data_list):
     df = pd.concat([df_fc, df_global], axis=1)
     df_wide = pd.concat([df_wide[id_cols + features_grouped], df], axis=1)
 
-    return df_wide
+    def multiset_pheno(df_wide):
+        """
+        Function that loads phenotypic data and merges it into the input dataframe.
 
-def multiset_pheno(df_wide):
-    """
-    Function that loads phenotypic data and merges it into the input dataframe.
+        - DX_GROUP: 1=ASD,2=ALL
+        - SEX: 1=Male,2=Female
 
-    - DX_GROUP: 1=ASD,2=ALL
-    - SEX: 1=Male,2=Female
+        """
+        df_labels = pd.read_csv(
+            os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")), "abide",
+                         "Phenotypic_V1_0b_preprocessed1.csv"))
 
-    """
-    df_labels = pd.read_csv(r"C:\Users\Jochem\Documents\GitHub\AutismDetection\abide\Phenotypic_V1_0b_preprocessed1.csv")
+        # Convert SUB_ID to match subject_id format
+        df_labels['SUB_ID'] = df_labels['SUB_ID'].astype(str).str.zfill(7)
+        df_wide['subject_id'] = df_wide['subject_id'].astype(str).str.zfill(7)
 
-    # Convert SUB_ID to match subject_id format
-    df_labels['SUB_ID'] = df_labels['SUB_ID'].astype(str).str.zfill(7)
-    df_wide['subject_id'] = df_wide['subject_id'].astype(str).str.zfill(7)
+        # Select desired phenotypic columns
+        df_pheno = df_labels[['SUB_ID', 'SITE_ID', 'DX_GROUP', 'SEX']]
 
-    # Select desired phenotypic columns
-    df_pheno = df_labels[['SUB_ID','SITE_ID', 'DX_GROUP', 'SEX']]
+        # Merge and drop SUB_ID
+        df_merged = df_wide.merge(df_pheno, left_on='subject_id', right_on='SUB_ID', how='left')
+        df_merged.drop(columns='SUB_ID', inplace=True)
 
-    # Merge and drop SUB_ID
-    df_merged = df_wide.merge(df_pheno, left_on='subject_id', right_on='SUB_ID', how='left')
-    df_merged.drop(columns='SUB_ID', inplace=True)
+        # Reorder phenotypic columns
+        phenotype_cols = ['DX_GROUP', 'SEX', 'SITE_ID']
+        cols = phenotype_cols + [col for col in df_merged.columns if col not in phenotype_cols]
+        df_merged = df_merged[cols]
 
-    # Reorder phenotypic columns
-    phenotype_cols = ['DX_GROUP', 'SEX', 'SITE_ID']
-    cols = phenotype_cols + [col for col in df_merged.columns if col not in phenotype_cols]
-    df_merged = df_merged[cols]
+        return df_merged
 
-    return df_merged
-
+    return multiset_pheno(df_wide)
 
 
 #-------{Main for testing}-------#
-folder_path = r"C:\Users\Jochem\Documents\GitHub\AutismDetection\abide\male-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
-data_arrays, file_paths, subject_ids, institute_names, metadata = load_files(folder_path)
+# data_arrays, file_paths, subject_ids, institute_names, metadata = load_files() # represents format of load_files()
 
-#stat_feats(data_arrays[0])
-#print(output)
-#print(data_arrays[0])
-#Laplacian = learn_normalized_laplacian(data_arrays[0], epsilon=5e-1, alpha=0.1)
-#print(Laplacian.shape)
-#S = mutual_info(data_arrays[2])
-#A, C = pearson_corr(data_arrays[2])
-#print(C)
-#Adj_heatmap(C)
-#graphing(Laplacian, alpha=0.1)
-
-output = multiset_feats(data_arrays[:5])
-print(output)
-
-print("subject ids: ", subject_ids)
-print("institute names: ", institute_names)
-
-output = multiset_pheno(output)
-print("Output data:\n", output)
+# represents multiset_feats() usage, add another index to load_files [] to select data amount
+print("Output data:\n", multiset_feats(load_files()[0][:5]))
