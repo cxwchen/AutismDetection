@@ -29,6 +29,17 @@ from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.datasets import make_classification
 
+
+#==== Brain Vis ====
+from nilearn import datasets, plotting
+
+# Load lightweight MNI152 template
+anat_img = datasets.load_mni152_template()
+
+# Plot it
+plotting.plot_anat(anat_img, title="MNI152 Template Brain")
+plotting.show()
+
 #==== DEMO: The data will be done in an other file ====
 
 X, y = make_classification(

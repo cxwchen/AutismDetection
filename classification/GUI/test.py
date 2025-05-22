@@ -5,7 +5,7 @@ Created on Thu May 15 15:50:07 2025
 @author: kakis
 """
 from HR_V1_0_03 import *
-
+import HR_V1_0_03
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
