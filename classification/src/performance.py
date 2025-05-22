@@ -64,14 +64,14 @@ def get_metrics(ytrue, ypred, yprob=None):
         metrics : dict
             Dictionary of computed metrics
     """
-    print("Classification report:\n", classification_report(ytrue, ypred))
+    print("Classification report:\n", classification_report(ytrue, ypred, zero_division=0))
 
     precision, recall, f1score, support = precision_recall_fscore_support(ytrue, ypred, zero_division=0)
 
     try:
-        auroc = roc_auc_score(ytrue, yprob)
+        auroc = roc_auc_score(ytrue, yprob) if yprob is not None and len(np.unique(ytrue)) > 1 else float('nan')
     except:
-        auroc = None  # AUROC can't be computed
+        auroc = float('nan')  # AUROC can't be computed
 
     spec = get_specificity(ytrue, ypred)
     sensi = get_sensitivity(ytrue, ypred)
@@ -108,7 +108,8 @@ def print_metrics(metrics, classifier_name="Classifier"):
 
     # Print per-class metrics
     print("\nPer-Class Metrics:")
-    classes = ['Control', 'Autism']
+    availclasses = len(precision)
+    classes = ['Control', 'Autism'][:availclasses]
     for i, cls in enumerate(classes):
         print(f"  {cls}:")
         print(f"    Precision: {precision[i]:.3f}")
@@ -134,6 +135,10 @@ def evaluate_by_group(ytrue, ypred, yprob, meta, group_col, group_name):
         yp = np.array(ypred)[idx]
         yp_prob = np.array(yprob)[idx] if yprob is not None else None
 
+        if len(np.unique(yt)) < 2:
+            print(f"Skipping {group_name} = {group} --> only one class present.")
+            continue
+        
         print(f"\n {group_name}: {group}")
         metrics = get_metrics(yt, yp, yp_prob)
         print_metrics(metrics, f"{group_name}={group}")
