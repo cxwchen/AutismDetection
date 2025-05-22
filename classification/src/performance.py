@@ -13,23 +13,38 @@ from sklearn.metrics import (
 
 def get_specificity(ytrue, ypred):
     cm = confusion_matrix(ytrue, ypred)
+    if cm.shape != (2,2): #during CV evaluation per group 'SITE' a fold could end up with only one class.
+        return float('nan')
     tn, fp, fn, tp = cm.ravel()
     return tn / (tn + fp)
 
 def get_sensitivity(ytrue, ypred):
     cm = confusion_matrix(ytrue, ypred)
+    if cm.shape != (2, 2):
+        return float('nan')
     tn, fp, fn, tp = cm.ravel()
     return tp / (tp + fn)
 
-def plot_confusion_matrix(y_true, y_pred, model):
+def plot_confusion_matrix(y_true, y_pred, model, fold=None, tag=""):
     conf_matrix = confusion_matrix(y_true, y_pred)
     plt.figure(figsize=(8, 6))
     sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
     plt.xlabel('Predicted')
     plt.ylabel('Actual')
-    plt.title(f'Confusion Matrix ({model.__class__.__name__})')
+    title = f'Confusion Matrix ({model.__class__.__name__})'
+    if tag:
+        title += f' - {tag}'
+    if fold is not None:
+        title += f' - Fold {fold}'
+    plt.title(title)
     os.makedirs('plots', exist_ok=True)
-    plt.savefig(f'plots/conf_matrix_{model.__class__.__name__}.png', bbox_inches='tight')
+    filename = f'plots/conf_matrix_{model.__class__.__name__}'
+    if tag:
+        filename += f' - {tag}'
+    if fold is not None:
+        filename += f' - Fold {fold}'
+    plt.savefig(f'{filename}.png', bbox_inches='tight')
+    plt.close()
     # plt.show(block=False)  # Non-blocking
     # plt.pause(0.1)
 
