@@ -17,12 +17,17 @@ import networkx.algorithms.community as nx_comm
 from scipy.stats import pearsonr,skew, kurtosis
 from networkx.algorithms import community
 from community import community_louvain
-from sklearn.covariance import GraphicalLasso, LedoitWolf
+from sklearn.covariance import GraphicalLasso, GraphicalLassoCV, LedoitWolf
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import mutual_info_regression
 from Normalized_laplacian import learn_normalized_laplacian
 from itertools import combinations
 from peak_stat import pk_stats
+from sklearn.decomposition import PCA
+
+def laplacian(A):
+    D = np.diag(np.sum(A, axis=1))
+    return D-A
 
 def eig_centrality(G, max_attempts=3):
     """
@@ -183,7 +188,9 @@ def graphing(A, community_method=None, feats=False, plot=True, deg_trh=0, alpha=
             "Shortest Paths": dict(nx.all_pairs_shortest_path_length(G)),
             "Average Clustering": nx.average_clustering(G),
             "Edge Betweenness": nx.edge_betweenness_centrality(G),
-            "Diameter": graph_diameter(G)
+            "Diameter": graph_diameter(G),
+            "Laplacian Eigenvectors": np.linalg.eig(laplacian(A))[0].real
+
         }
 
         # Node-level features
@@ -200,7 +207,8 @@ def graphing(A, community_method=None, feats=False, plot=True, deg_trh=0, alpha=
         # Graph-level features
         graph_features = {
             "Average Clustering": features["Average Clustering"],
-            "Diameter": features["Diameter"]
+            "Diameter": features["Diameter"],
+            "Laplacian Eigenvectors": features["Laplacian Eigenvectors"]
         }
 
         # Create DataFrames
@@ -242,6 +250,7 @@ def load_files(folder_path):
         try:
             # Load all columns from the file
             data = np.loadtxt(file_path)
+            data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
             all_data.append(data)
             filename = os.path.basename(file_path)
 
@@ -308,20 +317,25 @@ def pearson_corr(time_series_data, threshold=0.5, absolute_value=True):
     print("corr:\n",corr_matrix)
     return adj_matrix, corr_matrix
 
-def partial_corr(ts_data, method = "ledoit", alpha=0.1):
-    """
-    alpha: regularization parameter (smaller = denser connections)
-    """
-    try:
-        if method == 'glasso':
-            cov = GraphicalLasso(alpha=alpha, max_iter=5000).fit(ts_data).covariance_
-        else:  # Fallback to Ledoit-Wolf
-            cov = LedoitWolf().fit(ts_data)
-    finally:
-        inv_cov = np.linalg.pinv(cov)
-        W = -inv_cov / np.sqrt(np.outer(np.diag(inv_cov), np.diag(inv_cov)))
-        np.fill_diagonal(W, 0)
-    return W
+def partial_corr(ts_data, method="ledoit", threshold=0.2):
+
+    if method == 'glasso':
+        variances = np.var(ts_data, axis=0)
+        ts_data = ts_data[:, variances > 1e-8]
+        ts_data = StandardScaler().fit_transform(ts_data)
+        emp_cov = np.cov(ts_data)
+        emp_cov += np.eye(emp_cov.shape[0]) * 1e-3
+        inv_cov = GraphicalLassoCV(max_iter=5000).fit(emp_cov,ts_data).precision_
+    else:
+        inv_cov = LedoitWolf().fit(ts_data).precision_
+
+    #inv_cov = np.linalg.pinv(cov)
+    W = -inv_cov / np.sqrt(np.outer(np.diag(inv_cov), np.diag(inv_cov)))
+    np.fill_diagonal(W, 0)
+
+    # Apply thresholding to induce sparsity
+    W[abs(W) < threshold] = 0
+    return W, inv_cov
 
 def mutual_info(data):
     N = data.shape[1]
@@ -358,7 +372,6 @@ def stat_feats(x, n_rois = 116):
     # Extract features for each time series
     feature_list = []
     for ts in x:
-        ts = np.nan_to_num(np.asarray(ts), nan=0.0, posinf=0.0, neginf=0.0)
         features = {
             'mean': np.mean(ts, axis=0),
             'std': np.std(ts, axis=0),
@@ -370,21 +383,22 @@ def stat_feats(x, n_rois = 116):
 
     # Compute peak statistics
     df_pk = pk_stats(x)
-
-    # Functional connectivity matrix
-    fc_matrix = np.corrcoef(x)
-    triu_indices = np.triu_indices_from(fc_matrix, k=1)
-    fc_vector = fc_matrix[triu_indices]
-
     df = pd.DataFrame(feature_list)
     df = pd.concat([df, df_pk], axis=1)
-    # Generate ROI labels & pairs for upper triangle (exclude diagonal)
-    aal_labels = [f"ROI_{i+1}" for i in range(len(df))]
+    # Generate ROI labels
+    aal_labels = [f"ROI_{i + 1}" for i in range(len(df))]
+    df.insert(0, 'ROI', aal_labels)
+
+    # Functional connectivity matrix
     roi_pairs = list(combinations(aal_labels, 2))
     feature_names = [f"Corr_{r1}-{r2.split('_')[1]}" for r1, r2 in roi_pairs]
+
+    #xf = x[:, np.var(x, axis=0) > 1e-8]
+    fc_matrix = np.corrcoef(x)
+    fc_matrix = np.nan_to_num(fc_matrix, nan=0.0, posinf=0.0, neginf=0.0)
+    triu_indices = np.triu_indices_from(fc_matrix, k=1)
+    fc_vector = fc_matrix[triu_indices]
     df_fc = pd.DataFrame([fc_vector], columns=feature_names)
-    df.insert(0, 'ROI', aal_labels)
-    print("pk:\n", df)
 
     return df, df_fc
 
@@ -403,7 +417,7 @@ def multiset_feats(data_list):
             continue  # Skip if loading failed
 
         df_stat, df_fc = stat_feats(data) # Compute the statistical features
-        df_graph, df_global = graphing(A= pearson_corr(data)[1], feats=True, plot=True) # Compute the graphical features
+        df_graph, df_global = graphing(A= partial_corr(data)[0], feats=True, plot=True) # Compute the graphical features
         df_roi = pd.merge(df_stat, df_graph, on='ROI', how='left') # Merge both dataframes
         df_global_list.append(df_global)
         df_fc_list.append(df_fc)
@@ -418,10 +432,10 @@ def multiset_feats(data_list):
     print("appended dataframe:\n",df_app)
     df_fc = pd.concat(df_fc_list, ignore_index=True)
     df_global = pd.concat(df_global_list, ignore_index=True)
-    print("fc+glb:\n",pd.concat([df_fc, df_global], axis=1))
 
     # Assign to dataframe
     df_app['subject_id'] = expanded_ids
+    df_app = df_app.dropna(axis=1)  # Remove NaN columns
 
     # Automatically pivots all feature columns
     df_wide = df_app.pivot(
@@ -498,7 +512,6 @@ data_arrays, file_paths, subject_ids, institute_names, metadata = load_files(fol
 
 output = multiset_feats(data_arrays[:5])
 print(output)
-print(len(data_arrays))
 
 print("subject ids: ", subject_ids)
 print("institute names: ", institute_names)
