@@ -15,6 +15,9 @@ from sklearn.feature_selection import mutual_info_regression
 from itertools import combinations
 from scipy.signal import find_peaks
 
+import warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
 def pk_extract(x, time_values=None, height_threshold=0, prominence=1):
     """
     Extract and Compute statistics of peaks (if peaks exist).
@@ -122,6 +125,21 @@ def detect_communities(G, method='louvain', **kwargs):
         return next(nx_comm.girvan_newman(G))  # Returns 2 communities only
     else:
         raise ValueError(f"Unknown method: {method}. Choose: louvain|greedy_modularity|label_propagation|asyn_lpa|fluid|girvan_newman")
+
+def detect_inf_method(data, method):
+    """Detect inference method"""
+    if method == 'partial_corr_LF':
+        return partial_corr(data)[0]
+    elif method == 'partial_corr_glasso':
+        return partial_corr(data, method="glasso")[0]
+    elif method == 'pearson_corr_binary':
+        return pearson_corr(data)[0]
+    elif method == 'pearson_corr':
+        return pearson_corr(data)[1]
+    elif method == 'mutual_info':
+        return mutual_info(data)
+    else:
+        raise ValueError(f"Unknown method: {method}. Choose: partial_corr_LF|partial_corr_glasso|pearson_corr_binary|pearson_corr|mutual_info")
 
 def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=0e-0):
     """
@@ -435,9 +453,13 @@ def stat_feats(x):
 
     return df, df_fc
 
-def multiset_feats(data_list):
+def multiset_feats(data_list, method="partial_corr_LF"):
     """
     Loops over all data recursively to compute specific features and stores them in a dataframe indexed per individual (subject ID).
+
+    - Input: set of 1D timeseries
+    - Output: DataFrame indexed per individual with all relative features
+    - Parameters: 'method' to choose graph inference method used
 
     """
     df_app = pd.DataFrame(columns=stat_feats(data_list[0])[0].columns) # Initialize dataframe
@@ -450,7 +472,7 @@ def multiset_feats(data_list):
             continue  # Skip if loading failed
 
         df_stat, df_fc = stat_feats(data) # Compute the statistical features
-        df_graph, df_global = graphing(A= partial_corr(data)[0]) # Compute the graphical features
+        df_graph, df_global = graphing(A= detect_inf_method(data, method=method)) # Compute the graphical features
         df_roi = pd.merge(df_stat, df_graph, on='ROI', how='left') # Merge both dataframes
         df_global_list.append(df_global)
         df_fc_list.append(df_fc)
@@ -462,7 +484,6 @@ def multiset_feats(data_list):
 
         expanded_ids.extend([sid] * len(df_roi)) # Pad subject IDs with copies for all ROIs
 
-    print("appended dataframe:\n",df_app)
     df_fc = pd.concat(df_fc_list, ignore_index=True)
     df_global = pd.concat(df_global_list, ignore_index=True)
 
@@ -532,5 +553,5 @@ def multiset_feats(data_list):
 #-------{Main for testing}-------#
 # data_arrays, file_paths, subject_ids, institute_names, metadata = load_files() # represents format of load_files()
 
-# represents multiset_feats() usage, add another index to load_files [] to select data amount
+# represents multiset_feats() usage, add another index '[]' to load_files to select data amount
 print("Output data:\n", multiset_feats(load_files()[0][:5]))
