@@ -59,26 +59,26 @@ def bestSVM_GS(Xtrain, Xtest, ytrain, ytest, svcdefault):
     gridsearch = GridSearchCV(svcdefault, param_grid)
     gridsearch.fit(Xtrain, ytrain)
 
-    model = gridsearch.best_estimator_
-    y_pred = model.predict(Xtest)
+    # model = gridsearch.best_estimator_
+    # y_pred = model.predict(Xtest)
 
-    accuracy = accuracy_score(ytest, y_pred)
-    recall = recall_score(ytest, y_pred)
-    precision = precision_score(ytest, y_pred)
-    f1 = f1_score(ytest, y_pred)
+    # accuracy = accuracy_score(ytest, y_pred)
+    # recall = recall_score(ytest, y_pred)
+    # precision = precision_score(ytest, y_pred)
+    # f1 = f1_score(ytest, y_pred)
 
-    print(f"Accuracy:  {accuracy:.4f}")
-    print(f"Recall:    {recall:.4f}")
-    print(f"Precision: {precision:.4f}")
-    print(f"F1 Score:  {f1:.4f}")
+    # print(f"Accuracy:  {accuracy:.4f}")
+    # print(f"Recall:    {recall:.4f}")
+    # print(f"Precision: {precision:.4f}")
+    # print(f"F1 Score:  {f1:.4f}")
 
-    confmat = confusion_matrix(ytest, y_pred)
-    plt.figure(figsize=(8,6))
-    sns.heatmap(confmat, annot=True, fmt='d', cmap='flare')
-    plt.xlabel('Predicted')
-    plt.ylabel('True')
-    plt.title('Confusion Matrix using GridSearchCV')
-    plt.show()
+    # confmat = confusion_matrix(ytest, y_pred)
+    # plt.figure(figsize=(8,6))
+    # sns.heatmap(confmat, annot=True, fmt='d', cmap='flare')
+    # plt.xlabel('Predicted')
+    # plt.ylabel('True')
+    # plt.title('Confusion Matrix using GridSearchCV')
+    # plt.show()
 
     return gridsearch.best_params_
 
@@ -107,8 +107,8 @@ def bestSVM_RS(Xtrain, Xtest, ytrain, ytest, svcdefault):
     print("RandomizedSearchCV fitting completed.")
     print(f"Best Parameters Found: {rsearch.best_params_}")
 
-    model = rsearch.best_estimator_
-    y_pred = model.predict(Xtest)
+    # model = rsearch.best_estimator_
+    # y_pred = model.predict(Xtest)
 
     # accuracy = accuracy_score(ytest, y_pred)
     # recall = recall_score(ytest, y_pred)
@@ -156,8 +156,8 @@ def bestDT(Xtrain, Xtest, ytrain, ytest, dtdefault):
     print("RandomizedSearchCV fitting completed.")
     print(f"Best Parameters Found: {rsearch.best_params_}")
 
-    model = rsearch.best_estimator_
-    y_pred = model.predict(Xtest)
+    # model = rsearch.best_estimator_
+    # y_pred = model.predict(Xtest)
 
     # accuracy = accuracy_score(ytest, y_pred)
     # recall = recall_score(ytest, y_pred)
@@ -207,8 +207,8 @@ def bestRF(Xtrain, Xtest, ytrain, ytest, rfdefault):
     print("RandomizedSearchCV fitting completed.")
     print(f"Best Parameters Found: {rsearch.best_params_}")
 
-    model = rsearch.best_estimator_
-    y_pred = model.predict(Xtest)
+    # model = rsearch.best_estimator_
+    # y_pred = model.predict(Xtest)
 
     # accuracy = accuracy_score(ytest, y_pred)
     # recall = recall_score(ytest, y_pred)
@@ -257,8 +257,8 @@ def bestMLP(Xtrain, Xtest, ytrain, ytest, MLPdefault):
     print("RandomizedSearchCV fitting completed.")
     print(f"Best Parameters Found: {rsearch.best_params_}")
 
-    model = rsearch.best_estimator_
-    y_pred = model.predict(Xtest)
+    # model = rsearch.best_estimator_
+    # y_pred = model.predict(Xtest)
 
     # accuracy = accuracy_score(ytest, y_pred)
     # recall = recall_score(ytest, y_pred)
