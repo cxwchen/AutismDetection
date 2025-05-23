@@ -26,7 +26,7 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, fold=None, tag="", met
 
     if meta is not None:
         evaluate_by_group(ytest, ypred, yprob, meta, group_col='SITE_ID', group_name='Site')
-        if 'SEX' in meta.columns:
+        if 'SEX' in meta.columns and meta['SEX'].nunique() > 1: # only perform per sex evaluation if the df is M and F combined
             evaluate_by_group(ytest, ypred, yprob, meta, group_col='SEX', group_name='Sex')
 
     
