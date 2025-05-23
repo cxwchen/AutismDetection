@@ -1,0 +1,425 @@
+
+=== Fold 1 | FEMALE Data ===
+Starting RandomizedSearchCV fitting...
+Fitting 5 folds for each of 50 candidates, totalling 250 fits
+[CV] END C=100, coef0=0.1, degree=4, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=0.1, degree=4, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=0.1, degree=4, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=0.1, degree=4, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=0.1, degree=4, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=0.5, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=0.5, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=0.5, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=0.5, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=0.5, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END .C=0.1, coef0=0.1, degree=3, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=0.1, coef0=0.1, degree=3, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=0.1, coef0=0.1, degree=3, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=0.1, coef0=0.1, degree=3, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=0.1, coef0=0.1, degree=3, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.0, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.0, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.0, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.0, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.0, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ......................C=0.1, gamma=0.01, kernel=rbf; total time=   0.0s
+[CV] END ......................C=0.1, gamma=0.01, kernel=rbf; total time=   0.0s
+[CV] END ......................C=0.1, gamma=0.01, kernel=rbf; total time=   0.0s
+[CV] END ......................C=0.1, gamma=0.01, kernel=rbf; total time=   0.0s
+[CV] END ......................C=0.1, gamma=0.01, kernel=rbf; total time=   0.0s
+[CV] END ....C=10, coef0=1.0, degree=4, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=1.0, degree=4, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=1.0, degree=4, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=1.0, degree=4, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=1.0, degree=4, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ........C=1, coef0=0.1, gamma=0.001, kernel=sigmoid; total time=   0.0s
+[CV] END ........C=1, coef0=0.1, gamma=0.001, kernel=sigmoid; total time=   0.0s
+[CV] END ........C=1, coef0=0.1, gamma=0.001, kernel=sigmoid; total time=   0.0s
+[CV] END ........C=1, coef0=0.1, gamma=0.001, kernel=sigmoid; total time=   0.0s
+[CV] END ........C=1, coef0=0.1, gamma=0.001, kernel=sigmoid; total time=   0.0s
+[CV] END C=100, coef0=1.0, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=1.0, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=1.0, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=1.0, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=1.0, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END .C=10, coef0=0.5, degree=2, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END .C=10, coef0=0.5, degree=2, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END .C=10, coef0=0.5, degree=2, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END .C=10, coef0=0.5, degree=2, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END .C=10, coef0=0.5, degree=2, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ........................C=10, gamma=0.1, kernel=rbf; total time=   0.0s
+[CV] END ........................C=10, gamma=0.1, kernel=rbf; total time=   0.0s
+[CV] END ........................C=10, gamma=0.1, kernel=rbf; total time=   0.0s
+[CV] END ........................C=10, gamma=0.1, kernel=rbf; total time=   0.0s
+[CV] END ........................C=10, gamma=0.1, kernel=rbf; total time=   0.0s
+[CV] END ..C=1, coef0=0.0, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ..C=1, coef0=0.0, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ..C=1, coef0=0.0, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ..C=1, coef0=0.0, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ..C=1, coef0=0.0, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END .....C=1, coef0=0.5, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END .....C=1, coef0=0.5, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END .....C=1, coef0=0.5, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END .....C=1, coef0=0.5, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END .....C=1, coef0=0.5, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END .........C=10, coef0=0.5, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END .........C=10, coef0=0.5, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END .........C=10, coef0=0.5, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END .........C=10, coef0=0.5, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END .........C=10, coef0=0.5, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END ........C=0.1, coef0=0.0, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END ........C=0.1, coef0=0.0, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END ........C=0.1, coef0=0.0, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END ........C=0.1, coef0=0.0, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END ........C=0.1, coef0=0.0, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END .C=1, coef0=0.1, degree=4, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END .C=1, coef0=0.1, degree=4, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END .C=1, coef0=0.1, degree=4, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END .C=1, coef0=0.1, degree=4, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END .C=1, coef0=0.1, degree=4, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END ..C=10, coef0=0.5, degree=3, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ..C=10, coef0=0.5, degree=3, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ..C=10, coef0=0.5, degree=3, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ..C=10, coef0=0.5, degree=3, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ..C=10, coef0=0.5, degree=3, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .................................C=1, kernel=linear; total time=   0.0s
+[CV] END .................................C=1, kernel=linear; total time=   0.0s
+[CV] END .................................C=1, kernel=linear; total time=   0.0s
+[CV] END .................................C=1, kernel=linear; total time=   0.0s
+[CV] END .................................C=1, kernel=linear; total time=   0.0s
+[CV] END ..C=1, coef0=0.5, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ..C=1, coef0=0.5, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ..C=1, coef0=0.5, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ..C=1, coef0=0.5, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ..C=1, coef0=0.5, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ...........................C=1, gamma=1, kernel=rbf; total time=   0.0s
+[CV] END ...........................C=1, gamma=1, kernel=rbf; total time=   0.0s
+[CV] END ...........................C=1, gamma=1, kernel=rbf; total time=   0.0s
+[CV] END ...........................C=1, gamma=1, kernel=rbf; total time=   0.0s
+[CV] END ...........................C=1, gamma=1, kernel=rbf; total time=   0.0s
+[CV] END .........C=10, coef0=1.0, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END .........C=10, coef0=1.0, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END .........C=10, coef0=1.0, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END .........C=10, coef0=1.0, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END .........C=10, coef0=1.0, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END ......................C=10, gamma=0.001, kernel=rbf; total time=   0.0s
+[CV] END ......................C=10, gamma=0.001, kernel=rbf; total time=   0.0s
+[CV] END ......................C=10, gamma=0.001, kernel=rbf; total time=   0.0s
+[CV] END ......................C=10, gamma=0.001, kernel=rbf; total time=   0.0s
+[CV] END ......................C=10, gamma=0.001, kernel=rbf; total time=   0.0s
+[CV] END C=10, coef0=1.0, degree=4, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=10, coef0=1.0, degree=4, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=10, coef0=1.0, degree=4, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=10, coef0=1.0, degree=4, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=10, coef0=1.0, degree=4, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.1, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.1, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.1, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.1, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.1, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=0.5, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=0.5, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=0.5, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=0.5, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=0.5, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=1.0, degree=3, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=1.0, degree=3, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=1.0, degree=3, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=1.0, degree=3, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=1.0, degree=3, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END ...C=0.1, coef0=0.0, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=0.1, coef0=0.0, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=0.1, coef0=0.0, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=0.1, coef0=0.0, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=0.1, coef0=0.0, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ..C=10, coef0=0.0, degree=2, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ..C=10, coef0=0.0, degree=2, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ..C=10, coef0=0.0, degree=2, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ..C=10, coef0=0.0, degree=2, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ..C=10, coef0=0.0, degree=2, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.0, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.0, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.0, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.0, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.0, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=0.0, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=0.0, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=0.0, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=0.0, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=100, coef0=0.0, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ............C=1, coef0=0.0, gamma=1, kernel=sigmoid; total time=   0.0s
+[CV] END ............C=1, coef0=0.0, gamma=1, kernel=sigmoid; total time=   0.0s
+[CV] END ............C=1, coef0=0.0, gamma=1, kernel=sigmoid; total time=   0.0s
+[CV] END ............C=1, coef0=0.0, gamma=1, kernel=sigmoid; total time=   0.0s
+[CV] END ............C=1, coef0=0.0, gamma=1, kernel=sigmoid; total time=   0.0s
+[CV] END .C=0.1, coef0=0.5, degree=3, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=0.1, coef0=0.5, degree=3, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=0.1, coef0=0.5, degree=3, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=0.1, coef0=0.5, degree=3, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=0.1, coef0=0.5, degree=3, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ...C=0.1, coef0=1.0, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=0.1, coef0=1.0, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=0.1, coef0=1.0, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=0.1, coef0=1.0, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=0.1, coef0=1.0, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ........C=100, coef0=0.0, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END ........C=100, coef0=0.0, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END ........C=100, coef0=0.0, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END ........C=100, coef0=0.0, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END ........C=100, coef0=0.0, gamma=0.1, kernel=sigmoid; total time=   0.0s
+[CV] END .C=0.1, coef0=1.0, degree=4, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=0.1, coef0=1.0, degree=4, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=0.1, coef0=1.0, degree=4, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=0.1, coef0=1.0, degree=4, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=0.1, coef0=1.0, degree=4, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .........................C=100, gamma=1, kernel=rbf; total time=   0.0s
+[CV] END .........................C=100, gamma=1, kernel=rbf; total time=   0.0s
+[CV] END .........................C=100, gamma=1, kernel=rbf; total time=   0.0s
+[CV] END .........................C=100, gamma=1, kernel=rbf; total time=   0.0s
+[CV] END .........................C=100, gamma=1, kernel=rbf; total time=   0.0s
+[CV] END C=0.1, coef0=0.5, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=0.1, coef0=0.5, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=0.1, coef0=0.5, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=0.1, coef0=0.5, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=0.1, coef0=0.5, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=0.1, coef0=1.0, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=0.1, coef0=1.0, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=0.1, coef0=1.0, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=0.1, coef0=1.0, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=0.1, coef0=1.0, degree=3, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END C=10, coef0=0.1, degree=3, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=10, coef0=0.1, degree=3, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=10, coef0=0.1, degree=3, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=10, coef0=0.1, degree=3, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END C=10, coef0=0.1, degree=3, gamma=0.001, kernel=poly; total time=   0.0s
+[CV] END ...........C=10, coef0=0.1, gamma=1, kernel=sigmoid; total time=   0.0s
+[CV] END ...........C=10, coef0=0.1, gamma=1, kernel=sigmoid; total time=   0.0s
+[CV] END ...........C=10, coef0=0.1, gamma=1, kernel=sigmoid; total time=   0.0s
+[CV] END ...........C=10, coef0=0.1, gamma=1, kernel=sigmoid; total time=   0.0s
+[CV] END ...........C=10, coef0=0.1, gamma=1, kernel=sigmoid; total time=   0.0s
+[CV] END ...C=100, coef0=0.5, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.5, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.5, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.5, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.5, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ..C=1, coef0=0.0, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ..C=1, coef0=0.0, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ..C=1, coef0=0.0, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ..C=1, coef0=0.0, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ..C=1, coef0=0.0, degree=4, gamma=0.01, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.1, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.1, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.1, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.1, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=100, coef0=0.1, degree=2, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=0.0, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=0.0, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=0.0, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=0.0, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=0.0, degree=3, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ..C=10, coef0=0.5, degree=4, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ..C=10, coef0=0.5, degree=4, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ..C=10, coef0=0.5, degree=4, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ..C=10, coef0=0.5, degree=4, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ..C=10, coef0=0.5, degree=4, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END ......C=0.1, coef0=1.0, gamma=0.001, kernel=sigmoid; total time=   0.0s
+[CV] END ......C=0.1, coef0=1.0, gamma=0.001, kernel=sigmoid; total time=   0.0s
+[CV] END ......C=0.1, coef0=1.0, gamma=0.001, kernel=sigmoid; total time=   0.0s
+[CV] END ......C=0.1, coef0=1.0, gamma=0.001, kernel=sigmoid; total time=   0.0s
+[CV] END ......C=0.1, coef0=1.0, gamma=0.001, kernel=sigmoid; total time=   0.0s
+[CV] END .........C=1, coef0=0.0, gamma=0.01, kernel=sigmoid; total time=   0.0s
+[CV] END .........C=1, coef0=0.0, gamma=0.01, kernel=sigmoid; total time=   0.0s
+[CV] END .........C=1, coef0=0.0, gamma=0.01, kernel=sigmoid; total time=   0.0s
+[CV] END .........C=1, coef0=0.0, gamma=0.01, kernel=sigmoid; total time=   0.0s
+[CV] END .........C=1, coef0=0.0, gamma=0.01, kernel=sigmoid; total time=   0.0s
+[CV] END ....C=10, coef0=0.5, degree=4, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=0.5, degree=4, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=0.5, degree=4, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=0.5, degree=4, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ....C=10, coef0=0.5, degree=4, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=0.1, coef0=0.1, degree=4, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=0.1, coef0=0.1, degree=4, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=0.1, coef0=0.1, degree=4, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=0.1, coef0=0.1, degree=4, gamma=1, kernel=poly; total time=   0.0s
+[CV] END ...C=0.1, coef0=0.1, degree=4, gamma=1, kernel=poly; total time=   0.0s
+[CV] END .C=100, coef0=0.0, degree=2, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=100, coef0=0.0, degree=2, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=100, coef0=0.0, degree=2, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=100, coef0=0.0, degree=2, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=100, coef0=0.0, degree=2, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=100, coef0=0.1, degree=4, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=100, coef0=0.1, degree=4, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=100, coef0=0.1, degree=4, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=100, coef0=0.1, degree=4, gamma=0.1, kernel=poly; total time=   0.0s
+[CV] END .C=100, coef0=0.1, degree=4, gamma=0.1, kernel=poly; total time=   0.0s
+RandomizedSearchCV fitting completed.
+Best Parameters Found: {'kernel': 'sigmoid', 'gamma': 0.1, 'coef0': 1.0, 'C': 10}
+Starting RandomizedSearchCV fitting...
+Fitting 5 folds for each of 50 candidates, totalling 250 fits
+RandomizedSearchCV fitting completed.
+Best Parameters Found: {'bootstrap': False, 'max_depth': np.int64(25), 'max_features': 'sqrt', 'min_samples_leaf': 1, 'min_samples_split': 5, 'n_estimators': 96}
+Starting RandomizedSearchCV fitting...
+Fitting 5 folds for each of 50 candidates, totalling 250 fits
+RandomizedSearchCV fitting completed.
+Best Parameters Found: {'criterion': 'log_loss', 'max_depth': None, 'min_samples_leaf': 3, 'min_samples_split': 9}
+Starting RandomizedSearchCV fitting...
+Fitting 5 folds for each of 50 candidates, totalling 250 fits
+RandomizedSearchCV fitting completed.
+Best Parameters Found: {'activation': 'relu', 'alpha': np.float64(0.009256746456777733), 'hidden_layer_sizes': (100,), 'learning_rate_init': np.float64(0.08218348722360737), 'solver': 'sgd'}
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.84      0.89      0.86        18
+           1       0.78      0.70      0.74        10
+
+    accuracy                           0.82        28
+   macro avg       0.81      0.79      0.80        28
+weighted avg       0.82      0.82      0.82        28
+
+
+=== Metrics for LogisticRegression ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.842
+    Recall:    0.889
+    F1 Score:  0.865
+    Support:   18
+  Autism:
+    Precision: 0.778
+    Recall:    0.700
+    F1 Score:  0.737
+    Support:   10
+
+Overall Metrics:
+  Specificity:          0.889
+  Sensitivity:          0.700
+  AUROC:                0.872
+  Accuracy:             0.821
+  Balanced Accuracy:    0.794
+=====================================
+
+=== Metrics by Site ===
+
+ Site: NYU
+Classification report:
+               precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00         6
+           1       1.00      1.00      1.00         1
+
+    accuracy                           1.00         7
+   macro avg       1.00      1.00      1.00         7
+weighted avg       1.00      1.00      1.00         7
+
+
+=== Metrics for Site=NYU ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 1.000
+    Recall:    1.000
+    F1 Score:  1.000
+    Support:   6
+  Autism:
+    Precision: 1.000
+    Recall:    1.000
+    F1 Score:  1.000
+    Support:   1
+
+Overall Metrics:
+  Specificity:          1.000
+  Sensitivity:          1.000
+  AUROC:                1.000
+  Accuracy:             1.000
+  Balanced Accuracy:    1.000
+=====================================
+
+ Site: PITT
+Classification report:
+               precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00         1
+           1       1.00      1.00      1.00         1
+
+    accuracy                           1.00         2
+   macro avg       1.00      1.00      1.00         2
+weighted avg       1.00      1.00      1.00         2
+
+
+=== Metrics for Site=PITT ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 1.000
+    Recall:    1.000
+    F1 Score:  1.000
+    Support:   1
+  Autism:
+    Precision: 1.000
+    Recall:    1.000
+    F1 Score:  1.000
+    Support:   1
+
+Overall Metrics:
+  Specificity:          1.000
+  Sensitivity:          1.000
+  AUROC:                1.000
+  Accuracy:             1.000
+  Balanced Accuracy:    1.000
+=====================================
+
+ Site: UM_1
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.67      1.00      0.80         2
+           1       1.00      0.67      0.80         3
+
+    accuracy                           0.80         5
+   macro avg       0.83      0.83      0.80         5
+weighted avg       0.87      0.80      0.80         5
+
+
+=== Metrics for Site=UM_1 ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.667
+    Recall:    1.000
+    F1 Score:  0.800
+    Support:   2
+  Autism:
+    Precision: 1.000
+    Recall:    0.667
+    F1 Score:  0.800
+    Support:   3
+
+Overall Metrics:
+  Specificity:          1.000
+  Sensitivity:          0.667
+  AUROC:                0.833
+  Accuracy:             0.800
+  Balanced Accuracy:    0.833
+=====================================
+
+ Site: SDSU
+Classification report:
+               precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00         2
+
+    accuracy                           1.00         2
+   macro avg       1.00      1.00      1.00         2
+weighted avg       1.00      1.00      1.00         2
+
+
+=== Metrics for Site=SDSU ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 1.000
+    Recall:    1.000
+    F1 Score:  1.000
+    Support:   2
+  Autism:
