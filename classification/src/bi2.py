@@ -7,28 +7,32 @@ Created on Fri May 16 12:58:56 2025
 
 import pandas as pd
 import numpy as np
+from basicfeatureextraction import *
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-from wisardpkg import ClusWisard
+from wisardpkg import ClusWisard, Wisard
 from collections import defaultdict
 
 # Load and shuffle data
-df = pd.read_csv("female_df_merged.csv")
-df = df.sample(frac=1, random_state=42).reset_index(drop=True)
+# df = pd.read_csv("female_df_merged.csv")
+# df = df.sample(frac=1, random_state=42).reset_index(drop=True)
 
+data = extract_fc_features()
 # Drop subject_id, extract labels
-df.drop(columns=['subject_id'], inplace=True)
-y = df['DX_GROUP'].astype(str).tolist()
-X = df.drop(columns=['DX_GROUP'])
+# df.drop(columns=['subject_id'], inplace=True)
+# y = df['DX_GROUP'].astype(str).tolist()
+# X = df.drop(columns=['DX_GROUP'])
+X = data.iloc[:, 3:]
+y = data.iloc[:, 1]
 
 # Check for missing values
-missing = X.isnull().sum()
-missing = missing[missing > 0]
-if not missing.empty:
-    print("Missing values detected:")
-    print(missing)
-else:
-    print("No missing values detected.")
+# missing = X.isnull().sum()
+# missing = missing[missing > 0]
+# if not missing.empty:
+#     print("Missing values detected:")
+#     print(missing)
+# else:
+#     print("No missing values detected.")
 
 # Thermometer encoding
 def thermometer_encoding(data, n_bits=6):
@@ -52,12 +56,14 @@ X_encoded = thermometer_encoding(X.values, n_bits=6)
 X_train, X_test, y_train, y_test = train_test_split(
     X_encoded.tolist(), y, test_size=0.2, random_state=42
 )
+y_train = list(map(str, y_train))
+y_test = list(map(str, y_test))
 
 addressSize = 40
-minScore = 0.2
-threshold = 10
-discriminatorLimit = 100
-n_runs = 80
+minScore = 0.4
+threshold = 4
+discriminatorLimit = 16
+n_runs = 10
 
 accuracies = []
 conf_matrices = []
