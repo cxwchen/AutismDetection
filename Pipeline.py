@@ -1,22 +1,21 @@
 from sklearn.metrics import classification_report, confusion_matrix
 import numpy as np
 import pandas as pd
+import os
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.metrics import mean_squared_error, accuracy_score
 from classification.src import classifiers as cl
 from featureselection.src import feature_selection_methods as fs
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
-from featuredesign.graph_inference.AAL_test import multiset_feats, load_files, multiset_pheno
+from featuredesign.graph_inference.AAL_test import multiset_feats, load_files
 
 def load_file():
-    folder_path = "abide/female-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
-    data_arrays, file_paths, subject_ids, institude_names, metadata = load_files(folder_path)
+    #folder_path = r"C:\Users\guus\Python_map\AutismDetection-main\abide\female-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
+    data_arrays, file_paths, subject_ids, institude_names, metadata = load_files()
 
-    feature_df = multiset_feats(data_arrays, subject_ids)
-    print("Extracted features shape:\n", feature_df.shape)
+    full_df = multiset_feats(data_arrays)
 
-    full_df = multiset_pheno(feature_df)
     print("Merged feature+label shape:\n", full_df.shape)
 
     print(full_df)
@@ -118,7 +117,7 @@ def classify(X, X_train, X_test, y_train, y_test, selected_features, classifier)
     
     return acc, mse, selected_feature_names
 
-def cross_validate_model(X, y, selected_features, n_splits=5):
+def cross_validate_model(X, y, selected_features, classifier, n_splits=5):
     #K-Fold cross-validation evaluation.
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
     acc_scores = []
@@ -138,7 +137,19 @@ def cross_validate_model(X, y, selected_features, n_splits=5):
         X_test_scaled = scaler.transform(X_test_sel)
 
         #applying the classifier
-        model = cl.applySVM(X_train_scaled, y_train)
+        if classifier == "SVM":
+            model = cl.applySVM(X_train_scaled, y_train)
+        elif classifier == "RandomForest":
+            model = cl.applyRandForest(X_train_scaled, y_train)
+        elif classifier == "LogR":
+            model = cl.applyLogR(X_train_scaled, y_train)
+        elif classifier == "DecisionTree":
+            model = cl.applyDT(X_train_scaled, y_train)
+        elif classifier == "MLP":
+            model = cl.applyMLP(X_train_scaled, y_train)
+        y_pred = model.predict(X_test_scaled)
+
+
         model.fit(X_train_scaled, y_train)
         y_pred = model.predict(X_test_scaled)
 
@@ -174,6 +185,14 @@ def main():
     print_selected_features(acc, mse, selected_features_lars, selected_feature_names)
     print("\n\n")
 
+    selected_features_lars = fs.LAND(X_train_scaled, y_train, lambda_reg=0.01)
+    acc, mse, selected_feature_names = classify(X, X_train_scaled, X_test_scaled, y_train, y_test, selected_features_lars, classifier)
+    print("LAND selected features:")
+    print_selected_features(acc, mse, selected_features_lars, selected_feature_names)
+    print("\n\n")
+
+    X_train_scaled = fs.low_variance(X_train_scaled, threshold=0.01)
+    X_test_scaled = fs.low_variance(X_test_scaled, threshold=0.01)
     selected_features_rfe = fs.backwards_SFS(X_train_scaled, y_train, 10, classifier)
     acc, mse, selected_feature_names = classify(X, X_train_scaled, X_test_scaled, y_train, y_test, selected_features_rfe, classifier)
     print("SFS selected features:")
