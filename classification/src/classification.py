@@ -21,12 +21,12 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, fold=None, tag="", met
     metrics = get_metrics(ytest, ypred, yprob)
 
     clf_name = model.__class__.__name__
-    plot_confusion_matrix(ytest, ypred, model)
+    plot_confusion_matrix(ytest, ypred, model, fold=fold, tag=tag)
     print_metrics(metrics, clf_name)
 
     if meta is not None:
         evaluate_by_group(ytest, ypred, yprob, meta, group_col='SITE_ID', group_name='Site')
-        if 'SEX' in meta.columns and meta['SEX'].nunique() > 1: # only perform per sex evaluation if the df is M and F combined
+        if 'SEX' in meta.columns and meta['SEX'].nunique() > 1: # only perform per sex evaluation if the df is M and F combined 
             evaluate_by_group(ytest, ypred, yprob, meta, group_col='SEX', group_name='Sex')
 
     
