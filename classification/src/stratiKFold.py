@@ -39,7 +39,7 @@ sys.stdout = Tee(sys.stdout, log_file)
 female_df = pd.read_csv("female_df_merged.csv.gz").sample(frac=1, random_state=69).reset_index(drop=True) # shuffle the sites
 male_df = pd.read_csv("male_df_merged.csv.gz").sample(frac=1, random_state=69).reset_index(drop=True) # shuffle the sites
 
-def run_cv_classification(df, label="female"):
+def runCV(df, label="female"):
     X = df.iloc[:, 4:]
     y = df['DX_GROUP']
     meta = df[['SITE_ID', 'SEX']]
@@ -70,10 +70,10 @@ def run_cv_classification(df, label="female"):
         performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, params = mlpparams, fold=fold, tag=label, meta=meta_test)
 
 def run_all():
-    run_cv_classification(female_df, label="female")
-    run_cv_classification(male_df, label="male")
+    runCV(female_df, label="female")
+    runCV(male_df, label="male")
     comb_df = pd.concat([female_df, male_df], axis=0).sample(frac=1, random_state=69).reset_index(drop=True)
-    run_cv_classification(comb_df, label="combined")
+    runCV(comb_df, label="combined")
 
 if __name__ == "__main__":
     run_all()
