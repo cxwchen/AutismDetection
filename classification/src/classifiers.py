@@ -16,6 +16,8 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from wisardpkg import ClusWisard
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.neighbors import KNeighborsClassifier
 
 
 def applySVM(feat_train, y, params=None, use_probabilities=True):
@@ -201,3 +203,13 @@ def applyClusWiSARD(feat_train, y, minScore):
     model.train(binarized_feat, y_str)
     return model
 
+
+def applyLDA(feat_train, y):
+    model = LinearDiscriminantAnalysis()
+    model.fit(feat_train, y)
+    return model
+
+def applyKNN(feat_train, y):
+    model = KNeighborsClassifier()
+    model.fit(feat_train, y)
+    return model
