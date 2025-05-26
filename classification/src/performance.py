@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import os
 import csv
+import datetime
 import seaborn as sns
 import numpy as np
 from sklearn.metrics import (
@@ -11,6 +12,10 @@ from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score
 )
+
+# Generate timestamped CSV path at module load time
+_timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+DEFAULT_CSV_PATH = f"results/eval_metrics_{_timestamp}.csv"
 
 def get_specificity(ytrue, ypred):
     cm = confusion_matrix(ytrue, ypred)
@@ -142,13 +147,13 @@ def toCSV(csvpath, fold, classifierName, tag, group_col, group_name, metrics):
     
     header = ['Fold', 'Classifier', 'Dataset', 'GroupType', 'GroupName', 'Metric', 'Value']
     writeHeader = not os.path.exists(csvpath)
-    with open(csvpath, 'a', neline='') as f:
+    with open(csvpath, 'a', newline='') as f:
         writer = csv.writer(f) 
         if writeHeader:
             writer.writerow(header)
         writer.writerows(rows)
 
-def perGroupEval(ytrue, ypred, yprob, meta, group_col, group_name, fold=None, classifier_name='Classifier', tag=""):
+def perGroupEval(ytrue, ypred, yprob, meta, group_col, group_name, fold=None, classifier_name='Classifier', tag="", csv_path=DEFAULT_CSV_PATH):
     print(f"\n=== Metrics by {group_name} ===")
     groups = meta[group_col].unique()
     for group in groups:
@@ -176,7 +181,7 @@ def perGroupEval(ytrue, ypred, yprob, meta, group_col, group_name, fold=None, cl
                 "test_size": support,
                 **labelCts
             }
-            toCSV("results/eval_metrics.csv", fold, classifier_name, tag, group_name, group, metrics)
+            toCSV(csv_path, fold, classifier_name, tag, group_name, group, metrics)
             continue
         
         print(f"\n {group_name}: {group}")
@@ -184,4 +189,4 @@ def perGroupEval(ytrue, ypred, yprob, meta, group_col, group_name, fold=None, cl
         metrics["test_size"] = support
         metrics.update(labelCts)
         print_metrics(metrics, f"{group_name}={group}")
-        toCSV("results/eval_metrics.csv", fold, classifier_name, tag, group_name, group, metrics)
+        toCSV(csv_path, fold, classifier_name, tag, group_name, group, metrics)

@@ -24,7 +24,7 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, fold=None, tag="", met
     clf_name = model.__class__.__name__
     plot_confusion_matrix(ytest, ypred, model, fold=fold, tag=tag)
     print_metrics(metrics, clf_name)
-    toCSV("results/eval_metrics.csv", fold, clf_name, tag, "Overall", "ALL", metrics)
+    toCSV(DEFAULT_CSV_PATH, fold, clf_name, tag, "Overall", "ALL", metrics)
 
     if meta is not None:
         perGroupEval(ytest, ypred, yprob, meta, group_col='SITE_ID', group_name='Site', fold=fold, classifier_name=clf_name, tag=tag)
