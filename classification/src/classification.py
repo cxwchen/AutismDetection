@@ -8,14 +8,15 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, fold=None, tag="", met
 
     """
     model = func(feat_train, ytrain, **kwargs)
-    ypred = model.predict(feat_test)
+    
     if hasattr(model, "predict_proba"):
         yprob = model.predict_proba(feat_test)[:, 1]
     elif hasattr(model, "decision_function"):
         yprob = model.decision_function(feat_test)
     else:
-        raise AttributeError("Model does not support probability or decision function output.")
+        yprob = None
 
+    ypred = model.predict(feat_test)
     # yprob = model.predict_proba(feat_test)
 
     metrics = get_metrics(ytest, ypred, yprob)
@@ -23,11 +24,12 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, fold=None, tag="", met
     clf_name = model.__class__.__name__
     plot_confusion_matrix(ytest, ypred, model, fold=fold, tag=tag)
     print_metrics(metrics, clf_name)
+    toCSV("results/eval_metrics.csv", fold, clf_name, tag, "Overall", "ALL", metrics)
 
     if meta is not None:
-        perGroupEval(ytest, ypred, yprob, meta, group_col='SITE_ID', group_name='Site')
+        perGroupEval(ytest, ypred, yprob, meta, group_col='SITE_ID', group_name='Site', fold=fold, classifier_name=clf_name, tag=tag)
         if 'SEX' in meta.columns and meta['SEX'].nunique() > 1: # only perform per sex evaluation if the df is M and F combined 
-            perGroupEval(ytest, ypred, yprob, meta, group_col='SEX', group_name='Sex')
+            perGroupEval(ytest, ypred, yprob, meta, group_col='SEX', group_name='Sex', fold=fold, classifier_name=clf_name, tag=tag)
 
     
 

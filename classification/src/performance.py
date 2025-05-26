@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import os
+import csv
 import seaborn as sns
 import numpy as np
 from sklearn.metrics import (
@@ -126,7 +127,28 @@ def print_metrics(metrics, classifier_name="Classifier"):
     print(f"  Balanced Accuracy:    {balanced_acc:.3f}")
     print("=====================================")
 
-def perGroupeval(ytrue, ypred, yprob, meta, group_col, group_name):
+
+def toCSV(csvpath, fold, classifierName, tag, group_col, group_name, metrics):
+    os.makedirs(os.path.dirname(csvpath), exist_ok=True)
+
+    rows = []
+    for metric, value in metrics.items():
+        if isinstance(value, (list, np.ndarray)):
+            for i, v in enumerate(value):
+                label = ['Control', 'Autism'][i] if len(value) == 2 else f"Class{i}"
+                rows.append([fold, classifierName, tag, group_col, group_name, f"{group_name}_{label}", metric, v])
+        else:
+            rows.append([fold, classifierName, tag, group_col, group_name, metric, value])
+    
+    header = ['Fold', 'Classifier', 'Dataset', 'GroupType', 'GroupName', 'Metric', 'Value']
+    writeHeader = not os.path.exists(csvpath)
+    with open(csvpath, 'a', neline='') as f:
+        writer = csv.writer(f) 
+        if writeHeader:
+            writer.writerow(header)
+        writer.writerows(rows)
+
+def perGroupEval(ytrue, ypred, yprob, meta, group_col, group_name, fold=None, classifier_name='Classifier', tag=""):
     print(f"\n=== Metrics by {group_name} ===")
     groups = meta[group_col].unique()
     for group in groups:
@@ -135,10 +157,31 @@ def perGroupeval(ytrue, ypred, yprob, meta, group_col, group_name):
         yp = np.array(ypred)[idx]
         yp_prob = np.array(yprob)[idx] if yprob is not None else None
 
+        support = len(yt)
+        unique, counts = np.unique(yt, return_counts=True)
+        labelCts = {f"class_{int(u)}_count": int(c) for u, c in zip(unique, counts)}
+
         if len(np.unique(yt)) < 2:
             print(f"Skipping {group_name} = {group} --> only one class present.")
+            metrics = {
+                "precision": [float('nan')],
+                "recall": [float('nan')],
+                "f1_score": [float('nan')],
+                "support": [support],
+                "specificity": float('nan'),
+                "sensitivity": float('nan'),
+                "auroc": float('nan'),
+                "accuracy": float('nan'),
+                "balanced_accuracy": float('nan'),
+                "test_size": support,
+                **labelCts
+            }
+            toCSV("results/eval_metrics.csv", fold, classifier_name, tag, group_name, group, metrics)
             continue
         
         print(f"\n {group_name}: {group}")
         metrics = get_metrics(yt, yp, yp_prob)
+        metrics["test_size"] = support
+        metrics.update(labelCts)
         print_metrics(metrics, f"{group_name}={group}")
+        toCSV("results/eval_metrics.csv", fold, classifier_name, tag, group_name, group, metrics)

@@ -36,15 +36,15 @@ class Tee:
 
 sys.stdout = Tee(sys.stdout, log_file)
 
-female_df = pd.read_csv("female_df_merged.csv.gz").sample(frac=1, random_state=69).reset_index(drop=True) # shuffle the sites
-male_df = pd.read_csv("male_df_merged.csv.gz").sample(frac=1, random_state=69).reset_index(drop=True) # shuffle the sites
+female_df = pd.read_csv("female_df_merged.csv.gz").sample(frac=1, random_state=42).reset_index(drop=True) # shuffle the sites
+male_df = pd.read_csv("male_df_merged.csv.gz").sample(frac=1, random_state=42).reset_index(drop=True) # shuffle the sites
 
 def runCV(df, label="female"):
     X = df.iloc[:, 4:]
     y = df['DX_GROUP']
     meta = df[['SITE_ID', 'SEX']]
 
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=69)
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
     for fold, (trainidx, testidx) in enumerate(skf.split(X, y), 1):
         print(f"\n=== Fold {fold} | {label.upper()} Data ===")
@@ -59,20 +59,22 @@ def runCV(df, label="female"):
         Xtrain, Xtest = normalizer(Xtrain, Xtest)
 
         svcparams = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, SVC())
-        rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, RandomForestClassifier())
+        # rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, RandomForestClassifier())
         dtparams = bestDT(Xtrain, Xtest, ytrain, ytest, DecisionTreeClassifier())
         mlpparams = bestMLP(Xtrain, Xtest, ytrain, ytest, MLPClassifier())
 
         performCA(applyLogR, Xtrain, Xtest, ytrain, ytest, fold=fold, tag=label, meta=meta_test)
         performCA(applySVM, Xtrain, Xtest, ytrain, ytest, params = svcparams, fold=fold, tag=label, meta=meta_test)
-        performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, params = rfparams, fold=fold, tag=label, meta=meta_test)
+        performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, params = None, fold=fold, tag=label, meta=meta_test)
         performCA(applyDT, Xtrain, Xtest, ytrain, ytest, params = dtparams, fold=fold, tag=label, meta=meta_test)
         performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, params = mlpparams, fold=fold, tag=label, meta=meta_test)
+        performCA(applyLDA, Xtrain, Xtest, ytrain, ytest, fold=fold, tag=label, meta=meta_test)
+        performCA(applyKNN, Xtrain, Xtest, ytrain, ytest, fold=fold, tag=label, meta=meta_test)
 
 def run_all():
     runCV(female_df, label="female")
     runCV(male_df, label="male")
-    comb_df = pd.concat([female_df, male_df], axis=0).sample(frac=1, random_state=69).reset_index(drop=True)
+    comb_df = pd.concat([female_df, male_df], axis=0).sample(frac=1, random_state=42).reset_index(drop=True)
     runCV(comb_df, label="combined")
 
 if __name__ == "__main__":
