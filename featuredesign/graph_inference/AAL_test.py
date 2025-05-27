@@ -1,10 +1,8 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
-import os
-import glob
+import os,glob,re,random
 import pandas as pd
-import re
 import seaborn as sns
 import networkx.algorithms.community as nx_comm
 
@@ -14,9 +12,57 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import mutual_info_regression
 from itertools import combinations
 from scipy.signal import find_peaks
+from sklearn.decomposition import FastICA,PCA
+from scipy.linalg import pinv
+from statsmodels.tsa.stattools import adfuller
+from statsmodels.tsa.tsatools import detrend
 
 import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+def check_stationarity(fmri_data, alpha=0.05):
+    nonstationary_counts = []
+    for subj in fmri_data:
+        count = 0
+        for roi in range(subj.shape[1]):
+            pval = adfuller(subj[:, roi])[1]
+            if pval > alpha:
+                count += 1
+        nonstationary_counts.append(count)
+    return nonstationary_counts
+
+def zeroVar_filter(fmri_data, subject_ids, variance_threshold=1e-6):
+    """
+    Remove subjects with zero-variance ROIs while maintaining ID consistency
+
+    Args:
+        fmri_data: List of subject time series arrays
+        subject_ids: List of corresponding subject IDs
+        variance_threshold: Minimum acceptable standard deviation
+
+    Returns:
+        clean_data: Filtered time series data
+        clean_ids: Corresponding subject IDs
+        bad_indices: Original indices of removed subjects
+    """
+    clean_data = []
+    clean_ids = []
+    bad_indices = []
+
+    for idx, (data, sid) in enumerate(zip(fmri_data, subject_ids)):
+        if data is None:
+            bad_indices.append(idx)
+            continue
+
+        roi_stds = np.std(data, axis=0)
+        if np.any(roi_stds < variance_threshold):
+            bad_indices.append(idx)
+        else:
+            clean_data.append(data)
+            clean_ids.append(sid)
+
+    print(f"Removed {len(bad_indices)}/{len(fmri_data)} subjects")
+    return clean_data, clean_ids, bad_indices
 
 def pk_extract(x, time_values=None, height_threshold=0, prominence=1):
     """
@@ -129,7 +175,7 @@ def detect_communities(G, method='louvain', **kwargs):
 def detect_inf_method(data, method):
     """Detect inference method"""
     if method == 'partial_corr_LF':
-        return partial_corr(data)[0]
+        return partial_corr(data, threshold=None)[0]
     elif method == 'partial_corr_glasso':
         return partial_corr(data, method="glasso")[0]
     elif method == 'pearson_corr_binary':
@@ -141,7 +187,40 @@ def detect_inf_method(data, method):
     else:
         raise ValueError(f"Unknown method: {method}. Choose: partial_corr_LF|partial_corr_glasso|pearson_corr_binary|pearson_corr|mutual_info")
 
-def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=0e-0):
+def stat_feats(x):
+    """
+    Compute classic statistical features based on some time series data and stores it to a panda dataframe.
+
+    Features:
+    - Mean, Standard Deviation, Skewness, Kurtosis, Slope, Correlation, Covariance, Signal-to-noise ratio etc.
+    """
+    # Transpose back so each row is one ROI's time series
+    if x.shape[0] > x.shape[1]:
+        x = x.T
+
+    # Extract features for each time series
+    feature_list = []
+    for ts in x:
+        features = {
+            'mean': np.mean(ts, axis=0),
+            'std': np.std(ts, axis=0),
+            'SNR': np.mean(ts, axis=0) / (np.std(ts, axis=0) + 1e-10),
+            'Skewness': skew(ts, axis=0),
+            'Kurtosis': kurtosis(ts, axis=0)
+        }
+        feature_list.append(features)
+
+    # Compute peak statistics
+    df_pk = pk_stats(x)
+    df = pd.DataFrame(feature_list)
+    df = pd.concat([df, df_pk], axis=1)
+    # Generate ROI labels
+    aal_labels = [f"ROI_{i + 1}" for i in range(len(df))]
+    df.insert(0, 'ROI', aal_labels)
+
+    return df
+
+def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=0e-0, min_edges=1):
     """
     Function converting Adjacency matrix to a Graph
 
@@ -159,6 +238,9 @@ def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=
     np.fill_diagonal(A, 0) # remove self-loops
     G = nx.from_numpy_array(A)
     G.remove_nodes_from(list(nx.isolates(G)))  # Remove isolated nodes
+
+    if len(G.edges()) < min_edges:
+        raise ValueError(f"Graph has only {len(G.edges())} edges (min {min_edges} required)")
 
     # Extract edge weights and normalize for linewidth
     edges = G.edges()
@@ -262,7 +344,7 @@ def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=
         graph_features = {
             "Average Clustering": features["Average Clustering"],
             "Diameter": features["Diameter"],
-            "Laplacian Eigenvectors": features["Laplacian Eigenvectors"]
+            "Laplacian Eigenvectors": features["Laplacian Eigenvectors"] # is not really a graph feature, more so a temporal/spectral feature (its says something about the frequency components)
         }
 
         # Create DataFrames
@@ -275,56 +357,15 @@ def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=
 
         return node_df, graph_df
 
-def load_files(folder_path = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")), "abide")):
-    """
-    Load all .1D files from a folder where each file contains multiple time series (columns)
-
-    Returns:
-    - List of 2D numpy arrays (one per file)
-    - List of filenames
-    - List of institute names & subject ids
-    - Dictionary with metadata about dimensions
-    """
-    # Get all .1D files sorted alphabetically
-    file_list = sorted(glob.glob(os.path.join(folder_path,'*', '*.1D')))
-
-    all_data = []
-    subject_ids = []
-    institute_names = []
-    file_info = {
-        'total_files': len(file_list),
-        'timepoints_per_file': [],
-        'series_per_file': []
-    }
-
-    for file_path in file_list:
-        try:
-            # Load all columns from the file
-            data = np.loadtxt(file_path)
-            data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
-            all_data.append(data)
-            filename = os.path.basename(file_path)
-
-            # Extract institute name and subject ID from filename
-            institute = filename.split('_005')[0]
-            subject_id = '005' + filename.split('_005')[1].split('_')[0]
-
-            institute_names.append(institute)
-            subject_ids.append(subject_id)
-
-            # Store metadata
-            file_info['timepoints_per_file'].append(data.shape[0])
-            file_info['series_per_file'].append(data.shape[1])
-
-            print(f"Loaded {filename}: {data.shape[0]} timepoints × {data.shape[1]} series")
-
-        except Exception as e:
-            print(f"Error loading {file_path}: {str(e)}")
-            all_data.append(None)
-            subject_ids.append(None)
-            institute_names.append(None)
-
-    return all_data, file_list, subject_ids, institute_names, file_info
+def adj_heatmap(W):
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(W,
+                cmap='coolwarm',
+                square=True)
+    plt.xlabel("ROI")
+    plt.ylabel("ROI")
+    plt.tight_layout()
+    plt.show()
 
 def pearson_corr(time_series_data, threshold=0.5, absolute_value=True):
     """
@@ -364,28 +405,31 @@ def pearson_corr(time_series_data, threshold=0.5, absolute_value=True):
             if i != j and corr > threshold:
                 adj_matrix[i, j] = adj_matrix[j, i] = 1
                 corr_matrix[i, j] = corr
-    print("adj:\n",adj_matrix)
-    print("corr:\n",corr_matrix)
+
     return adj_matrix, corr_matrix
 
-def partial_corr(ts_data, method="ledoit", threshold=0.2):
+def partial_corr(ts_data, method="glasso", threshold=None):
+    # Standardize the data
+    ts_data = StandardScaler().fit_transform(ts_data)
 
-    if method == 'glasso':
-        variances = np.var(ts_data, axis=0)
-        ts_data = ts_data[:, variances > 1e-8]
-        ts_data = StandardScaler().fit_transform(ts_data)
-        emp_cov = np.cov(ts_data)
-        emp_cov += np.eye(emp_cov.shape[0]) * 1e-3
-        inv_cov = GraphicalLassoCV(max_iter=5000).fit(emp_cov,ts_data).precision_
+    # Compute inverse covariance
+    if method == "glasso":
+        inv_cov = GraphicalLassoCV(max_iter=5000).fit(ts_data).precision_
     else:
         inv_cov = LedoitWolf().fit(ts_data).precision_
 
-    #inv_cov = np.linalg.pinv(cov)
-    W = -inv_cov / np.sqrt(np.outer(np.diag(inv_cov), np.diag(inv_cov)))
+    # Compute partial correlations
+    diag = np.sqrt(np.diag(inv_cov))
+    W = -inv_cov / np.outer(diag, diag)
     np.fill_diagonal(W, 0)
 
-    # Apply thresholding to induce sparsity
-    W[abs(W) < threshold] = 0
+    # Apply threshold if specified
+    if threshold is not None:
+        if 0 < threshold < 1:  # Percentile threshold (0-100)
+            abs_vals = np.abs(W[np.triu_indices_from(W, k=1)])
+            threshold = np.percentile(abs_vals, threshold * 100)
+        W[np.abs(W) < threshold] = 0
+
     return W, inv_cov
 
 def mutual_info(data):
@@ -399,92 +443,230 @@ def mutual_info(data):
             mi_matrix[i, j] = mi_matrix[j, i] = mi
     return mi_matrix
 
-def Adj_heatmap(W):
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(W,
-                cmap='coolwarm',
-                square=True)
-    plt.xlabel("ROI")
-    plt.ylabel("ROI")
-    plt.tight_layout()
-    plt.show()
-
-def stat_feats(x):
+def load_files(folder_path=None, var_filt=True, ica=False, sex='all', max_files=None, shuffle=False):
     """
-    Compute classic statistical features based on some time series data and stores it to a panda dataframe.
+    Load .1D fMRI files with options to filter by gender, limit number of files, and shuffle data.
 
-    Features:
-    - Mean, Standard Deviation, Skewness, Kurtosis, Slope, Correlation, Covariance, Signal-to-noise ratio etc.
+    Parameters:
+    - folder_path: base folder path. Defaults to '.../abide'.
+    - var_filt: apply zero variance filter.
+    - ica: apply ICA dimensionality reduction.
+    - gender: 'male', 'female', or 'all'
+    - max_files: maximum number of files to load
+    - shuffle: whether to shuffle data and subject IDs
+
+    Returns:
+    - all_data: List of 2D numpy arrays (one per file)
+    - subject_ids: List of subject IDs
+    - file_list: List of file paths
+    - file_info: Dictionary with metadata
     """
-    # Transpose back so each row is one ROI's time series
-    if x.shape[0] > x.shape[1]:
-        x = x.T
+    if folder_path is None:
+        folder_path = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")), "abide")
 
-    # Extract features for each time series
-    feature_list = []
-    for ts in x:
-        features = {
-            'mean': np.mean(ts, axis=0),
-            'std': np.std(ts, axis=0),
-            'SNR': np.mean(ts, axis=0) / (np.std(ts, axis=0) + 1e-10),
-            'Skewness': skew(ts, axis=0),
-            'Kurtosis': kurtosis(ts, axis=0)
-        }
-        feature_list.append(features)
+    # Find sex-specific subfolders dynamically (e.g., male-cpac-..., female-cpac-...)
+    subdirs = [d for d in glob.glob(os.path.join(folder_path, '*')) if os.path.isdir(d)]
 
-    # Compute peak statistics
-    df_pk = pk_stats(x)
-    df = pd.DataFrame(feature_list)
-    df = pd.concat([df, df_pk], axis=1)
-    # Generate ROI labels
-    aal_labels = [f"ROI_{i + 1}" for i in range(len(df))]
-    df.insert(0, 'ROI', aal_labels)
+    sex_folders = []
+    if sex.lower() in ['male', 'female']:
+        sex_folders = [d for d in subdirs if os.path.basename(d).lower().startswith(sex.lower())]
+    elif sex.lower() == 'all':
+        sex_folders = [d for d in subdirs if os.path.basename(d).lower().startswith(('male', 'female'))]
+    else:
+        raise ValueError("sex must be 'male', 'female', or 'all'")
 
-    # Functional connectivity matrix
-    roi_pairs = list(combinations(aal_labels, 2))
-    feature_names = [f"Corr_{r1}-{r2.split('_')[1]}" for r1, r2 in roi_pairs]
+    file_list = []
+    for sfolder in sex_folders:
+        file_list.extend(glob.glob(os.path.join(sfolder, '*.1D')))
 
-    #xf = x[:, np.var(x, axis=0) > 1e-8]
-    fc_matrix = np.corrcoef(x)
-    fc_matrix = np.nan_to_num(fc_matrix, nan=0.0, posinf=0.0, neginf=0.0)
-    triu_indices = np.triu_indices_from(fc_matrix, k=1)
-    fc_vector = fc_matrix[triu_indices]
-    df_fc = pd.DataFrame([fc_vector], columns=feature_names)
+    if shuffle:
+        random.shuffle(file_list)
+    else:
+        file_list = sorted(file_list)
 
-    return df, df_fc
+    if max_files is not None:
+        file_list = file_list[:max_files]
 
-def multiset_feats(data_list, method="partial_corr_LF"):
+    if not file_list:
+        raise ValueError(f"No .1D files found for sex='{sex}' in {folder_path}.")
+
+    all_data = []
+    subject_ids = []
+    loaded_files = []
+    file_info = {
+        'total_files': 0,
+        'timepoints_per_file': [],
+        'series_per_file': []
+    }
+
+    for file_path in file_list:
+        try:
+            data = np.loadtxt(file_path)
+            data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+            all_data.append(data)
+            filename = os.path.basename(file_path)
+            subject_id = '005' + filename.split('_005')[1].split('_')[0]
+            subject_ids.append(subject_id)
+            loaded_files.append(file_path)
+
+            file_info['timepoints_per_file'].append(data.shape[0])
+            file_info['series_per_file'].append(data.shape[1])
+            file_info['total_files'] += 1
+
+            print(f"Loaded {filename}: {data.shape[0]} timepoints × {data.shape[1]} series")
+        except Exception as e:
+            print(f"Error loading {file_path}: {str(e)}")
+
+    if var_filt:
+        all_data, subject_ids, _ = zeroVar_filter(all_data, subject_ids)
+
+    if ica:
+        all_data, _, subject_ids, failed_indices = ica_dimReduc(
+            all_data,
+            subject_ids=subject_ids,
+            remove_failures=True
+        )
+        if failed_indices:
+            print(f"Removed subjects at indices: {failed_indices}")
+
+    return all_data, subject_ids, loaded_files, file_info
+
+def ica_dimReduc(fmri_data, subject_ids=None, n_components=15, max_iter=10000, tol=1e-5,
+                prinCA=True, ica_attempts=3, remove_failures=True):
+    """
+    Reduce dimensionality of fMRI time series data using ICA with:
+    - Multiple convergence attempts (ica_attempts, 3 standard)
+    - Fallback to PCA
+    - Numerical stability checks
+
+    Parameters:
+    - fmri_data: List of subject time series data (each subject: timepoints × 116 AAL regions)
+    - n_components: Number of ICA components to extract (default: 30)
+
+    Returns:
+    - ica_components: List of ICA components per subject (timepoints × n_components)
+    - mixing_matrices: List of mixing matrices per subject (116 regions × n_components)
+    - filtered_ids: Subject IDs that passed ICA (only if subject_ids provided)
+    - failed_indices: Indices of removed subjects
+    """
+    scaler = StandardScaler()
+    ica_components = []
+    mixing_matrices = []
+    successful_indices = []
+
+    for subj_idx, subject in enumerate(fmri_data):
+        print(f"\nSubject {subj_idx + 1}/{len(fmri_data)}")
+        X = scaler.fit_transform(subject)
+
+        # 1. Data Quality Check
+        valid_mask = np.var(X, axis=0) > 1e-8
+        if np.sum(valid_mask) < n_components:
+            print(f"Only {np.sum(valid_mask)} valid ROIs - skipping")
+            continue
+
+        X = X[:, valid_mask]
+
+        # 2. PCA Whitening with Rank Check
+        if prinCA:
+            pca = PCA(n_components=min(n_components, X.shape[1] - 1), whiten=True)
+            try:
+                X_white = pca.fit_transform(X)
+                explained_var = np.sum(pca.explained_variance_ratio_)
+                print(f"PCA explained variance: {explained_var:.1%}")
+                if explained_var < 0.5:
+                    raise ValueError("PCA explains <50% variance")
+            except Exception as e:
+                print(f"PCA failed: {str(e)}")
+                if remove_failures: continue
+                X_white = X[:, :n_components]  # Fallback
+
+        # 3. ICA with Enhanced Attempts
+        success = False
+        for attempt in range(ica_attempts):
+            try:
+                ica = FastICA(
+                    n_components=n_components,
+                    max_iter=max_iter,
+                    tol=tol,
+                    random_state=attempt * 100 + 42,  # Diverse seeds
+                    algorithm='parallel',
+                )
+
+                components = ica.fit_transform(X_white if prinCA else X)
+
+                # Component Quality Check
+                if np.max(np.abs(components)) < 1e-6:
+                    raise ValueError("Near-zero components")
+
+                # Store results
+                mixing = ica.mixing_ if hasattr(ica, 'mixing_') else pinv(ica.components_)
+                if prinCA:
+                    mixing = pca.components_.T @ mixing
+
+                ica_components.append(components)
+                mixing_matrices.append(mixing)
+                successful_indices.append(subj_idx)
+                print(f"ICA succeeded in {ica.n_iter_} iterations")
+                success = True
+                break
+
+            except Exception as e:
+                print(f"Attempt {attempt + 1} failed: {str(e)}")
+
+        if not success and not remove_failures:
+            print("Using PCA fallback")
+            ica_components.append(X_white if prinCA else X[:, :n_components])
+            mixing_matrices.append(pca.components_.T if prinCA else np.eye(X.shape[1], n_components))
+            successful_indices.append(subj_idx)
+
+    # Handle subject IDs
+    filtered_ids = [subject_ids[i] for i in successful_indices] if subject_ids else None
+    failed_indices = [i for i in range(len(fmri_data)) if i not in successful_indices]
+
+    if failed_indices:
+        print(f"\nFailed on {len(failed_indices)} subjects: {failed_indices}")
+
+    return ica_components, mixing_matrices, filtered_ids, failed_indices
+
+def multiset_feats(data_list, subject_ids, method="mutual_info"):
     """
     Loops over all data recursively to compute specific features and stores them in a dataframe indexed per individual (subject ID).
 
-    - Input: set of 1D timeseries
+    - Input: fmri_dataset of 1D timeseries, corresponding subject_ids
     - Output: DataFrame indexed per individual with all relative features
     - Parameters: 'method' to choose graph inference method used
 
     """
-    df_app = pd.DataFrame(columns=stat_feats(data_list[0])[0].columns) # Initialize dataframe
+    df_app = pd.DataFrame()
     df_global_list = []
-    df_fc_list = []
     expanded_ids = []
 
-    for data, sid in zip(data_list, load_files()[2]):
-        if data is None:
-            continue  # Skip if loading failed
+    for data, sid in zip(data_list, subject_ids):
+        try:
+            df_stat = stat_feats(data)
 
-        df_stat, df_fc = stat_feats(data) # Compute the statistical features
-        df_graph, df_global = graphing(A= detect_inf_method(data, method=method)) # Compute the graphical features
-        df_roi = pd.merge(df_stat, df_graph, on='ROI', how='left') # Merge both dataframes
-        df_global_list.append(df_global)
-        df_fc_list.append(df_fc)
-        if df_app.empty:
-            df_app = df_roi  # First iteration in case df_app=empty: set df_app = df
-        else:
+            try:
+                adj_matrix = detect_inf_method(data, method=method)
+                if np.all(adj_matrix == 0):
+                    raise ValueError("Zero adjacency matrix")
+
+                df_graph, df_global = graphing(adj_matrix)
+                df_roi = pd.merge(df_stat, df_graph, on='ROI', how='left')
+
+            except Exception as graph_err:
+                print(f"Graph failed for {sid}: {str(graph_err)}")
+                df_roi = df_stat  # Keep statistical features only
+                df_global = pd.DataFrame()  # Empty global features
+
+            # Accumulate results
+            df_global_list.append(df_global)
+            expanded_ids.extend([sid] * len(df_roi)) # Pad subject IDs with copies for all ROIs
             df_app = pd.concat([df_app, df_roi], ignore_index=True)
 
+        except Exception as e:
+            print(f"Subject {sid} failed completely: {str(e)}")
+            continue
 
-        expanded_ids.extend([sid] * len(df_roi)) # Pad subject IDs with copies for all ROIs
-
-    df_fc = pd.concat(df_fc_list, ignore_index=True)
     df_global = pd.concat(df_global_list, ignore_index=True)
 
     # Assign to dataframe
@@ -514,8 +696,7 @@ def multiset_feats(data_list, method="partial_corr_LF"):
 
     # Group by ROI number
     features_grouped = sorted(feature_cols, key=lambda x: (extract_roi_num(x), x.split('_')[0]))
-    df = pd.concat([df_fc, df_global], axis=1)
-    df_wide = pd.concat([df_wide[id_cols + features_grouped], df], axis=1)
+    df_wide = pd.concat([df_wide[id_cols + features_grouped], df_global], axis=1)
 
     def multiset_pheno(df_wide):
         """
@@ -551,7 +732,16 @@ def multiset_feats(data_list, method="partial_corr_LF"):
 
 
 #-------{Main for testing}-------#
-# data_arrays, file_paths, subject_ids, institute_names, metadata = load_files() # represents format of load_files()
+# fmri_data, subject_ids, file_paths, metadata = load_files() # represents format of load_files()
+# output_df = multiset_feats(fmri_data,subject_ids)           # represents multiset_feats() usage, add another index '[]' to load_files to select data amount
 
-# represents multiset_feats() usage, add another index '[]' to load_files to select data amount
-print("Output data:\n", multiset_feats(load_files()[0][:5]))
+# This will automatically remove problematic subjects
+fmri_data, subject_ids, _, _ = load_files(sex='all', max_files=20, shuffle=True, var_filt=True, ica=True)
+
+print(f"Final data: {len(fmri_data)} subjects")
+print(f"Final IDs: {len(subject_ids)}")
+print("Subject IDs:", subject_ids)
+
+df_out = multiset_feats(fmri_data, subject_ids)
+
+print("df_out:\n", df_out)
