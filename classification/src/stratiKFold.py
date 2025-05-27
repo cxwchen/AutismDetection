@@ -36,13 +36,22 @@ class Tee:
 
 sys.stdout = Tee(sys.stdout, log_file)
 
-female_df = pd.read_csv("female_df_merged.csv.gz").sample(frac=1, random_state=42).reset_index(drop=True) # shuffle the sites
-male_df = pd.read_csv("male_df_merged.csv.gz").sample(frac=1, random_state=42).reset_index(drop=True) # shuffle the sites
+# female_df = pd.read_csv("female_df_merged.csv.gz").sample(frac=1, random_state=42).reset_index(drop=True) # shuffle the sites
+# male_df = pd.read_csv("male_df_merged.csv.gz").sample(frac=1, random_state=42).reset_index(drop=True) # shuffle the sites
+
+female_df = pd.read_csv("ourfeats_female.csv.gz").sample(frac=1, random_state=42).reset_index(drop=True) # shuffle the sites
+male_df = pd.read_csv("ourfeats_male.csv.gz").sample(frac=1, random_state=42).reset_index(drop=True) # shuffle the sites
 
 def runCV(df, label="female"):
-    X = df.iloc[:, 4:]
+    # version for Jochem
+    # X = df.iloc[:, 4:]
+    # y = df['DX_GROUP']
+    # meta = df[['SITE_ID', 'SEX', 'AGE']]
+
+    # version for us
+    X = df.iloc[:, 5:]
     y = df['DX_GROUP']
-    meta = df[['SITE_ID', 'SEX']]
+    meta = df[['SITE_ID', 'SEX', 'AGE']]
 
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 

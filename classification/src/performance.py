@@ -141,7 +141,7 @@ def toCSV(csvpath, fold, classifierName, tag, group_col, group_name, metrics):
         if isinstance(value, (list, np.ndarray)):
             for i, v in enumerate(value):
                 label = ['Control', 'Autism'][i] if len(value) == 2 else f"Class{i}"
-                rows.append([fold, classifierName, tag, group_col, group_name, f"{group_name}_{label}", metric, v])
+                rows.append([fold, classifierName, tag, group_col, group_name, f"{metric}_{label}", v])
         else:
             rows.append([fold, classifierName, tag, group_col, group_name, metric, value])
     
@@ -169,10 +169,14 @@ def perGroupEval(ytrue, ypred, yprob, meta, group_col, group_name, fold=None, cl
         if len(np.unique(yt)) < 2:
             print(f"Skipping {group_name} = {group} --> only one class present.")
             metrics = {
-                "precision": [float('nan')],
-                "recall": [float('nan')],
-                "f1_score": [float('nan')],
-                "support": [support],
+                "precision_control": float('nan'),
+                "recall_control": float('nan'),
+                "f1_score_control": float('nan'),
+                "support_control": float('nan'),
+                "precision_autism": float('nan'),
+                "recall_autism": float('nan'),
+                "f1_score_autism": float('nan'),
+                "support_autism": float('nan'),
                 "specificity": float('nan'),
                 "sensitivity": float('nan'),
                 "auroc": float('nan'),
