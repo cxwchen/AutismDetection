@@ -1,4 +1,4 @@
-# %%
+#%%
 import numpy as np
 import cvxpy as cp
 from numpy.linalg import eigh, norm
@@ -44,11 +44,24 @@ def select_graph(graph_type, N):
     else:
         raise ValueError("Invalid graph type")
 
-# --------- Laplacian Computation ---------
-def compute_normalized_laplacian(W):
-    D = np.diag(W.sum(axis=1))
-    D_inv_sqrt = np.diag(1.0 / np.sqrt(np.maximum(D.diagonal(), 1e-10)))
-    return np.eye(W.shape[0]) - D_inv_sqrt @ W @ D_inv_sqrt
+def create_random_normalized_laplacian(N, mean=0.0, std=1.0):
+    # Step 1: Create random symmetric adjacency with positive weights
+    A_upper = np.random.normal(mean, std, size=(N, N))
+    A_upper = np.triu(np.abs(A_upper), k=1)  # abs to ensure positive weights
+    
+    A = A_upper + A_upper.T
+    np.fill_diagonal(A, 0)
+    
+    # Step 2: Compute degree matrix
+    degrees = A.sum(axis=1)
+    # To avoid division by zero for isolated nodes:
+    degrees[degrees == 0] = 1e-10
+    D_inv_sqrt = np.diag(1.0 / np.sqrt(degrees))
+    
+    # Step 3: Compute normalized Laplacian
+    L_norm = np.eye(N) - D_inv_sqrt @ A @ D_inv_sqrt
+    
+    return L_norm
 
 # --------- Signal Simulation ---------
 def simulate_diffused_graph_signals(S, P=100, K=5, alpha=0.5):
@@ -71,103 +84,102 @@ def compute_sample_covariance(X):
     sample_cov = (1 / (P - 1)) * X_centered @ X_centered.T
     return sample_cov, X_centered
 
-# --------- Laplacian Learning ---------
-def refine_normalized_laplacian_with_spectrum(V_hat, tau=1.0, delta=1e-6, epsilon=1e-1, max_iter=10):
-    """
-    Iteratively reweighted L1 minimization to learn sparse normalized Laplacian S
-    satisfying:
-    - PSD
-    - symmetric
-    - diag(S) = 1
-    - off-diagonal ∈ [-1, 0]
-    - λ₀ = 0 via λ_vec[0] = 0
-    """
+# --------- Adjacency Learning ---------
+def learn_adjacency_matrix(X, tau=1.0, delta=1e-4, epsilon=0.1, max_iter=10, binarize_threshold=0.1):
+    sample_cov, _ = compute_sample_covariance(X)
+    _, V_hat = eigh(sample_cov)
     N = V_hat.shape[0]
-    S_est = np.eye(N)
+    S_est = np.zeros((N, N))
     weights = np.ones((N, N))
-    off_diag_mask = np.ones((N, N)) - np.eye(N)
+    off_diag_mask = np.ones((N, N)) - np.eye(N)  # to exclude diagonal
 
+    I = np.eye(N)
+    off_diag_mask = np.ones((N, N)) - I
+    
     for p in range(max_iter):
-        S = cp.Variable((N, N), symmetric=True)
+        S = cp.Variable((N, N))
         lambda_vec = cp.Variable(N)
         S_prime = sum([lambda_vec[k] * np.outer(V_hat[:, k], V_hat[:, k]) for k in range(N)])
-
         off_diag_entries = cp.multiply(off_diag_mask, S)
-
+        
         constraints = [
-            S >> 0,                                 # PSD
-            cp.diag(S) == 1,                        # Diagonal = 1
-            #off_diag_entries <= 0,
-            off_diag_entries >= -1,
-            cp.norm(S - S_prime, 'fro') <= epsilon, # spectral similarity
-            lambda_vec[0] == 0,                     # enforce λ₀ = 0
+            cp.diag(S) == 1,                          # Diagonal = 1
+            S >> 0,                                   # PSD
+            off_diag_entries >= -1,                   # Off-diagonal ≥ -1
+            cp.norm(S - S_prime, 'fro') <= epsilon,   # Spectral similarity
+            lambda_vec[0] == 0                       # λ₁(S') = 0, right eigenvector picked?  
         ]
 
-        # Weighted L1 on off-diagonals
-        objective = cp.Minimize(cp.sum(cp.multiply(weights, cp.abs(S))))
+        objective = cp.Minimize(cp.sum(cp.multiply(weights * off_diag_mask, cp.abs(S))))
         problem = cp.Problem(objective, constraints)
         problem.solve(solver=cp.SCS)
 
         if S.value is None:
-            print(f"Iteration {p}: optimization failed.")
+            print(f"Iteration {p+1}: optimization failed.")
             break
 
         S_est = S.value
         weights = tau / (np.abs(S_est) + delta)
-
-        nnz = (np.abs(S_est[off_diag_mask == 1]) > 1e-3).sum()
-        print(f"Iter {p+1:>2}: status = {problem.status}, nonzeros (off-diagonal): {nnz}")
+        weights *= off_diag_mask  # keep ignoring the diagonal
+        nnz = (np.abs(S_est) > 1e-3).sum()
+        print(f"Iter {p+1:>2}: status = {problem.status}, nonzeros = {nnz}")
 
     return S_est
 
-def learn_normalized_laplacian(X, tau=1.0, delta=1e-6, epsilon=1e-1, max_iter=10):
-    print("Step 1: Covariance and Eigendecomposition")
-    sample_cov, _ = compute_sample_covariance(X)
-    eigvals, V_hat = eigh(sample_cov)
-    print("Step 2: Learning Laplacian")
-    return refine_normalized_laplacian_with_spectrum(V_hat, tau, delta, epsilon, max_iter)
 
 # --------- Evaluation ---------
-def compare_graphs(S_true, S_learned):
-    frob_error = norm(S_true - S_learned, 'fro')
-    rel_error = frob_error / norm(S_true, 'fro')
-    threshold = 1e-3
-    A_true = (S_true < -threshold).astype(int)
-    A_learned = (S_learned < -threshold).astype(int)
-    shd = np.sum(np.abs(A_true - A_learned))
+def compare_graphs(A_true, A_learned, threshold=1e-3):
+    A_true_bin = (A_true > threshold).astype(int)
+    A_learned_bin = (A_learned > threshold).astype(int)
+
+    tp = np.sum((A_true_bin == 1) & (A_learned_bin == 1))
+    fp = np.sum((A_true_bin == 0) & (A_learned_bin == 1))
+    fn = np.sum((A_true_bin == 1) & (A_learned_bin == 0))
+
+    precision = tp / (tp + fp + 1e-10)
+    recall = tp / (tp + fn + 1e-10)
+    f1 = 2 * precision * recall / (precision + recall + 1e-10)
+
+    # Mask out diagonal
+    mask_offdiag = np.ones_like(A_true) - np.eye(A_true.shape[0])
+    A_true_masked = A_true * mask_offdiag
+    A_learned_masked = A_learned * mask_offdiag
+
+    frob_error = norm(A_true_masked - A_learned_masked, 'fro')
+    rel_error = frob_error / (norm(A_true_masked, 'fro') + 1e-10)  # avoid division by zero
+    shd = np.sum(np.abs(A_true_bin - A_learned_bin))
 
     print("\n=== Graph Comparison ===")
-    print(f"Frobenius Error: {frob_error:.4f}")
-    print(f"Relative Error:  {rel_error:.4f}")
-    print(f"SHD:             {shd}")
+    print(f"Frobenius Error:        {frob_error:.4f}")
+    print(f"Relative Error:         {rel_error:.4f}")
 
 def plot_graphs(S_true, S_learned):
     plt.figure(figsize=(10, 4))
     plt.subplot(1, 2, 1)
     plt.imshow(S_true, cmap='viridis')
-    plt.title("True Normalized Laplacian")
+    plt.title("True Adjacency Matrix")
     plt.colorbar()
 
     plt.subplot(1, 2, 2)
     plt.imshow(S_learned, cmap='viridis')
-    plt.title("Learned Normalized Laplacian")
+    plt.title("Learned Adjacency Matrix")
     plt.colorbar()
     plt.tight_layout()
     plt.show()
 
 # --------- Main Pipeline ---------
 if __name__ == "__main__":
-    np.random.seed(0)
+    #np.random.seed(0)
     N = 10
-    P = 1000
-    graph_type = "ring"  # Choose: "ring", "star", "community"
+    P = 250000
+    graph_type = "community"  # Choose from: "ring", "star", "community"
+    
+    A_true = create_random_normalized_laplacian(N, mean=0.0, std=1.0)
+    
+    #A_true = select_graph(graph_type, N)
+    X = simulate_diffused_graph_signals(A_true, P=P)
 
-    W = select_graph(graph_type, N)
-    L_true = compute_normalized_laplacian(W)
-    X = simulate_diffused_graph_signals(L_true, P=P)
-    L_learned = learn_normalized_laplacian(X, tau=1.0, delta=1e-6, epsilon=2e-1, max_iter=10)
-
-    compare_graphs(L_true, L_learned)
-    plot_graphs(L_true, L_learned)
-
+    A_learned = learn_adjacency_matrix(X, epsilon=1e-2, max_iter=10)
+    compare_graphs(A_true, A_learned)
+    plot_graphs(A_true, A_learned)
 # %%

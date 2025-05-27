@@ -3,6 +3,7 @@ import numpy as np
 import cvxpy as cp
 from numpy.linalg import eigh, norm
 import matplotlib.pyplot as plt
+from tqdm import trange, tqdm  # Add this at the top with other imports
 
 # --------- Graph Generators ---------
 def create_ring_graph(N):
@@ -44,6 +45,24 @@ def select_graph(graph_type, N):
     else:
         raise ValueError("Invalid graph type")
 
+def create_random_normal_adjacency(N, mean=0.0, std=1.0):
+    # Generate upper triangle random normal entries
+    A_upper = np.random.normal(mean, std, size=(N, N))
+    A_upper = np.triu(A_upper, k=1)
+
+    # Symmetrize to get full adjacency
+    A = A_upper + A_upper.T
+
+    # Zero diagonal (no self loops)
+    np.fill_diagonal(A, 0)
+
+    # Normalize only the first column
+    col_sum = np.sum(A[:, 0])
+    if col_sum != 0:
+        A[:, 0] /= col_sum
+        A[0, :] = A[:, 0]  # Maintain symmetry on first row as well
+    return A
+
 # --------- Signal Simulation ---------
 def simulate_diffused_graph_signals(S, P=100, K=5, alpha=0.5):
     N = S.shape[0]
@@ -66,26 +85,28 @@ def compute_sample_covariance(X):
     return sample_cov, X_centered
 
 # --------- Adjacency Learning ---------
-def learn_adjacency_matrix(X, tau=1.0, delta=1e-6, epsilon=0.1, max_iter=10, binarize_threshold=0.1):
+def learn_adjacency_matrix(X, tau=1.0, delta=1e-5, epsilon=0.1, max_iter=10, binarize_threshold=0.1):
     sample_cov, _ = compute_sample_covariance(X)
     _, V_hat = eigh(sample_cov)
     N = V_hat.shape[0]
     S_est = np.zeros((N, N))
     weights = np.ones((N, N))
-    off_diag_mask = np.ones((N, N)) - np.eye(N)  # to exclude diagonal
+    off_diag_mask = np.ones((N, N)) - np.eye(N)
 
-    for p in range(max_iter):
+    for p in trange(max_iter, desc="Learning adjacency matrix", unit="iter"):
         S = cp.Variable((N, N))
         lambda_vec = cp.Variable(N)
         S_prime = sum([lambda_vec[k] * np.outer(V_hat[:, k], V_hat[:, k]) for k in range(N)])
 
+        t1 = cp.Variable()
+        t2 = cp.Variable()
+
         constraints = [
-            #S >= 0,
             cp.diag(S) == 0,
-            #cp.sum(S[:, 0]) == 1,
             S == S.T,
-            cp.sum(S, axis=1) >= 1,
-            cp.norm(S - S_prime, 'fro') <= epsilon
+            t1 >= cp.norm(S - S_prime, 'fro'),
+            t2 >= cp.abs(cp.sum(S[:, 0]) - 1),
+            cp.norm(cp.hstack([t1, t2]), 2) <= epsilon    
         ]
 
         objective = cp.Minimize(cp.sum(cp.multiply(weights * off_diag_mask, cp.abs(S))))
@@ -93,19 +114,16 @@ def learn_adjacency_matrix(X, tau=1.0, delta=1e-6, epsilon=0.1, max_iter=10, bin
         problem.solve(solver=cp.SCS)
 
         if S.value is None:
-            print(f"Iteration {p}: optimization failed.")
+            tqdm.write(f"Iteration {p+1}: optimization failed.")
             break
 
         S_est = S.value
         weights = tau / (np.abs(S_est) + delta)
-        weights *= off_diag_mask  # keep ignoring the diagonal
+        weights *= off_diag_mask
         nnz = (np.abs(S_est) > 1e-3).sum()
-        print(f"Iter {p+1:>2}: status = {problem.status}, nonzeros = {nnz}")
+        #tqdm.write(f"Iter {p+1:>2}: status = {problem.status}, nonzeros = {nnz}")
 
-    # ✅ Binarize directly after final iteration
-    A_bin = (S_est > binarize_threshold).astype(int)
-    np.fill_diagonal(A_bin, 0)  # enforce no self-loops
-    return A_bin
+    return S_est
 
 
 # --------- Evaluation ---------
@@ -149,15 +167,16 @@ def plot_graphs(S_true, S_learned):
 
 # --------- Main Pipeline ---------
 if __name__ == "__main__":
-    np.random.seed(0)
-    N = 10
-    P = 1000
+    #np.random.seed(0)
+    N = 40
+    P = 250
     graph_type = "community"  # Choose from: "ring", "star", "community"
-
-    A_true = select_graph(graph_type, N)
+    
+    A_true = create_random_normal_adjacency(N, mean=0.0, std=1.0)
+    
+    #A_true = select_graph(graph_type, N)
     X = simulate_diffused_graph_signals(A_true, P=P)
-
-    A_learned = learn_adjacency_matrix(X, epsilon=5e-1, max_iter=10)
+    A_learned = learn_adjacency_matrix(X, epsilon=0.05, max_iter=100)
     compare_graphs(A_true, A_learned)
     plot_graphs(A_true, A_learned)
 
