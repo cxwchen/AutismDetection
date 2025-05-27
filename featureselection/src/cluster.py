@@ -41,10 +41,6 @@ def load_file():
     return X, y
 
 def cluster(X, y, t = 1):
-    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
-
-    clf = RandomForestClassifier(n_estimators=100, random_state=42)
-    clf.fit(X_train, y_train)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 8))
     corr = spearmanr(X).correlation
@@ -69,15 +65,14 @@ def cluster(X, y, t = 1):
     selected_features = [v[0] for v in cluster_id_to_feature_ids.values()]
     selected_features_names = X.columns[selected_features]
 
-    X_train_sel = X_train[selected_features_names]
-    X_test_sel = X_test[selected_features_names]
+    X_sel = X[selected_features_names]
 
     print(selected_features_names)
-    return X_train_sel, X_test_sel
+    return X_sel
 
 def main():
     X, y = load_file()
-    X_train_sel, X_test_sel = cluster(X, y)
+    X_sel = cluster(X, y)
 
 if __name__ == '__main__':
     main()
