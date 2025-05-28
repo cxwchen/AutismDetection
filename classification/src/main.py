@@ -1,14 +1,201 @@
+# Here I perform the classification for research (not GUI!)
+import os
+import sys
+import datetime
+from dotenv import load_dotenv
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import make_scorer, precision_score, recall_score, f1_score, accuracy_score, classification_report, confusion_matrix, balanced_accuracy_score
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.layers import Flatten
-from sklearn.neural_network import MLPClassifier
-from sklearn.svm import SVC
-from sklearn.linear_model import LogisticRegression
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from imblearn.over_sampling import SMOTE
+
+from loaddata import *
+from classification import *
+from classifiers import *
+from hyperparametertuning import *
+
+import sys
+import datetime
+
+# Create a timestamped log file
+os.makedirs('logs', exist_ok=True)
+log_filename = f'logs/run_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+log_file = open(log_filename, 'w')
+
+# Redirect all prints to the log file and still see them in the terminal
+class Tee:
+    def __init__(self, *files):
+        self.files = files
+    def write(self, obj):
+        for f in self.files:
+            f.write(obj)
+            f.flush()
+    def flush(self):
+        for f in self.files:
+            f.flush()
+
+sys.stdout = Tee(sys.stdout, log_file)
+# sys.stderr = Tee(sys.stderr, log_file)  # Optional: Also capture errors
+
+
+# load data
+female_df = pd.read_csv("female_df_merged.csv.gz")
+male_df = pd.read_csv("male_df_merged.csv.gz")
+
+X = female_df.loc[:, female_df.columns.str.startswith('Corr')]
+y = female_df.iloc[:, 0]
+# data = pd.read_csv("ourfeats.csv.gz", compression='gzip')
+# X = data.iloc[:, 3:]
+# y = data.iloc[:, 1]
+
+Xtrain, Xtest, ytrain, ytest = performsplit(X, y)
+# #Mean imputation since the features contain NaN values
+imputer = SimpleImputer(strategy='mean')
+Xtrain = imputer.fit_transform(Xtrain)
+Xtest = imputer.transform(Xtest)
+
+Xtrain, Xtest = normalizer(Xtrain, Xtest)
+
+# Try resampling with SMOTE to improve accuracy
+# smote = SMOTE(random_state=42)
+# Xtrain, ytrain = smote.fit_resample(Xtrain, ytrain)
+print("Using the AAL (116 regions) Atlas and Jochems extraction. ONLY FEMALE DATA ONLY CORRELATION, train-test split of 20%. MEAN IMPUTATION")
+print("=========================================")
+
+
+# perform classification
+performCA(applyLogR, Xtrain, Xtest, ytrain, ytest)
+
+# svcdefault = SVC()
+# svcparams = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, svcdefault)
+svcparams = {
+    'kernel': 'linear',
+    'C': 1
+}
+performCA(applySVM, Xtrain, Xtest, ytrain, ytest, params=svcparams)
+
+
+# rfdefault = RandomForestClassifier()
+# rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, rfdefault)
+rfparams = {'bootstrap': True, 'max_depth': None, 'max_features': None, 'min_samples_leaf': 8, 'min_samples_split': 18, 'n_estimators': 81}
+performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, params=rfparams)
+
+
+dtdefault = DecisionTreeClassifier()
+dtparams = bestDT(Xtrain, Xtest, ytrain, ytest, dtdefault)
+performCA(applyDT, Xtrain, Xtest, ytrain, ytest, params=dtparams)
+
+
+# mlpdefault = MLPClassifier()
+# mlpparams = bestMLP(Xtrain, Xtest, ytrain, ytest, mlpdefault)
+mlpparams = {'activation': 'tanh', 'alpha': np.float64(0.0006152656745540253), 'hidden_layer_sizes': (50,), 'learning_rate_init': np.float64(0.07405040815107786), 'solver': 'sgd'}
+performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, params=mlpparams)
+
+
+# # ======== MALE CLASSIFICATION ========
+# X = male_df.loc[:, male_df.columns.str.startswith('Corr')]
+# y = male_df.iloc[:, 0]
+# # data = pd.read_csv("ourfeats.csv.gz", compression='gzip')
+# # X = data.iloc[:, 3:]
+# # y = data.iloc[:, 1]
+
+# Xtrain, Xtest, ytrain, ytest = performsplit(X, y)
+# # #Mean imputation since the features contain NaN values
+# imputer = SimpleImputer(strategy='mean')
+# Xtrain = imputer.fit_transform(Xtrain)
+# Xtest = imputer.transform(Xtest)
+
+# Xtrain, Xtest = normalizer(Xtrain, Xtest)
+
+# # Try resampling with SMOTE to improve accuracy
+# # smote = SMOTE(random_state=42)
+# # Xtrain, ytrain = smote.fit_resample(Xtrain, ytrain)
+# print("Using the AAL (116 regions) Atlas and Jochems extraction. ONLY MALE DATA ONLY CORRELATION, train-test split of 20%")
+# print("=========================================")
+
+
+# # perform classification
+# performCA(applyLogR, Xtrain, Xtest, ytrain, ytest)
+
+# # svcdefault = SVC()
+# # svcparams = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, svcdefault)
+# svcparams = {
+#     'kernel': 'linear',
+#     'C': 1
+# }
+# performCA(applySVM, Xtrain, Xtest, ytrain, ytest, params=svcparams)
+
+
+# # rfdefault = RandomForestClassifier()
+# # rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, rfdefault)
+# rfparams = {'bootstrap': True, 'max_depth': None, 'max_features': None, 'min_samples_leaf': 8, 'min_samples_split': 18, 'n_estimators': 81}
+# performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, params=rfparams)
+
+
+# dtdefault = DecisionTreeClassifier()
+# dtparams = bestDT(Xtrain, Xtest, ytrain, ytest, dtdefault)
+# performCA(applyDT, Xtrain, Xtest, ytrain, ytest, params=dtparams)
+
+
+# # mlpdefault = MLPClassifier()
+# # mlpparams = bestMLP(Xtrain, Xtest, ytrain, ytest, mlpdefault)
+# mlpparams = {'activation': 'tanh', 'alpha': np.float64(0.0006152656745540253), 'hidden_layer_sizes': (50,), 'learning_rate_init': np.float64(0.07405040815107786), 'solver': 'sgd'}
+# performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, params=mlpparams)
+
+
+# # ========= CLASSIFICATION ON BOTH ===========
+# comb_df = pd.concat([female_df, male_df], axis=0)
+
+# X = comb_df.iloc[:, comb_df.columns.str.startswith('Corr')]
+# y = comb_df.iloc[:, 0]
+# # data = pd.read_csv("ourfeats.csv.gz", compression='gzip')
+# # X = data.iloc[:, 3:]
+# # y = data.iloc[:, 1]
+
+# Xtrain, Xtest, ytrain, ytest = performsplit(X, y)
+# # #Mean imputation since the features contain NaN values
+# imputer = SimpleImputer(strategy='mean')
+# Xtrain = imputer.fit_transform(Xtrain)
+# Xtest = imputer.transform(Xtest)
+
+# Xtrain, Xtest = normalizer(Xtrain, Xtest)
+
+# # Try resampling with SMOTE to improve accuracy
+# # smote = SMOTE(random_state=42)
+# # Xtrain, ytrain = smote.fit_resample(Xtrain, ytrain)
+# print("Using the AAL (116 regions) Atlas and Jochems extraction. BOTH FEMALE AND MALE DATA ONLY CORRELATION, train-test split of 20%")
+# print("=========================================")
+
+
+# # perform classification
+# performCA(applyLogR, Xtrain, Xtest, ytrain, ytest)
+
+# # svcdefault = SVC()
+# # svcparams = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, svcdefault)
+# svcparams = {
+#     'kernel': 'linear',
+#     'C': 1
+# }
+# performCA(applySVM, Xtrain, Xtest, ytrain, ytest, params=svcparams)
+
+
+# # rfdefault = RandomForestClassifier()
+# # rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, rfdefault)
+# rfparams = {'bootstrap': True, 'max_depth': None, 'max_features': None, 'min_samples_leaf': 8, 'min_samples_split': 18, 'n_estimators': 81}
+# performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, params=rfparams)
+
+
+# dtdefault = DecisionTreeClassifier()
+# dtparams = bestDT(Xtrain, Xtest, ytrain, ytest, dtdefault)
+# performCA(applyDT, Xtrain, Xtest, ytrain, ytest, params=dtparams)
+
+
+# # mlpdefault = MLPClassifier()
+# # mlpparams = bestMLP(Xtrain, Xtest, ytrain, ytest, mlpdefault)
+# mlpparams = {'activation': 'tanh', 'alpha': np.float64(0.0006152656745540253), 'hidden_layer_sizes': (50,), 'learning_rate_init': np.float64(0.07405040815107786), 'solver': 'sgd'}
+# performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, params=mlpparams)
 
 
 

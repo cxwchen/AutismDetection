@@ -1,0 +1,212 @@
+Using the AAL (116 regions) Atlas, train-test split of 20%
+=========================================
+Results for the full correlation features
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.62      0.72      0.67        94
+           1       0.61      0.49      0.54        81
+
+    accuracy                           0.62       175
+   macro avg       0.61      0.61      0.61       175
+weighted avg       0.62      0.62      0.61       175
+
+
+=== Metrics for LogisticRegression ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.624
+    Recall:    0.723
+    F1 Score:  0.670
+    Support:   94
+  Autism:
+    Precision: 0.606
+    Recall:    0.494
+    F1 Score:  0.544
+    Support:   81
+
+Overall Metrics:
+  Specificity:          0.723
+  Sensitivity:          0.494
+  AUROC:                0.673
+  Accuracy:             0.617
+  Balanced Accuracy:    0.609
+=====================================
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.62      0.73      0.67        94
+           1       0.60      0.47      0.53        81
+
+    accuracy                           0.61       175
+   macro avg       0.61      0.60      0.60       175
+weighted avg       0.61      0.61      0.60       175
+
+
+=== Metrics for SVC ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.616
+    Recall:    0.734
+    F1 Score:  0.670
+    Support:   94
+  Autism:
+    Precision: 0.603
+    Recall:    0.469
+    F1 Score:  0.528
+    Support:   81
+
+Overall Metrics:
+  Specificity:          0.734
+  Sensitivity:          0.469
+  AUROC:                0.658
+  Accuracy:             0.611
+  Balanced Accuracy:    0.602
+=====================================
+Starting RandomizedSearchCV fitting...
+Fitting 5 folds for each of 50 candidates, totalling 250 fits
+RandomizedSearchCV fitting completed.
+Best Parameters Found: {'criterion': 'entropy', 'max_depth': np.int64(6), 'min_samples_leaf': 12, 'min_samples_split': 9}
+Accuracy:  0.5657
+Recall:    0.4568
+Precision: 0.5362
+F1 Score:  0.4933
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.58      0.66      0.62        94
+           1       0.54      0.46      0.49        81
+
+    accuracy                           0.57       175
+   macro avg       0.56      0.56      0.56       175
+weighted avg       0.56      0.57      0.56       175
+
+
+=== Metrics for DecisionTreeClassifier ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.585
+    Recall:    0.660
+    F1 Score:  0.620
+    Support:   94
+  Autism:
+    Precision: 0.536
+    Recall:    0.457
+    F1 Score:  0.493
+    Support:   81
+
+Overall Metrics:
+  Specificity:          0.660
+  Sensitivity:          0.457
+  AUROC:                0.574
+  Accuracy:             0.566
+  Balanced Accuracy:    0.558
+=====================================
+Results for partial correlation
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.60      0.69      0.64        94
+           1       0.57      0.47      0.51        81
+
+    accuracy                           0.59       175
+   macro avg       0.58      0.58      0.58       175
+weighted avg       0.59      0.59      0.58       175
+
+
+=== Metrics for LogisticRegression ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.602
+    Recall:    0.691
+    F1 Score:  0.644
+    Support:   94
+  Autism:
+    Precision: 0.567
+    Recall:    0.469
+    F1 Score:  0.514
+    Support:   81
+
+Overall Metrics:
+  Specificity:          0.691
+  Sensitivity:          0.469
+  AUROC:                0.584
+  Accuracy:             0.589
+  Balanced Accuracy:    0.580
+=====================================
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.60      0.60      0.60        94
+           1       0.53      0.53      0.53        81
+
+    accuracy                           0.57       175
+   macro avg       0.56      0.56      0.56       175
+weighted avg       0.57      0.57      0.57       175
+
+
+=== Metrics for SVC ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.596
+    Recall:    0.596
+    F1 Score:  0.596
+    Support:   94
+  Autism:
+    Precision: 0.531
+    Recall:    0.531
+    F1 Score:  0.531
+    Support:   81
+
+Overall Metrics:
+  Specificity:          0.596
+  Sensitivity:          0.531
+  AUROC:                0.583
+  Accuracy:             0.566
+  Balanced Accuracy:    0.563
+=====================================
+Starting RandomizedSearchCV fitting...
+Fitting 5 folds for each of 50 candidates, totalling 250 fits
+RandomizedSearchCV fitting completed.
+Best Parameters Found: {'criterion': 'gini', 'max_depth': np.int64(11), 'min_samples_leaf': 3, 'min_samples_split': 4}
+Accuracy:  0.5257
+Recall:    0.5185
+Precision: 0.4884
+F1 Score:  0.5030
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.54      0.52      0.53        94
+           1       0.46      0.48      0.47        81
+
+    accuracy                           0.50       175
+   macro avg       0.50      0.50      0.50       175
+weighted avg       0.50      0.50      0.50       175
+
+
+=== Metrics for DecisionTreeClassifier ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.538
+    Recall:    0.521
+    F1 Score:  0.530
+    Support:   94
+  Autism:
+    Precision: 0.464
+    Recall:    0.481
+    F1 Score:  0.473
+    Support:   81
+
+Overall Metrics:
+  Specificity:          0.521
+  Sensitivity:          0.481
+  AUROC:                0.521
+  Accuracy:             0.503
+  Balanced Accuracy:    0.501
+=====================================

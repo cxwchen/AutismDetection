@@ -1,0 +1,170 @@
+Using the AAL (116 regions) Atlas and Jochems extraction. ONLY FEMALE DATA ONLY CORRELATION, train-test split of 20%. MEAN IMPUTATION
+=========================================
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.64      0.78      0.70        18
+           1       0.33      0.20      0.25        10
+
+    accuracy                           0.57        28
+   macro avg       0.48      0.49      0.47        28
+weighted avg       0.53      0.57      0.54        28
+
+
+=== Metrics for LogisticRegression ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.636
+    Recall:    0.778
+    F1 Score:  0.700
+    Support:   18
+  Autism:
+    Precision: 0.333
+    Recall:    0.200
+    F1 Score:  0.250
+    Support:   10
+
+Overall Metrics:
+  Specificity:          0.778
+  Sensitivity:          0.200
+  AUROC:                0.800
+  Accuracy:             0.571
+  Balanced Accuracy:    0.489
+=====================================
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.67      0.78      0.72        18
+           1       0.43      0.30      0.35        10
+
+    accuracy                           0.61        28
+   macro avg       0.55      0.54      0.54        28
+weighted avg       0.58      0.61      0.59        28
+
+
+=== Metrics for SVC ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.667
+    Recall:    0.778
+    F1 Score:  0.718
+    Support:   18
+  Autism:
+    Precision: 0.429
+    Recall:    0.300
+    F1 Score:  0.353
+    Support:   10
+
+Overall Metrics:
+  Specificity:          0.778
+  Sensitivity:          0.300
+  AUROC:                0.800
+  Accuracy:             0.607
+  Balanced Accuracy:    0.539
+=====================================
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.70      0.89      0.78        18
+           1       0.60      0.30      0.40        10
+
+    accuracy                           0.68        28
+   macro avg       0.65      0.59      0.59        28
+weighted avg       0.66      0.68      0.64        28
+
+
+=== Metrics for RandomForestClassifier ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.696
+    Recall:    0.889
+    F1 Score:  0.780
+    Support:   18
+  Autism:
+    Precision: 0.600
+    Recall:    0.300
+    F1 Score:  0.400
+    Support:   10
+
+Overall Metrics:
+  Specificity:          0.889
+  Sensitivity:          0.300
+  AUROC:                0.606
+  Accuracy:             0.679
+  Balanced Accuracy:    0.594
+=====================================
+Starting RandomizedSearchCV fitting...
+Fitting 5 folds for each of 50 candidates, totalling 250 fits
+RandomizedSearchCV fitting completed.
+Best Parameters Found: {'criterion': 'gini', 'max_depth': np.int64(7), 'min_samples_leaf': 10, 'min_samples_split': 16}
+Accuracy:  0.5357
+Recall:    0.1000
+Precision: 0.2000
+F1 Score:  0.1333
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.61      0.78      0.68        18
+           1       0.20      0.10      0.13        10
+
+    accuracy                           0.54        28
+   macro avg       0.40      0.44      0.41        28
+weighted avg       0.46      0.54      0.49        28
+
+
+=== Metrics for DecisionTreeClassifier ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.609
+    Recall:    0.778
+    F1 Score:  0.683
+    Support:   18
+  Autism:
+    Precision: 0.200
+    Recall:    0.100
+    F1 Score:  0.133
+    Support:   10
+
+Overall Metrics:
+  Specificity:          0.778
+  Sensitivity:          0.100
+  AUROC:                0.511
+  Accuracy:             0.536
+  Balanced Accuracy:    0.439
+=====================================
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.68      0.72      0.70        18
+           1       0.44      0.40      0.42        10
+
+    accuracy                           0.61        28
+   macro avg       0.56      0.56      0.56        28
+weighted avg       0.60      0.61      0.60        28
+
+
+=== Metrics for MLPClassifier ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.684
+    Recall:    0.722
+    F1 Score:  0.703
+    Support:   18
+  Autism:
+    Precision: 0.444
+    Recall:    0.400
+    F1 Score:  0.421
+    Support:   10
+
+Overall Metrics:
+  Specificity:          0.722
+  Sensitivity:          0.400
+  AUROC:                0.761
+  Accuracy:             0.607
+  Balanced Accuracy:    0.561
+=====================================

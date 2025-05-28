@@ -1,0 +1,21 @@
+minScore=0.000 -> Validation Accuracy: 0.5476
+minScore=0.053 -> Validation Accuracy: 0.5476
+minScore=0.105 -> Validation Accuracy: 0.5476
+minScore=0.158 -> Validation Accuracy: 0.5476
+minScore=0.211 -> Validation Accuracy: 0.5476
+minScore=0.263 -> Validation Accuracy: 0.5476
+minScore=0.316 -> Validation Accuracy: 0.5476
+minScore=0.368 -> Validation Accuracy: 0.5476
+minScore=0.421 -> Validation Accuracy: 0.5476
+minScore=0.474 -> Validation Accuracy: 0.5476
+minScore=0.526 -> Validation Accuracy: 0.5476
+minScore=0.579 -> Validation Accuracy: 0.5476
+minScore=0.632 -> Validation Accuracy: 0.5476
+minScore=0.684 -> Validation Accuracy: 0.5476
+minScore=0.737 -> Validation Accuracy: 0.5476
+minScore=0.789 -> Validation Accuracy: 0.5476
+minScore=0.842 -> Validation Accuracy: 0.5476
+minScore=0.895 -> Validation Accuracy: 0.5476
+minScore=0.947 -> Validation Accuracy: 0.5476
+minScore=1.000 -> Validation Accuracy: 0.5476
+Best minScore: 0.000 with accuracy: 0.5476
