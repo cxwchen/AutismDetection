@@ -1,0 +1,146 @@
+Using the AAL (116 regions) Atlas and our own extraction, train-test split of 20%
+=========================================
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.74      0.79      0.76        90
+           1       0.74      0.68      0.71        78
+
+    accuracy                           0.74       168
+   macro avg       0.74      0.73      0.74       168
+weighted avg       0.74      0.74      0.74       168
+
+
+=== Metrics for LogisticRegression ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.740
+    Recall:    0.789
+    F1 Score:  0.763
+    Support:   90
+  Autism:
+    Precision: 0.736
+    Recall:    0.679
+    F1 Score:  0.707
+    Support:   78
+
+Overall Metrics:
+  Specificity:          0.789
+  Sensitivity:          0.679
+  AUROC:                0.770
+  Accuracy:             0.738
+  Balanced Accuracy:    0.734
+=====================================
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.73      0.80      0.76        90
+           1       0.74      0.65      0.69        78
+
+    accuracy                           0.73       168
+   macro avg       0.73      0.73      0.73       168
+weighted avg       0.73      0.73      0.73       168
+
+
+=== Metrics for SVC ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.727
+    Recall:    0.800
+    F1 Score:  0.762
+    Support:   90
+  Autism:
+    Precision: 0.739
+    Recall:    0.654
+    F1 Score:  0.694
+    Support:   78
+
+Overall Metrics:
+  Specificity:          0.800
+  Sensitivity:          0.654
+  AUROC:                0.762
+  Accuracy:             0.732
+  Balanced Accuracy:    0.727
+=====================================
+Starting RandomizedSearchCV fitting...
+Fitting 5 folds for each of 50 candidates, totalling 250 fits
+RandomizedSearchCV fitting completed.
+Best Parameters Found: {'criterion': 'entropy', 'max_depth': np.int64(2), 'min_samples_leaf': 11, 'min_samples_split': 14}
+Accuracy:  0.6131
+Recall:    0.7179
+Precision: 0.5657
+F1 Score:  0.6328
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.68      0.52      0.59        90
+           1       0.57      0.72      0.63        78
+
+    accuracy                           0.61       168
+   macro avg       0.62      0.62      0.61       168
+weighted avg       0.63      0.61      0.61       168
+
+
+=== Metrics for DecisionTreeClassifier ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.681
+    Recall:    0.522
+    F1 Score:  0.591
+    Support:   90
+  Autism:
+    Precision: 0.566
+    Recall:    0.718
+    F1 Score:  0.633
+    Support:   78
+
+Overall Metrics:
+  Specificity:          0.522
+  Sensitivity:          0.718
+  AUROC:                0.621
+  Accuracy:             0.613
+  Balanced Accuracy:    0.620
+=====================================
+Starting RandomizedSearchCV fitting...
+Fitting 5 folds for each of 50 candidates, totalling 250 fits
+RandomizedSearchCV fitting completed.
+Best Parameters Found: {'activation': 'relu', 'alpha': np.float64(0.0005331061115779867), 'hidden_layer_sizes': (100,), 'learning_rate_init': np.float64(0.01846164144725356), 'solver': 'sgd'}
+Accuracy:  0.6607
+Recall:    0.5897
+Precision: 0.6479
+F1 Score:  0.6174
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.70      0.71      0.71        90
+           1       0.66      0.65      0.66        78
+
+    accuracy                           0.68       168
+   macro avg       0.68      0.68      0.68       168
+weighted avg       0.68      0.68      0.68       168
+
+
+=== Metrics for MLPClassifier ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.703
+    Recall:    0.711
+    F1 Score:  0.707
+    Support:   90
+  Autism:
+    Precision: 0.662
+    Recall:    0.654
+    F1 Score:  0.658
+    Support:   78
+
+Overall Metrics:
+  Specificity:          0.711
+  Sensitivity:          0.654
+  AUROC:                0.745
+  Accuracy:             0.685
+  Balanced Accuracy:    0.682
+=====================================

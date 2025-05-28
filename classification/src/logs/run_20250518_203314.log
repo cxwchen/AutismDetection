@@ -1,0 +1,32 @@
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.68      0.76      0.72       141
+           1       0.67      0.58      0.62       121
+
+    accuracy                           0.68       262
+   macro avg       0.68      0.67      0.67       262
+weighted avg       0.68      0.68      0.67       262
+
+
+=== Metrics for LogisticRegression ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.677
+    Recall:    0.759
+    F1 Score:  0.716
+    Support:   141
+  Autism:
+    Precision: 0.673
+    Recall:    0.579
+    F1 Score:  0.622
+    Support:   121
+
+Overall Metrics:
+  Specificity:          0.759
+  Sensitivity:          0.579
+  AUROC:                0.722
+  Accuracy:             0.676
+  Balanced Accuracy:    0.669
+=====================================
