@@ -3,7 +3,33 @@ import numpy as np
 
 
 def performCA(func, feat_train, feat_test, ytrain, ytest, fold=None, tag="", meta=None, **kwargs):
-    """This function performs the classification, prediction and performance analysis
+    """
+    --------------------------------------------------------------------------------
+    This function performs the classification, prediction and performance analysis
+    --------------------------------------------------------------------------------
+
+    Parameters
+    ----------
+    func :
+        The classifier functions to use. Options: applyLogR, applySVM, applyRandForest, applyDT, applyMLP, applyLDA, and applyKNN
+    
+    feat_train : array-like
+        the features that are used for training
+    
+    feat_test : array-like
+        the features that are used for validation
+    
+    ytrain : array-like
+        the true labels of the training set
+    
+    ytest : array-like
+        the true labels of the validation set
+    
+    fold : integer
+        the number of the fold
+    
+    tag : string
+        
         
 
     """
