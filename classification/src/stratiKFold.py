@@ -81,9 +81,10 @@ def runCV(df, label="female"):
         performCA(applyKNN, Xtrain, Xtest, ytrain, ytest, fold=fold, tag=label, meta=meta_test)
 
 def run_all():
-    runCV(female_df, label="female")
-    runCV(male_df, label="male")
+    # runCV(female_df, label="female")
+    # runCV(male_df, label="male")
     comb_df = pd.concat([female_df, male_df], axis=0).sample(frac=1, random_state=42).reset_index(drop=True)
+    comb_df = comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True)
     runCV(comb_df, label="combined")
 
 if __name__ == "__main__":
