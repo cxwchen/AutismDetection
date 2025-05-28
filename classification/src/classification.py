@@ -29,8 +29,13 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, fold=None, tag="", met
         the number of the fold
     
     tag : string
+        Information on the dataset. Either female, male, or combined
+
+    meta : array-like
+        contains phenotypic data for per-site or per-sex evaluation
         
-        
+    **kwargs : dict
+        to pass parameters found using hyperparameter tuning. Default: params = None
 
     """
     model = func(feat_train, ytrain, **kwargs)

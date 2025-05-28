@@ -159,11 +159,48 @@ def applyMLP(feat_train, y, params=None):
     return model
 
 def applyLDA(feat_train, y):
+    """
+    ----------------------------------------------------------------------------------------------
+    This function applies Linear Discriminant Analysis (LDA) from sklearn on the training features
+    ----------------------------------------------------------------------------------------------
+
+    Parameters
+    ----------
+    feat_train : array-like
+        The training features
+    y : array-like
+        The true labels
+    
+    Returns
+    -------
+    model : object
+        The trained LDA model
+    
+    """
+
     model = LinearDiscriminantAnalysis()
     model.fit(feat_train, y)
     return model
 
 def applyKNN(feat_train, y):
+    """
+    -------------------------------------------------------------------------------------
+    This function applies K-Nearest Neighbour (KNN) from sklearn on the training features
+    -------------------------------------------------------------------------------------
+
+    Parameters
+    ----------
+    feat_train : array-like
+        The training features
+    y : array-like
+        The true labels
+    
+    Returns
+    -------
+    model : object
+        The trained KNN model
+    
+    """
     model = KNeighborsClassifier()
     model.fit(feat_train, y)
     return model

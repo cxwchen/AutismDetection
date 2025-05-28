@@ -36,6 +36,19 @@ female_df = pd.read_csv("ourfeats_female.csv.gz").sample(frac=1, random_state=42
 male_df = pd.read_csv("ourfeats_male.csv.gz").sample(frac=1, random_state=42).reset_index(drop=True) # shuffle the sites
 
 def runHarmoCV(df, label="female"):
+    """
+    -------------------------------------------------------------------------------
+    This function performs stratified K-fold cross-validation on harmonized features
+    --------------------------------------------------------------------------------
+
+    Parameters
+    ----------
+    df : DataFrame
+        The features that were extracted from ABIDE I
+    label : string
+        Label for the dataset. Default: female.
+
+    """
     X = df.iloc[:, 5:]
     y = df['DX_GROUP']
     meta = df[['SITE_ID', 'SEX', 'AGE']]
@@ -92,6 +105,12 @@ def runHarmoCV(df, label="female"):
 
 
 def run_all():
+    """
+    ----------------------------------------------
+    This function runs all versions of runHarmoCV()
+    -----------------------------------------------
+    """
+
     # runHarmoCV(female_df, label="female")
     # runHarmoCV(male_df, label="male")
     comb_df = pd.concat([female_df, male_df], axis=0).sample(frac=1, random_state=42).reset_index(drop=True)
