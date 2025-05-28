@@ -16,6 +16,9 @@ from sklearn.decomposition import FastICA,PCA
 from scipy.linalg import pinv
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.tsatools import detrend
+from nilearn import datasets, image
+from nilearn.input_data import NiftiLabelsMasker
+from typing import List, Union
 
 import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -628,6 +631,73 @@ def ica_dimReduc(fmri_data, subject_ids=None, n_components=15, max_iter=10000, t
 
     return ica_components, mixing_matrices, filtered_ids, failed_indices
 
+
+def ica_smith(
+        aal_time_series_list: List[np.ndarray],
+        standardize: bool = False,
+        return_transformation_matrix: bool = False
+) -> Union[List[np.ndarray], tuple]:
+    """
+    Converts AAL time series (116 ROIs) to Smith 2009 ICA component time series (10 RSNs).
+
+    Parameters:
+    -----------
+    aal_time_series_list : List[np.ndarray]
+        List of 2D arrays, each with shape [n_timepoints × 116] (AAL time series per subject).
+    standardize : bool, optional (default=False)
+        If True, standardizes each subject's time series (z-score) before projection.
+    return_transformation_matrix : bool, optional (default=False)
+        If True, returns the pseudo-inverse transformation matrix (ica_to_aal_inv).
+
+    Returns:
+    --------
+    smith_ics_list : List[np.ndarray]
+        List of 2D arrays, each with shape [n_timepoints × 10] (Smith IC time series per subject).
+    ica_to_aal_inv : np.ndarray (optional)
+        Pseudo-inverse transformation matrix [10 × 116], returned only if return_transformation_matrix=True.
+    """
+    # --- Input Validation ---
+    for i, ts in enumerate(aal_time_series_list):
+        if ts.shape[1] != 116:
+            raise ValueError(f"Subject {i} has {ts.shape[1]} ROIs (expected 116). Transpose?")
+
+    # --- Load Smith 2009 ICA Maps and AAL Atlas ---
+    smith = datasets.fetch_atlas_smith_2009()
+    smith_maps = image.load_img(smith.rsn10)  # 10 ICA components
+
+    aal = datasets.fetch_atlas_aal()
+    aal_img = image.load_img(aal.maps)  # AAL atlas
+
+    # --- Compute ICA-to-AAL Transformation Matrix ---
+    n_components = smith_maps.shape[-1]  # 10
+    n_regions = 116
+    ica_to_aal = np.zeros((n_regions, n_components))
+
+    masker = NiftiLabelsMasker(labels_img=aal_img, standardize=False)
+    for i in range(n_components):
+        component_img = image.index_img(smith_maps, i)
+        signals = masker.fit_transform(component_img)
+        ica_to_aal[:, i] = signals[0]  # Spatial map for ICA component i
+
+    # Pseudo-inverse for projection (AAL → ICA space)
+    ica_to_aal_inv = np.linalg.pinv(ica_to_aal)  # Shape: [10 × 116]
+
+    # --- Project Each Subject's Data ---
+    smith_ics_list = []
+    for ts in aal_time_series_list:
+        if standardize:
+            ts = (ts - ts.mean(axis=0)) / ts.std(axis=0)  # Z-score
+        smith_ics = ts @ ica_to_aal_inv.T  # [time × 116] @ [116 × 10] → [time × 10]
+        smith_ics_list.append(smith_ics)
+
+    # --- Return Results ---
+    if return_transformation_matrix:
+        return smith_ics_list, ica_to_aal_inv
+    else:
+        return smith_ics_list
+
+
+
 def multiset_feats(data_list, subject_ids, method="mutual_info"):
     """
     Loops over all data recursively to compute specific features and stores them in a dataframe indexed per individual (subject ID).
@@ -736,12 +806,15 @@ def multiset_feats(data_list, subject_ids, method="mutual_info"):
 # output_df = multiset_feats(fmri_data,subject_ids)           # represents multiset_feats() usage, add another index '[]' to load_files to select data amount
 
 # This will automatically remove problematic subjects
-fmri_data, subject_ids, _, _ = load_files(sex='all', max_files=20, shuffle=True, var_filt=True, ica=True)
+fmri_data, subject_ids, _, _ = load_files(sex='all', max_files=5, shuffle=True, var_filt=False, ica=False)
 
 print(f"Final data: {len(fmri_data)} subjects")
 print(f"Final IDs: {len(subject_ids)}")
 print("Subject IDs:", subject_ids)
 
+smithICs = ica_smith(fmri_data)
+print("Smith ICs:\n", smithICs)
+for i in range(len(smithICs)): print("smith shape: ", smithICs[i].shape)
 df_out = multiset_feats(fmri_data, subject_ids)
 
 print("df_out:\n", df_out)
