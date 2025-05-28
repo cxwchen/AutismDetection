@@ -13,12 +13,14 @@ from sklearn.feature_selection import mutual_info_regression
 from itertools import combinations
 from scipy.signal import find_peaks
 from sklearn.decomposition import FastICA,PCA
-from scipy.linalg import pinv
+from scipy.linalg import pinv, eigh
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.tsatools import detrend
 from nilearn import datasets, image
 from nilearn.input_data import NiftiLabelsMasker
 from typing import List, Union
+
+from featuredesign.graph_inference.GSP_methods import normalized_laplacian, normalized_laplacian_reweighted, adjacency_reweighted, learn_adjacency_rLogSpecT
 
 import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -117,6 +119,52 @@ def laplacian(A):
     D = np.diag(np.sum(A, axis=1))
     return D-A
 
+def inv_laplace(S):
+    """
+    Convert a normalized Laplacian matrix back to an adjacency matrix.
+    """
+    # Verify input is square
+    assert S.shape[0] == S.shape[1], "Laplacian matrix must be square"
+    n = S.shape[0]
+
+    # Verify diagonal is all ones
+    assert np.allclose(np.diag(S), np.ones(n)), "Diagonal must be all ones"
+
+    # Create adjacency matrix
+    A = np.zeros_like(S)
+
+    # Diagonal elements of adjacency matrix are zero
+    np.fill_diagonal(A, 0)
+
+    # Off-diagonal elements: A_ij = -S_ij (since L_ij = -A_ij for i≠j in normalized Laplacian)
+    for i in range(n):
+        for j in range(i + 1, n):
+            A[i, j] = -S[i, j]
+            A[j, i] = A[i, j]  # Symmetry
+
+    return A
+
+def comp_eigen(cov_matrix, n_components=None):
+    """Compute eigenvectors and eigenvalues of a sample covariance matrix and sorts them by eigenvalues."""
+
+    # Compute eigenvalues and eigenvectors
+    eigenvalues, V_hat = eigh(cov_matrix, lower=True)
+
+    # Sort in descending order
+    idx = np.argsort(eigenvalues)[::-1]
+    eigenvalues = eigenvalues[idx]
+    V_hat = V_hat[:, idx]
+
+    # Select number of components if specified
+    if n_components is not None:
+        V_hat = V_hat[:, :n_components]
+        eigenvalues = eigenvalues[:n_components]
+
+    # Compute Frobenius norm (total energy)
+    E_tot = np.sum(eigenvalues**2)
+
+    return V_hat, eigenvalues, E_tot
+
 def eig_centrality(G, max_attempts=3):
     """
     Compute eigenvector centrality with robust convergence handling.
@@ -175,20 +223,58 @@ def detect_communities(G, method='louvain', **kwargs):
     else:
         raise ValueError(f"Unknown method: {method}. Choose: louvain|greedy_modularity|label_propagation|asyn_lpa|fluid|girvan_newman")
 
-def detect_inf_method(data, method):
+def detect_inf_method(ts_data, method):
     """Detect inference method"""
     if method == 'partial_corr_LF':
-        return partial_corr(data, threshold=None)[0]
+        return partial_corr(ts_data, threshold=None)[0]
     elif method == 'partial_corr_glasso':
-        return partial_corr(data, method="glasso")[0]
+        return partial_corr(ts_data, method="glasso")[0]
     elif method == 'pearson_corr_binary':
-        return pearson_corr(data)[0]
+        return pearson_corr(ts_data)[0]
     elif method == 'pearson_corr':
-        return pearson_corr(data)[1]
+        return pearson_corr(ts_data)[1]
     elif method == 'mutual_info':
-        return mutual_info(data)
+        return mutual_info(ts_data)
+    elif method == 'norm_laplacian':
+        C = sample_covEst(ts_data)
+        V_hat,_,_ = comp_eigen(C)
+        S = normalized_laplacian(V_hat)
+        if S is None:
+            raise ValueError("Laplacian matrix is None. Check prior steps for subject.")
+        return inv_laplace(S)
+    elif method == 'rlogspect':
+        C = sample_covEst(ts_data)
+        V_hat,_,E_tot = comp_eigen(C)
+        return learn_adjacency_rLogSpecT(V_hat,delta_n=0.2*np.sqrt(E_tot)) # threshold dn to remove noisy eigenvalues
     else:
-        raise ValueError(f"Unknown method: {method}. Choose: partial_corr_LF|partial_corr_glasso|pearson_corr_binary|pearson_corr|mutual_info")
+        raise ValueError(f"Unknown method: {method}. Choose: partial_corr_LF|partial_corr_glasso|pearson_corr_binary|pearson_corr|mutual_info|norm_laplacian|rlogspect")
+
+def sample_covEst(ts_data, method='glasso'):
+    """Compute the sample covariance estimate using various methods"""
+    if method == 'direct':
+        T, n_ics = ts_data.shape
+        X_centered = ts_data - np.mean(ts_data, axis=0)
+        cov = (X_centered.T @ X_centered) / (T - 1)
+        return cov
+    elif method == 'ledoit':
+        lw = LedoitWolf()
+        lw.fit(ts_data)
+        return lw.covariance_
+    elif method == 'glasso':
+        gl = GraphicalLasso(alpha=1e-5, max_iter=10000)
+        gl.fit(ts_data)
+        return gl.covariance_
+    elif method == 'window':
+        window_size = 25
+        T, n_ics = ts_data.shape
+        n_windows = T - window_size + 1
+        covs = []
+        for i in range(n_windows):
+            window = ts_data[i:i+window_size]
+            covs.append(np.cov(window, rowvar=False))
+        return np.mean(covs, axis=0)
+    else:
+        raise ValueError(f"Unknown method: {method}. Choose: direct|ledoit|glasso|window")
 
 def stat_feats(x):
     """
@@ -524,13 +610,8 @@ def load_files(folder_path=None, var_filt=True, ica=False, sex='all', max_files=
         all_data, subject_ids, _ = zeroVar_filter(all_data, subject_ids)
 
     if ica:
-        all_data, _, subject_ids, failed_indices = ica_dimReduc(
-            all_data,
-            subject_ids=subject_ids,
-            remove_failures=True
-        )
-        if failed_indices:
-            print(f"Removed subjects at indices: {failed_indices}")
+        all_data = ica_smith(all_data)
+
 
     return all_data, subject_ids, loaded_files, file_info
 
@@ -631,7 +712,6 @@ def ica_dimReduc(fmri_data, subject_ids=None, n_components=15, max_iter=10000, t
 
     return ica_components, mixing_matrices, filtered_ids, failed_indices
 
-
 def ica_smith(
         aal_time_series_list: List[np.ndarray],
         standardize: bool = False,
@@ -695,8 +775,6 @@ def ica_smith(
         return smith_ics_list, ica_to_aal_inv
     else:
         return smith_ics_list
-
-
 
 def multiset_feats(data_list, subject_ids, method="mutual_info"):
     """
@@ -804,17 +882,13 @@ def multiset_feats(data_list, subject_ids, method="mutual_info"):
 #-------{Main for testing}-------#
 # fmri_data, subject_ids, file_paths, metadata = load_files() # represents format of load_files()
 # output_df = multiset_feats(fmri_data,subject_ids)           # represents multiset_feats() usage, add another index '[]' to load_files to select data amount
-
-# This will automatically remove problematic subjects
-fmri_data, subject_ids, _, _ = load_files(sex='all', max_files=5, shuffle=True, var_filt=False, ica=False)
+"""
+fmri_data, subject_ids, _, _ = load_files(sex='all', max_files=800, shuffle=True, var_filt=True, ica=True)
 
 print(f"Final data: {len(fmri_data)} subjects")
 print(f"Final IDs: {len(subject_ids)}")
-print("Subject IDs:", subject_ids)
 
-smithICs = ica_smith(fmri_data)
-print("Smith ICs:\n", smithICs)
-for i in range(len(smithICs)): print("smith shape: ", smithICs[i].shape)
-df_out = multiset_feats(fmri_data, subject_ids)
+df_out = multiset_feats(fmri_data, subject_ids, method='rlogspect')
 
 print("df_out:\n", df_out)
+"""
