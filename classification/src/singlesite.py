@@ -24,13 +24,16 @@ class Tee:
 
 sys.stdout = Tee(sys.stdout, log_file)
 
-female_df = pd.read_csv("ourfeats_female.csv.gz")
-male_df = pd.read_csv("ourfeats_male.csv.gz")
-
 def run_singlesite(sitename="NYU"):
+    female_df = pd.read_csv("ourfeats_female.csv.gz")
+    male_df = pd.read_csv("ourfeats_male.csv.gz")
+    female_df = female_df[female_df['SITE_ID'] == sitename].reset_index(drop=True)
+    male_df = male_df[male_df['SITE_ID'] == sitename].reset_index(drop=True)
+    runCV(female_df, label=f"female_only{sitename}")
+    runCV(male_df, label=f"male_only{sitename}")
     comb_df = pd.concat([female_df, male_df], axis=0).sample(frac=1, random_state=42).reset_index(drop=True)
     comb_df = comb_df[comb_df['SITE_ID'] == sitename].reset_index(drop=True)
-    runCV(comb_df, label="combined_onlyNYU")
+    runCV(comb_df, label=f"combined_only{sitename}")
 
 if __name__ == "__main__":
     run_singlesite()
