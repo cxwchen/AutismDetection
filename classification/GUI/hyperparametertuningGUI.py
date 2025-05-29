@@ -6,7 +6,7 @@ from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.metrics import make_scorer, precision_score, recall_score, f1_score, accuracy_score, classification_report, confusion_matrix, balanced_accuracy_score
 import seaborn as sns
 from wisardpkg import ClusWisard
-
+from scipy.stats import randint, uniform
 
 # traindata = load_features(file_path=...)
 # testdata = load_features(file_path=...)
@@ -108,6 +108,41 @@ def bestSVM_RS(Xtrain, Xtest, ytrain, ytest, paramgrid, svcdefault):
     # plt.ylabel('True')
     # plt.title('Confusion Matrix using RandomizedSearchCV')
     # plt.show()
+
+    return rsearch.best_params_
+
+def weighted_recall(y_true, y_pred):
+    recall_pos = recall_score(y_true, y_pred, pos_label=1)
+    recall_neg = recall_score(y_true, y_pred, pos_label=0)
+    # Adjust weights as you prefer
+    return 0.7 * recall_pos + 0.3 * recall_neg
+
+def bestMLP(Xtrain, Xtest, ytrain, ytest, MLPdefault):
+    param_grid = {
+        'hidden_layer_sizes': [(50,), (100,)], # Removed , (100, 50), (50, 50, 50) to increase speed
+        'activation': [ 'tanh'], # removed 'relu', due to convergence
+        'alpha': uniform(1e-5, 1e-2),
+        'learning_rate_init': uniform(1e-4, 1e-1),
+        'solver': ['adam', 'sgd']
+    }
+
+    weighted_recall_scorer = make_scorer(weighted_recall)
+
+    rsearch = RandomizedSearchCV(
+        MLPdefault,
+        param_distributions=param_grid,
+        n_iter=50,
+        cv=5,
+        scoring=weighted_recall_scorer,
+        random_state=19,
+        n_jobs=-1,
+        verbose=2
+    )
+    
+    print("Starting RandomizedSearchCV fitting...")
+    rsearch.fit(Xtrain, ytrain)
+    print("RandomizedSearchCV fitting completed.")
+    print(f"Best Parameters Found: {rsearch.best_params_}")
 
     return rsearch.best_params_
 
