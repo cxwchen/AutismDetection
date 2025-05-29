@@ -119,8 +119,8 @@ def weighted_recall(y_true, y_pred):
 
 def bestMLP(Xtrain, Xtest, ytrain, ytest, MLPdefault):
     param_grid = {
-        'hidden_layer_sizes': [(50,), (100,)], # Removed , (100, 50), (50, 50, 50) to increase speed
-        'activation': [ 'tanh'], # removed 'relu', due to convergence
+        'hidden_layer_sizes': [(50,), (100,), (100, 50), (50, 50, 50)], # Removed , (100, 50), (50, 50, 50) to increase speed
+        'activation': ['relu', 'tanh'], # removed 'relu', due to convergence
         'alpha': uniform(1e-5, 1e-2),
         'learning_rate_init': uniform(1e-4, 1e-1),
         'solver': ['adam', 'sgd']

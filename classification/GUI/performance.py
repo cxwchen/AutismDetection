@@ -13,8 +13,8 @@ from sklearn.metrics import (
 )
 
 def get_weights(model, X_train, X_test):
-    train_sample = shap.sample(X_train, 40, random_state=42)
-    test_sample = shap.sample(X_test, 20, random_state=42)
+    train_sample = shap.sample(X_train, 10, random_state=42)
+    test_sample = shap.sample(X_test, 5, random_state=42)
 
     explainer = shap.KernelExplainer(model.predict_proba, train_sample)
     shap_values = explainer(test_sample)

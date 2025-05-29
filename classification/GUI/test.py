@@ -43,16 +43,16 @@ MLPdefault=MLPClassifier()
 params = bestMLP(Xtrain, Xtest, ytrain, ytest, MLPdefault)
 model = applyMLP(Xtrain, ytrain, params)
 
-shap_values = get_weights(model, Xtrain, Xtest)
+shap_values = get_weights(model, Xtrain, Xtest).values
 
 # Mean absolute SHAP values for each feature
-mean_abs_shap = np.abs(shap_values[:, :, 1]).mean(axis=0)
+mean_abs_shap = shap_values.mean#(axis=0)
 
 # If you have feature names
 feature_importance = pd.DataFrame({
     'feature': Xtest.columns,
     'importance': mean_abs_shap
-}).sort_values(by='importance', ascending=False)
+})#.sort_values(by='importance', ascending=False)
 
 # check()
 # if __name__ == "__main__":
