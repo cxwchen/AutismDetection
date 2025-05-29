@@ -125,7 +125,7 @@ def applyDT(feat_train, y):
     # ypred = model.predict(feat_test)
     return model
 
-def applyMLP(feat_train, y):
+def applyMLP(feat_train, y, params=None):
     """
     -----------------------------------------------------------------------------------------
     This function applies Multi-Layer Perceptron (MLP) from sklearn on the training features
@@ -144,8 +144,10 @@ def applyMLP(feat_train, y):
         The trained MLP model
     
     """
+    if params is None:
+        params = {}
 
-    model = MLPClassifier() #default: one layer with 100 units
+    model = MLPClassifier(**params) #default: one layer with 100 units
     model.fit(feat_train, y)
     return model
 

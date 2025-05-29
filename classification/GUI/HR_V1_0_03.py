@@ -10,7 +10,7 @@ from PIL import Image, ImageTk, ImageGrab
 from ctypes import windll
 
 from classifiersGUI import *
-from selection_buttons import*
+from selection_buttons import *
 import selection_buttons
 from functionality_buttons import *
 from hyperparametertuningGUI import *
@@ -44,7 +44,6 @@ X, y = make_classification(
 
 # === Split data ===
 Xtrain, Xtest, ytrain, ytest = train_test_split(X, y, test_size=0.2, random_state=42)
-
 svcdefault=SVC()
 
 params = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, hyperparametertuningGUI.param_grid, svcdefault)
@@ -78,6 +77,7 @@ def update_overview_text(context):
 
 def build_gui(root, filepath=None):
     # Default stats
+    print(Xtrain.size)
     run_stats = []      ##TO DO: Adjust this later to match the other stats
     subjects_set = "subjects_set"; classifiers_set = "SVM"; features_set = "features_set"; dataset_fit = "dataset_fit";
     
@@ -164,7 +164,7 @@ def build_gui(root, filepath=None):
     # Classifier Frame
     classifier_frame = tk.LabelFrame(left, text="Classifier", bg="lavender")
     classifier_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-    selection_buttons.class_btn(classifier_frame, context)
+    selection_buttons.class_btn(classifier_frame, context, Xtrain, ytrain)
 
     # Features Frame
     features_frame = tk.LabelFrame(left, text="Features", bg="mistyrose")
@@ -470,42 +470,6 @@ def build_gui(root, filepath=None):
     globals()["right"] = right
     
     
-
-# Start Calling the system
-
-if platform.system() == "Windows":
-    try:
-        from ctypes import windll
-        windll.shcore.SetProcessDpiAwareness(1)
-    except Exception:
-        pass
-
-try:
-    root.destroy()
-except:
-    pass
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    root.title("NASDA")
-    build_gui(root)
-    filepath = filedialog.askopenfilename(
-    title="Select a data file",
-    filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")])
-    
-    if not filepath:
-        print("No file selected.")
-        # Start the update loop
-        root.mainloop()
-    
-    root.destroy()
-    root = tk.Tk()
-    root.title(f"NASDA – {filepath.split('/')[-1]}")
-    build_gui(root, filepath)
-    
-    # Start the update loop
-    root.mainloop()
-    
 def start():
     root = tk.Tk()
     root.title("NASDA")
@@ -522,6 +486,7 @@ def start():
     root.destroy()
     root = tk.Tk()
     root.title(f"NASDA – {filepath.split('/')[-1]}")
+    print(Xtrain.size)
     build_gui(root, filepath)
     
     # Start the update loop
@@ -539,4 +504,12 @@ def check():
         root.destroy()
     except:
         pass
+    
+
+# Start Calling the system
+
+check()
+
+if __name__ == "__main__":
+    start()
     

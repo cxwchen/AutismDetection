@@ -12,7 +12,8 @@ import HR_V1_0_03
 from test import *
 import test
 
-def class_btn(classifier_frame, context):
+def class_btn(classifier_frame, context, Xtrain, ytrain):
+    print(Xtrain.size)
     # Define shared variable at module level if needed
     classifier_functions = {
         "SVM": applySVM,
@@ -30,7 +31,7 @@ def class_btn(classifier_frame, context):
         context.classifiers_set = selected
         context.model = classifier_functions[selected](Xtrain, ytrain)
         try:
-            update_overview_text(context)
+            HR_V1_0_03.update_overview_text(context)
         except Exception as e:
             print(f"[Visualizer] Could not update overlay text: {e}")
 
