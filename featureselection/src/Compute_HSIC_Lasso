@@ -1,0 +1,185 @@
+from __future__ import division
+import numpy as np
+from scipy.stats import gamma
+from sklearn.linear_model import Lasso, LassoCV
+import warnings
+warnings.filterwarnings('ignore')
+
+def rbf_dot(pattern1, pattern2, deg):
+    """RBF kernel computation"""
+    size1 = pattern1.shape
+    size2 = pattern2.shape
+
+    G = np.sum(pattern1*pattern1, 1).reshape(size1[0],1)
+    H = np.sum(pattern2*pattern2, 1).reshape(size2[0],1)
+
+    Q = np.tile(G, (1, size2[0]))
+    R = np.tile(H.T, (size1[0], 1))
+
+    H = Q + R - 2* np.dot(pattern1, pattern2.T)
+    H = np.exp(-H/2/(deg**2))
+
+    return H
+
+def compute_hsic_values(X, y):
+    """
+    Compute HSIC values between each feature and target
+    
+    Parameters:
+    X: n x p matrix of features
+    y: n x 1 target vector
+    
+    Returns:
+    hsic_values: p-dimensional vector of HSIC values
+    """
+    n, p = X.shape
+    y = y.reshape(-1, 1) if y.ndim == 1 else y
+    
+    # Center the target
+    H = np.identity(n) - np.ones((n,n)) / n
+    
+    # Compute kernel width for y
+    G = np.sum(y*y, 1).reshape(n,1)
+    Q = np.tile(G, (1, n))
+    R = np.tile(G.T, (n, 1))
+    dists = Q + R - 2* np.dot(y, y.T)
+    dists = dists - np.tril(dists)
+    dists = dists.reshape(n**2, 1)
+    width_y = np.sqrt(0.5 * np.median(dists[dists>0]))
+    
+    # Compute y kernel
+    L = rbf_dot(y, y, width_y)
+    Lc = np.dot(np.dot(H, L), H)
+    
+    hsic_values = np.zeros(p)
+    
+    for j in range(p):
+        x_j = X[:, j].reshape(-1, 1)
+        
+        # Compute kernel width for feature j
+        G = np.sum(x_j*x_j, 1).reshape(n,1)
+        Q = np.tile(G, (1, n))
+        R = np.tile(G.T, (n, 1))
+        dists = Q + R - 2* np.dot(x_j, x_j.T)
+        dists = dists - np.tril(dists)
+        dists = dists.reshape(n**2, 1)
+        width_x = np.sqrt(0.5 * np.median(dists[dists>0]))
+        
+        # Compute feature kernel
+        K = rbf_dot(x_j, x_j, width_x)
+        Kc = np.dot(np.dot(H, K), H)
+        
+        # Compute HSIC
+        hsic_values[j] = np.sum(Kc.T * Lc) / n
+        
+    return hsic_values
+
+def hsic_lasso(X, y, alpha=None, max_features=None):
+    """
+    HSIC LASSO feature selection algorithm
+    
+    Parameters:
+    X: n x p feature matrix
+    y: n-dimensional target vector
+    alpha: regularization parameter (if None, uses cross-validation)
+    max_features: maximum number of features to select (if None, no limit)
+    
+    Returns:
+    selected_indices: indices of selected features
+    """
+    n, p = X.shape
+    y = y.reshape(-1, 1) if y.ndim == 1 else y
+    
+    # Step 1: Compute HSIC values for all features
+    hsic_values = compute_hsic_values(X, y)
+    
+    # Step 2: Create HSIC matrix for LASSO
+    # We'll use the HSIC values as coefficients in a linear system
+    # The idea is to find sparse weights that maximize total HSIC
+    
+    # Normalize HSIC values
+    hsic_values = hsic_values / np.max(hsic_values) if np.max(hsic_values) > 0 else hsic_values
+    
+    # Create a design matrix where each row represents the HSIC contribution
+    # We want to solve: minimize ||1 - X_hsic * w||^2 + alpha * ||w||_1
+    # where w are the feature weights
+    
+    # Use HSIC values as the target for LASSO regression
+    target = np.ones(p)  # We want to select features that contribute to independence
+    design_matrix = np.diag(hsic_values)  # Diagonal matrix with HSIC values
+    
+    # Apply LASSO
+    if alpha is None:
+        # Use cross-validation to select alpha
+        lasso = LassoCV(cv=min(5, n//2), random_state=42, max_iter=10000)
+    else:
+        lasso = Lasso(alpha=alpha, max_iter=10000)
+    
+    # Fit LASSO
+    lasso.fit(design_matrix, target)
+    
+    # Get selected features (non-zero coefficients)
+    selected_mask = np.abs(lasso.coef_) > 1e-6
+    selected_indices = np.where(selected_mask)[0]
+    
+    # If max_features is specified, select top features by HSIC value
+    if max_features is not None and len(selected_indices) > max_features:
+        hsic_selected = hsic_values[selected_indices]
+        top_k_idx = np.argsort(hsic_selected)[-max_features:]
+        selected_indices = selected_indices[top_k_idx]
+    
+    # Sort indices for consistent output
+    selected_indices = np.sort(selected_indices)
+    
+    return selected_indices
+
+def hsic_lasso_forward_selection(X, y, max_features=10, threshold=0.01):
+    """
+    Alternative HSIC LASSO using forward selection approach
+    
+    Parameters:
+    X: n x p feature matrix
+    y: n-dimensional target vector  
+    max_features: maximum number of features to select
+    threshold: minimum HSIC improvement threshold
+    
+    Returns:
+    selected_indices: indices of selected features
+    """
+    n, p = X.shape
+    y = y.reshape(-1, 1) if y.ndim == 1 else y
+    
+    selected_indices = []
+    remaining_indices = list(range(p))
+    
+    for _ in range(min(max_features, p)):
+        best_hsic = -1
+        best_idx = -1
+        
+        for idx in remaining_indices:
+            # Test adding this feature
+            test_indices = selected_indices + [idx]
+            test_X = X[:, test_indices]
+            
+            # Compute HSIC between selected features and target
+            hsic_values = compute_hsic_values(test_X, y)
+            total_hsic = np.sum(hsic_values)
+            
+            if total_hsic > best_hsic:
+                best_hsic = total_hsic
+                best_idx = idx
+        
+        # Check if improvement is significant
+        current_hsic = 0
+        if selected_indices:
+            current_X = X[:, selected_indices]
+            current_hsic_values = compute_hsic_values(current_X, y)
+            current_hsic = np.sum(current_hsic_values)
+        
+        if best_hsic - current_hsic < threshold:
+            break
+            
+        selected_indices.append(best_idx)
+        remaining_indices.remove(best_idx)
+    
+    return np.array(sorted(selected_indices))
