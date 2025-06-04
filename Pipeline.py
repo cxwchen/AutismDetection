@@ -13,13 +13,13 @@ from sklearn.preprocessing import StandardScaler
 from featuredesign.graph_inference.AAL_test import multiset_feats, load_files
 import os
 
-def load_file(sex='all'):
+def load_file(sex='all', method='pearson_corr'):
     
 
     #folder_path = r"C:\Users\guus\Python_map\AutismDetection-main\abide\female-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
-    fmri_data, subject_ids, _, _ = load_files(sex=sex, max_files=800, shuffle=True, var_filt=True, ica=True)
+    fmri_data, subject_ids, _, _ = load_files(sex=sex, shuffle=True, var_filt=False, ica=False)
 
-    full_df = multiset_feats(fmri_data, subject_ids, method='rlogspect')
+    full_df = multiset_feats(fmri_data, subject_ids, method=method)
 
     print("Merged feature+label shape:\n", full_df.shape)
 
@@ -120,22 +120,37 @@ def train_and_evaluate(X, y, classifier):
     #applying the classifier to the total data
     y_pred_raw = model_raw.predict(X_test_scaled)
 
+    try:
+        y_proba_raw = model_raw.predict_proba(X_test_scaled)[:, 1]
+    except:
+        y_proba_raw = None
+
     #finding mse and accuracy
+    perf_raw = evaluate_performance(y_test, y_pred_raw, y_proba_raw, classifier_name=classifier, verbose=False)
+    acc_raw = perf_raw["accuracy"]
     mse_raw = mean_squared_error(y_test, y_pred_raw)
-    acc_raw = accuracy_score(y_test, y_pred_raw)
+    precision_raw = perf_raw["precision"]
+    recall_raw = perf_raw["recall"]
+    F1_raw = perf_raw["f1"]
+    AUC_raw = perf_raw["auc"]
     print(classification_report(y_test, y_pred_raw, target_names=["Class 0", "Class 1"]))
     print('Confusion matrix:', confusion_matrix(y_test, y_pred_raw))
     print('Amount of features:', X_train.shape[1])
 
     #acc, mse, selected_feature_names = cross_validate_model(X, y, selected_features)
-    print(f"Train/Test Accuracy raw: {acc_raw:.4f}, MSE: {mse_raw:.4f}")
+    print(f"Train/Test Accuracy raw: {acc_raw:.4f}, MSE: {mse_raw:.4f}, Precision: {precision_raw:.4f}, Recall: {recall_raw:.4f}, F1: {F1_raw:.4f}, AUC: {AUC_raw:.4f}")
 
     return X_train, X_test, y_train, y_test
 
 def classify(X_train, X_test, y_train, y_test, selected_features, classifier, performance=True):
 
-    selected_train_x = X_train.iloc[:, selected_features]
-    selected_test_x = X_test.iloc[:, selected_features]
+    #scale the data for the classifier
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    selected_train_x = X_train_scaled.iloc[:, selected_features]
+    selected_test_x = X_test_scaled.iloc[:, selected_features]
 
     if classifier == "SVM":
         model = cl.applySVM(selected_train_x, y_train)
@@ -170,7 +185,7 @@ def classify(X_train, X_test, y_train, y_test, selected_features, classifier, pe
     
     return selected_feature_names
 
-def cross_validate_model(X, y, feature_selection, classifier, n_splits=5, **feature_selection_kwargs):
+def cross_validate_model(X, y, feature_selection, classifier, raw=True, n_splits=5, **feature_selection_kwargs):
     #K-Fold cross-validation evaluation.
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
     acc_scores = []
@@ -181,6 +196,10 @@ def cross_validate_model(X, y, feature_selection, classifier, n_splits=5, **feat
     AUC_scores = []
     acc_scores_raw = []
     mse_scores_raw = []
+    precision_scores_raw = []
+    recall_scores_raw = []
+    F1_scores_raw = []
+    AUC_scores_raw= []
 
     # Convert inputs to numpy arrays once at the beginning
     if isinstance(X, pd.DataFrame):
@@ -206,8 +225,13 @@ def cross_validate_model(X, y, feature_selection, classifier, n_splits=5, **feat
 
         X_train, X_test = X[train_idx], X[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
+
+        #Scaling the data
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+        X_test_scaled = scaler.transform(X_test)
         
-        selected_features = failsafe_feature_selection(feature_selection, X_train, y_train, classifier=classifier, **feature_selection_kwargs)
+        selected_features = failsafe_feature_selection(feature_selection, X_train_scaled, y_train, classifier=classifier, **feature_selection_kwargs)
 
         # Ensure selected_features is a list of valid indices
         if not isinstance(selected_features, (list, np.ndarray)):
@@ -220,40 +244,41 @@ def cross_validate_model(X, y, feature_selection, classifier, n_splits=5, **feat
             selected_features = list(range(X_train.shape[1]))
 
         # Select the features based on the selected indices 
-        X_train_sel = X_train[:, selected_features]
-        X_test_sel = X_test[:, selected_features]
-
-        #Scaling the data
-        scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train_sel)
-        X_test_scaled = scaler.transform(X_test_sel)
+        X_train_sel = X_train_scaled[:, selected_features]
+        X_test_sel = X_test_scaled[:, selected_features]
 
         #applying the classifier
         if classifier == "SVM":
-            model = cl.applySVM(X_train_scaled, y_train)
-            model_raw = cl.applySVM(X_train, y_train, use_probabilities=False)
+            model = cl.applySVM(X_train_sel, y_train)
+            model_raw = cl.applySVM(X_train_scaled, y_train, use_probabilities=False)
         elif classifier == "RandomForest":
-            model = cl.applyRandForest(X_train_scaled, y_train)
-            model_raw = cl.applyRandForest(X_train, y_train, use_probabilities=False)
+            model = cl.applyRandForest(X_train_sel, y_train)
+            model_raw = cl.applyRandForest(X_train_scaled, y_train, use_probabilities=False)
         elif classifier == "LogR":
-            model = cl.applyLogR(X_train_scaled, y_train)
-            model_raw = cl.applyLogR(X_train, y_train)
+            model = cl.applyLogR(X_train_sel, y_train)
+            model_raw = cl.applyLogR(X_train_scaled, y_train)
         elif classifier == "DecisionTree":
-            model = cl.applyDT(X_train_scaled, y_train)
-            model_raw = cl.applyDT(X_train, y_train)
+            model = cl.applyDT(X_train_sel, y_train)
+            model_raw = cl.applyDT(X_train_scaled, y_train)
         elif classifier == "MLP":
-            model = cl.applyMLP(X_train_scaled, y_train)
-            model_raw = cl.applyMLP(X_train, y_train)
+            model = cl.applyMLP(X_train_sel, y_train)
+            model_raw = cl.applyMLP(X_train_scaled, y_train)
 
-        y_pred = model.predict(X_test_scaled)
-        y_pred_raw = model_raw.predict(X_test)
+        y_pred = model.predict(X_test_sel)
+        y_pred_raw = model_raw.predict(X_test_scaled)
 
         try:
-            y_proba = model.predict_proba(X_test_scaled)[:, 1]
+            y_proba = model.predict_proba(X_test_sel)[:, 1]
         except:
             y_proba = None
 
+        try:
+            y_proba_raw = model.predict_proba(X_test_scaled)[:, 1]
+        except:
+            y_proba_raw = None
+
         perf = evaluate_performance(y_test, y_pred, y_proba, classifier_name=classifier, fold_idx=len(acc_scores) + 1, verbose=False)
+        perf_raw = evaluate_performance(y_test, y_pred_raw, y_proba_raw, classifier_name=classifier, fold_idx=len(acc_scores) + 1, verbose=False)
 
         acc_scores.append(perf["accuracy"])
         mse_scores.append(mean_squared_error(y_test, y_pred))
@@ -262,9 +287,29 @@ def cross_validate_model(X, y, feature_selection, classifier, n_splits=5, **feat
         F1_scores.append(perf["f1"])
         AUC_scores.append(perf["auc"])
 
-        # Raw performance (optional)
-        acc_scores_raw.append(accuracy_score(y_test, y_pred_raw))
-        mse_scores_raw.append(mean_squared_error(y_test, y_pred_raw))
+        if raw==True:
+            perf_raw = evaluate_performance(y_test, y_pred_raw, y_proba_raw, classifier_name=classifier, fold_idx=len(acc_scores) + 1, verbose=False)
+            # Raw performance
+            acc_scores_raw.append(perf_raw["accuracy"])
+            mse_scores_raw.append(mean_squared_error(y_test, y_pred))
+            precision_scores_raw.append(perf_raw["precision"])
+            recall_scores_raw.append(perf_raw["recall"])
+            F1_scores_raw.append(perf_raw["f1"])
+            AUC_scores_raw.append(perf_raw["auc"])
+
+            avg_acc_raw = np.mean(acc_scores_raw)
+            avg_mse_raw = np.mean(mse_scores_raw)
+            avg_precision_raw = np.mean(precision_scores_raw)
+            avg_recall_raw = np.mean(recall_scores_raw)
+            avg_F1_raw = np.mean(F1_scores_raw)
+            avg_AUC_raw = np.mean(AUC_scores_raw)
+
+            print(f"Average accuracy raw: {avg_acc_raw}")
+            print(f"Average mse raw: {avg_mse_raw}")
+            print(f"Average precision raw: {avg_precision_raw}")
+            print(f"Average recall raw: {avg_recall_raw}")
+            print(f"Average F1 raw: {avg_F1_raw}")
+            print(f"Average AUC raw: {avg_AUC_raw}")
 
     # Calculate averages (only if we have results)
     if acc_scores:
@@ -281,11 +326,6 @@ def cross_validate_model(X, y, feature_selection, classifier, n_splits=5, **feat
     avg_recall = np.mean(recall_scores)
     avg_F1 = np.mean(F1_scores)
     avg_AUC = np.mean(AUC_scores)
-    avg_acc_raw = np.mean(acc_scores_raw)
-    avg_mse_raw = np.mean(mse_scores_raw)
-
-    print("Accuracy raw:", avg_acc_raw)
-    print("MSE raw:", avg_mse_raw)
 
     print(f"Average accuracy: {avg_acc}")
     print(f"Average mse: {avg_mse}")
@@ -301,13 +341,14 @@ def cross_validate_model(X, y, feature_selection, classifier, n_splits=5, **feat
 
 def main():
 
-    X, y = load_file()
+    #Choose method: partial_corr_LF|partial_corr_glasso|pearson_corr_binary|pearson_corr|mutual_info|norm_laplacian|rlogspect
+    X, y = load_file(sex='female', method='rlogspect')
 
-    classifier = "LogR"  # Choose from SVM, RandomForest, LogR, DecisionTree, MLP
+    classifier = "SVM"  # Choose from SVM, RandomForest, LogR, DecisionTree, MLP
 
     X_train, X_test, y_train, y_test = train_and_evaluate(X, y, classifier)
 
-    X_clustered = cluster.cluster(X_train, y_train, t=2)  # Clustering to select features
+    X_clustered = cluster.cluster(X_train, y_train, t=1)  # Clustering to select features
     print(f"Features selected by clustering({X_clustered.shape[1]}):", X_clustered)
     X_mRMR = mRMR(X_train, y_train, num_features_to_select=150)
     print(f"Features selected by mRMR({len(X_mRMR)}):", X_mRMR)
@@ -315,51 +356,51 @@ def main():
     #Cross-validation with feature selection
     selected_features_cv, selected_feature_names_cv = cross_validate_model(X, y, l1_logistic_regression, classifier, C=1.0, max_iter=1000)
     print("Cross-validated L1 Logistic Regression selected features:")
-    print_selected_features(selected_features_cv, selected_feature_names_cv)
+    print_selected_features(selected_features_cv, selected_feature_names_cv, print_feat=True)
     print("\n\n")
 
     selected_features_lars_cv, selected_feature_names_lars_cv = cross_validate_model(X, y, lars_lasso, classifier)
     print("Cross-validated LARS Lasso selected features:")
-    print_selected_features(selected_features_lars_cv, selected_feature_names_lars_cv)
+    print_selected_features(selected_features_lars_cv, selected_feature_names_lars_cv, print_feat=True)
     print("\n\n")
 
     selected_features_LAND_cv, selected_feature_names_LAND_cv = cross_validate_model(X, y, LAND, classifier)
     print("Cross-validated LAND selected features:")
-    print_selected_features(selected_features_LAND_cv, selected_feature_names_LAND_cv)
+    print_selected_features(selected_features_LAND_cv, selected_feature_names_LAND_cv, print_feat=True)
     print("\n\n")
 
     selected_features_hsiclasso_cv, selected_feature_names_hsiclasso_cv = cross_validate_model(X, y, hsic_lasso.hsic_lasso_forward_selection, classifier)
     print("Cross-validated HSIC Lasso selected features:")
-    print_selected_features(selected_features_hsiclasso_cv, selected_feature_names_hsiclasso_cv)
+    print_selected_features(selected_features_hsiclasso_cv, selected_feature_names_hsiclasso_cv, print_feat=True)
     print("\n\n")
 
     selected_features_mRMR_cv, selected_feature_names_mRMR_cv = cross_validate_model(X, y, mRMR, classifier, n_splits=5, num_features_to_select=50)
     print("Cross-validated mRMR selected features:")
-    print_selected_features(selected_features_mRMR_cv, selected_feature_names_mRMR_cv)
+    print_selected_features(selected_features_mRMR_cv, selected_feature_names_mRMR_cv, print_feat=True)
     print("\n\n")
 
     selected_features_permutation = failsafe_feature_selection(Perm_importance, X_train, y_train, classifier=classifier, select_features=X_clustered)
     print("Permutation Importance selected features clustered:")
     selected_feature_names_permutation = classify(X_train, X_test, y_train, y_test, selected_features_permutation, classifier)
-    print_selected_features(selected_features_permutation, selected_feature_names_permutation)
+    print_selected_features(selected_features_permutation, selected_feature_names_permutation, print_feat=True)
     print("\n\n")
 
     selected_features_permutation_mRMR = failsafe_feature_selection(Perm_importance, X_train, y_train, classifier=classifier, select_features=X_mRMR)
     print("Permutation Importance selected features mRMR")
     selected_features_names_perm_mRMR = classify(X_train, X_test, y_train, y_test, selected_features_permutation_mRMR, classifier)
-    print_selected_features(selected_features_permutation_mRMR, selected_features_names_perm_mRMR)
+    print_selected_features(selected_features_permutation_mRMR, selected_features_names_perm_mRMR, print_feat=True)
     print("\n\n")
 
     selected_features_sfs = failsafe_feature_selection(backwards_SFS, X_train, y_train, min_features=20, classifier=classifier, select_features=X_clustered, n_features_to_select=20)
     print("Sequential Feature Selection (SFS) selected features:")
     selected_features_names_sfs = classify(X_train, X_test, y_train, y_test, selected_features_sfs, classifier)
-    print_selected_features(selected_features_sfs, selected_features_names_sfs)
+    print_selected_features(selected_features_sfs, selected_features_names_sfs, print_feat=True)
     print("\n\n")
 
     selected_features_sfs_mRMR = failsafe_feature_selection(backwards_SFS, X_train, y_train, min_features=20, classifier=classifier, select_features=X_mRMR, n_features_to_select=20)
     print("Sequential Feature Selection (SFS) selected features mRMR:")
     selected_features_names_sfs_mRMR = classify(X_train, X_test, y_train, y_test, selected_features_sfs_mRMR, classifier)
-    print_selected_features(selected_features_sfs_mRMR, selected_features_names_sfs_mRMR)
+    print_selected_features(selected_features_sfs_mRMR, selected_features_names_sfs_mRMR, print_feat=True)
     print("\n\n")
 
 if __name__ == '__main__':

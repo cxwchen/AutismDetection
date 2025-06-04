@@ -403,21 +403,31 @@ def greedy_hsic_lasso(X, y, k, redundancy_penalty=0.5):
 
 def mRMR(X, y, num_features_to_select=50):
 
-    X_array = X.values
-    y_array = np.asarray(y).ravel()  # Ensure y is a 1D array
+    # Handle both pandas DataFrame and numpy array inputs
+    if isinstance(X, pd.DataFrame):
+        X_array = X.values
+    else:
+        X_array = np.asarray(X)
+    
+    if isinstance(y, (pd.Series, pd.DataFrame)):
+        y_array = y.values.ravel()
+    else:
+        y_array = np.asarray(y).ravel()  # Ensure y is a 1D array
+    
+    # Ensure proper data types
     X_array = X_array.astype(np.float64)  # Ensure X is float64 for compatibility
 
-        # Handle categorical target variable
+    # Handle categorical target variable
     if y_array.dtype == 'object' or not np.issubdtype(y_array.dtype, np.number):
         le = LabelEncoder()
         y_array = le.fit_transform(y_array)
     
     y_array = y_array.astype(np.int32)  # MRMR often expects integer labels
 
-        # Check for NaN values and handle them
+    # Check for NaN values and handle them
     if np.any(np.isnan(X_array)) or np.any(np.isnan(y_array)):
         print("Warning: NaN values detected. Consider handling them before feature selection.")
-        #Remove rows with NaN
+        # Remove rows with NaN
         valid_rows = ~(np.isnan(X_array).any(axis=1) | np.isnan(y_array))
         X_array = X_array[valid_rows]
         y_array = y_array[valid_rows]
@@ -428,7 +438,7 @@ def mRMR(X, y, num_features_to_select=50):
 
     return selected_indices
 
-def LAND(X, y, lambda_reg=0.01):
+def LAND(X, y, lambda_reg=0.1):
 
     X = np.array(X)
     y = np.array(y).reshape(-1, 1)
