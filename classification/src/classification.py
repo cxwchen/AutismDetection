@@ -1,8 +1,9 @@
 from performance import *
 import numpy as np
+import pandas as pd
 
 
-def performCA(func, feat_train, feat_test, ytrain, ytest, fold=None, tag="", meta=None, **kwargs):
+def performCA(func, feat_train, feat_test, ytrain, ytest, groupeval=False, fold=None, tag="", meta=None, **kwargs):
     """
     --------------------------------------------------------------------------------
     This function performs the classification, prediction and performance analysis
@@ -29,10 +30,10 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, fold=None, tag="", met
         the number of the fold
     
     tag : string
-        Information on the dataset. Either female, male, or combined
+        Information on the dataset. Female, male, or combined. multisite or singlesite. fs or not. harmo or not
 
     meta : array-like
-        contains phenotypic data for per-site or per-sex evaluation
+        contains phenotypic data for per-site, per-sex, and per-agegroup evaluation
         
     **kwargs : dict
         to pass parameters found using hyperparameter tuning. Default: params = None
@@ -57,30 +58,13 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, fold=None, tag="", met
     print_metrics(metrics, clf_name)
     toCSV(DEFAULT_CSV_PATH, fold, clf_name, tag, "Overall", "ALL", metrics)
 
-    if meta is not None:
+    if groupeval and meta is not None:
         perGroupEval(ytest, ypred, yprob, meta, group_col='SITE_ID', group_name='Site', fold=fold, classifier_name=clf_name, tag=tag)
         if 'SEX' in meta.columns and meta['SEX'].nunique() > 1: # only perform per sex evaluation if the df is M and F combined 
             perGroupEval(ytest, ypred, yprob, meta, group_col='SEX', group_name='Sex', fold=fold, classifier_name=clf_name, tag=tag)
 
+        # Bin age into groups and evaluate
+        meta = meta.copy()
+        meta['AGE_GROUP'] = pd.cut(meta['AGE'], bins=[0, 11, 18, 30, 100], labels=["0-11", "12-18", "19-30", "30+"])
+        perGroupEval(ytest, ypred, yprob, meta, group_col='AGE_GROUP', group_name='AgeGroup', fold=fold, classifier_name=clf_name, tag=tag)
     
-
-## separate function for ClusWiSARD
-def performCA_cluswisard(func, feat_train, feat_test, ytrain, ytest, **kwargs):
-    """
-    Performs classification and evaluation specifically for ClusWiSARD.
-    """
-    model = func(feat_train, ytrain, **kwargs)
-
-    # Predict using ClusWiSARD
-    ypred = model.classify(feat_test)
-
-    # ClusWiSARD doesn't support probabilities -> use dummy values for AUROC
-    # We'll use 1 for predicted class 1 and 0 for class 0
-    yprob = np.array(ypred, dtype=float)
-
-    # Get metrics (robust to missing probability info)
-    metrics = get_metrics(ytest, ypred, yprob)
-
-    clf_name = model.__class__.__name__
-    plot_confusion_matrix(ytest, ypred, model)
-    print_metrics(metrics, clf_name)

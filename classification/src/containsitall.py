@@ -10,7 +10,9 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import StratifiedKFold, LeaveOneGroupOut
-from featureselection.src.HSIC_Lasso_2 import hsic_lasso
+
+sys.path.insert(0, 'C:\\Users\\carme\\OneDrive\\Documenten\\AutismDetection\\featureselection\\src')
+from feature_selection_methods import hsiclasso
 
 from loaddata import *
 from classification import *
@@ -42,7 +44,7 @@ sys.stdout = Tee(sys.stdout, log_file)
 female_df = pd.read_csv("ourfeats_female.csv.gz").sample(frac=1, random_state=42).reset_index(drop=True) # shuffle the sites
 male_df = pd.read_csv("ourfeats_male.csv.gz").sample(frac=1, random_state=42).reset_index(drop=True) # shuffle the sites
 
-def runCV(df, label="female", useFS=False, useHarmo=False):
+def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False):
     # version for Jochem
     # X = df.iloc[:, 4:]
     # y = df['DX_GROUP']
@@ -69,7 +71,7 @@ def runCV(df, label="female", useFS=False, useHarmo=False):
         # --- Feature Selection (Optional) --- 
         if useFS:
             print("Running HSIC Lasso feature selection...")
-            selected_idx = hsic_lasso(Xtrain, ytrain,alpha=0.1)
+            selected_idx = hsiclasso(Xtrain, ytrain, numfeats=100)
             Xtrain = Xtrain[:, selected_idx]
             Xtest = Xtest[:, selected_idx]
         
@@ -77,7 +79,7 @@ def runCV(df, label="female", useFS=False, useHarmo=False):
         if useHarmo:
             print("Using NeuroHarmonize...")
             site_train = meta['SITE_ID'].iloc[trainidx].reset_index(drop=True)
-            site_test = meta['SITE_ID'].iloc[trainidx].reset_index(drop=True)
+            site_test = meta['SITE_ID'].iloc[testidx].reset_index(drop=True)
 
             # NeuroHarmonize relies on Combat which requires sites in test to be seen in train
             # Drop test sites absent in train
@@ -99,15 +101,15 @@ def runCV(df, label="female", useFS=False, useHarmo=False):
         dtparams = bestDT(Xtrain, Xtest, ytrain, ytest, DecisionTreeClassifier())
         mlpparams = bestMLP(Xtrain, Xtest, ytrain, ytest, MLPClassifier())
 
-        performCA(applyLogR, Xtrain, Xtest, ytrain, ytest, fold=fold, tag=label, meta=meta_test)
-        performCA(applySVM, Xtrain, Xtest, ytrain, ytest, params = svcparams, fold=fold, tag=label, meta=meta_test)
-        performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, params = None, fold=fold, tag=label, meta=meta_test)
-        performCA(applyDT, Xtrain, Xtest, ytrain, ytest, params = dtparams, fold=fold, tag=label, meta=meta_test)
-        performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, params = mlpparams, fold=fold, tag=label, meta=meta_test)
-        performCA(applyLDA, Xtrain, Xtest, ytrain, ytest, fold=fold, tag=label, meta=meta_test)
-        performCA(applyKNN, Xtrain, Xtest, ytrain, ytest, fold=fold, tag=label, meta=meta_test)
+        performCA(applyLogR, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test)
+        performCA(applySVM, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = svcparams)
+        performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = None)
+        performCA(applyDT, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = dtparams)
+        performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = mlpparams)
+        performCA(applyLDA, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test)
+        performCA(applyKNN, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test)
 
-def runLOGO(df, label="female", useFS=False):
+def runLOGO(df, label="female", useFS=False, groupeval=False):
     X = df.iloc[:, 5:]
     y = df['DX_GROUP']
     meta = df[['SITE_ID', 'SEX', 'AGE']]
@@ -129,7 +131,7 @@ def runLOGO(df, label="female", useFS=False):
         # --- Feature Selection (Optional) --- 
         if useFS:
             print("Running HSIC Lasso feature selection...")
-            selected_idx = hsic_lasso(Xtrain, ytrain,alpha=0.1)
+            selected_idx = hsiclasso(Xtrain, ytrain, numfeats=100)
             Xtrain = Xtrain[:, selected_idx]
             Xtest = Xtest[:, selected_idx]
 
@@ -140,13 +142,13 @@ def runLOGO(df, label="female", useFS=False):
         dtparams = bestDT(Xtrain, Xtest, ytrain, ytest, DecisionTreeClassifier())
         mlpparams = bestMLP(Xtrain, Xtest, ytrain, ytest, MLPClassifier())
 
-        performCA(applyLogR, Xtrain, Xtest, ytrain, ytest, fold=fold, tag=label, meta=meta_test)
-        performCA(applySVM, Xtrain, Xtest, ytrain, ytest, params = svcparams, fold=fold, tag=label, meta=meta_test)
-        performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, params = None, fold=fold, tag=label, meta=meta_test)
-        performCA(applyDT, Xtrain, Xtest, ytrain, ytest, params = dtparams, fold=fold, tag=label, meta=meta_test)
-        performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, params = mlpparams, fold=fold, tag=label, meta=meta_test)
-        performCA(applyLDA, Xtrain, Xtest, ytrain, ytest, fold=fold, tag=label, meta=meta_test)
-        performCA(applyKNN, Xtrain, Xtest, ytrain, ytest, fold=fold, tag=label, meta=meta_test)
+        performCA(applyLogR, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test)
+        performCA(applySVM, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = svcparams)
+        performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = None)
+        performCA(applyDT, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = dtparams)
+        performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = mlpparams)
+        performCA(applyLDA, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test)
+        performCA(applyKNN, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test)
 
 def run_all():
     # runCV(female_df, label="female")
@@ -180,3 +182,4 @@ def run_all():
 
 if __name__ == "__main__":
     run_all()
+    # print("Able to use feature selection package")
