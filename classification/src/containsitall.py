@@ -9,7 +9,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from imblearn.over_sampling import SMOTE
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, LeaveOneGroupOut
 from featureselection.src.HSIC_Lasso_2 import hsic_lasso
 
 from loaddata import *
@@ -54,6 +54,7 @@ def runCV(df, label="female", useFS=False, useHarmo=False):
     meta = df[['SITE_ID', 'SEX', 'AGE']]
 
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    print("Running Stratified KFold Cross-Validation...")
 
     for fold, (trainidx, testidx) in enumerate(skf.split(X, y), 1):
         print(f"\n=== Fold {fold} | {label.upper()} Data ===")
@@ -106,29 +107,76 @@ def runCV(df, label="female", useFS=False, useHarmo=False):
         performCA(applyLDA, Xtrain, Xtest, ytrain, ytest, fold=fold, tag=label, meta=meta_test)
         performCA(applyKNN, Xtrain, Xtest, ytrain, ytest, fold=fold, tag=label, meta=meta_test)
 
+def runLOGO(df, label="female", useFS=False):
+    X = df.iloc[:, 5:]
+    y = df['DX_GROUP']
+    meta = df[['SITE_ID', 'SEX', 'AGE']]
+    sites = df['SITE_ID']
+
+    logo = LeaveOneGroupOut()
+    for fold, (trainidx, testidx) in enumerate(logo.split(X, y, groups=sites)):
+        testsite = df['SITE_ID'].iloc[testidx].unique()[0]
+        print(f"\n=== Fold {fold} | Testing on SITE: {testsite}")
+
+        Xtrain, Xtest = X.iloc[trainidx], X.iloc[testidx]
+        ytrain, ytest = y.iloc[trainidx], y.iloc[testidx]
+        meta_test = meta.iloc[testidx].reset_index(drop=True)
+
+        imputer = SimpleImputer(strategy='mean')
+        Xtrain = imputer.fit_transform(Xtrain)
+        Xtest = imputer.transform(Xtest)
+
+        # --- Feature Selection (Optional) --- 
+        if useFS:
+            print("Running HSIC Lasso feature selection...")
+            selected_idx = hsic_lasso(Xtrain, ytrain,alpha=0.1)
+            Xtrain = Xtrain[:, selected_idx]
+            Xtest = Xtest[:, selected_idx]
+
+        Xtrain, Xtest = normalizer(Xtrain, Xtest)
+
+        svcparams = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, SVC())
+        # rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, RandomForestClassifier())
+        dtparams = bestDT(Xtrain, Xtest, ytrain, ytest, DecisionTreeClassifier())
+        mlpparams = bestMLP(Xtrain, Xtest, ytrain, ytest, MLPClassifier())
+
+        performCA(applyLogR, Xtrain, Xtest, ytrain, ytest, fold=fold, tag=label, meta=meta_test)
+        performCA(applySVM, Xtrain, Xtest, ytrain, ytest, params = svcparams, fold=fold, tag=label, meta=meta_test)
+        performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, params = None, fold=fold, tag=label, meta=meta_test)
+        performCA(applyDT, Xtrain, Xtest, ytrain, ytest, params = dtparams, fold=fold, tag=label, meta=meta_test)
+        performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, params = mlpparams, fold=fold, tag=label, meta=meta_test)
+        performCA(applyLDA, Xtrain, Xtest, ytrain, ytest, fold=fold, tag=label, meta=meta_test)
+        performCA(applyKNN, Xtrain, Xtest, ytrain, ytest, fold=fold, tag=label, meta=meta_test)
+
 def run_all():
     # runCV(female_df, label="female")
     # runCV(male_df, label="male")
     comb_df = pd.concat([female_df, male_df], axis=0).sample(frac=1, random_state=42).reset_index(drop=True)
     # comb_df = comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True)
 
-    #Run cross-validation with combined data, harmonization=true, feature-selection=true
-    runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="combined_harmo_fs", useFS=True, useHarmo=True)
+    #Run skf cross-validation with combined data, harmonization=true, feature-selection=true
+    runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_harmo_fs", useFS=True, useHarmo=True)
 
-    #Run cross-validation with combined data, no harmonization, no feature selection
-    runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="combined_noharmo_nofs", useFS=False, useHarmo=False)
+    #Run skf cross-validation with combined data, no harmonization, no feature selection
+    runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_noharmo_nofs", useFS=False, useHarmo=False)
 
-    #Run cross-validation with combined data, no harmo, with feature selection
-    runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="combined_noharmo_fs", useFS=True, useHarmo=False)
+    #Run skf cross-validation with combined data, no harmo, with feature selection
+    runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_noharmo_fs", useFS=True, useHarmo=False)
 
-    #Run cross-validation with combined data, with harmonization, no feature-selection
-    runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="combined_harmo_nofs", useFS=False, useHarmo=True)
+    #Run skf cross-validation with combined data, with harmonization, no feature-selection
+    runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_harmo_nofs", useFS=False, useHarmo=True)
 
-    #Run cross-validation with combined data, only NYU, no feature selection
-    runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="combined_onlyNYU_nofs", useFS=False, useHarmo=False)
+    #Run skf cross-validation with combined data, only NYU, no feature selection
+    runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf_combined_onlyNYU_nofs", useFS=False, useHarmo=False)
 
-    #Run cross-validation with combined data, only NYU, with feature selection
-    runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="combined_onlyNYU_fs", useFS=True, useHarmo=False)
+    #Run skf cross-validation with combined data, only NYU, with feature selection
+    runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf_combined_onlyNYU_fs", useFS=True, useHarmo=False)
+
+    #Run LOGO cross-validation with combined data, no feature selection
+    runLOGO(comb_df, label="logo_combined_nofs", useFS=False)
+
+    #Run LOGO cross-validation with combined data, with feature selection
+    runLOGO(comb_df, label="logo_combined_fs", useFS=True)
 
 if __name__ == "__main__":
     run_all()
