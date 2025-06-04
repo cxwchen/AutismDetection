@@ -688,7 +688,7 @@ def gr_causality(data, max_lag=5, n_jobs=-1, verbose=False):
 
     return gr_matrix
 
-def load_files(folder_path=None, var_filt=True, ica=False, sex='all', max_files=None, shuffle=False, n_components=20):
+def load_files(folder_path=None, var_filt=True, ica=False, sex='all', site=None, max_files=None, shuffle=False, n_components=20):
     """
     Load .1D fMRI files with options to filter by gender, limit number of files, and shuffle data.
 
@@ -724,6 +724,9 @@ def load_files(folder_path=None, var_filt=True, ica=False, sex='all', max_files=
     for sfolder in sex_folders:
         file_list.extend(glob.glob(os.path.join(sfolder, '*.1D')))
 
+    if site is not None:
+        file_list = [f for f in file_list if os.path.basename(f).split('_005')[0] == site]
+
     if shuffle:
         random.shuffle(file_list)
     else:
@@ -737,6 +740,7 @@ def load_files(folder_path=None, var_filt=True, ica=False, sex='all', max_files=
 
     all_data = []
     subject_ids = []
+    site_ids = []
     loaded_files = []
     file_info = {
         'total_files': 0,
@@ -751,7 +755,9 @@ def load_files(folder_path=None, var_filt=True, ica=False, sex='all', max_files=
             all_data.append(data)
             filename = os.path.basename(file_path)
             subject_id = '005' + filename.split('_005')[1].split('_')[0]
+            site_id = filename.split('_005')[0]
             subject_ids.append(subject_id)
+            site_ids.append(site_id)
             loaded_files.append(file_path)
 
             file_info['timepoints_per_file'].append(data.shape[0])
@@ -1082,11 +1088,11 @@ def multiset_feats(data_list, subject_ids, inf_method="mutual_info", cov_method=
 # fmri_data, subject_ids, file_paths, metadata = load_files() # represents format of load_files()
 # output_df = multiset_feats(fmri_data,subject_ids)           # represents multiset_feats() usage, add another index '[]' to load_files to select data amount
 
-fmri_data, subject_ids, _, _ = load_files(sex='all', max_files=100, shuffle=True, var_filt=True, ica=True)
+fmri_data, subject_ids, _, _ = load_files(sex='all', site='NYU', max_files=None, shuffle=True, var_filt=False, ica=True)
 
-print("fmri_data_shape: " + str(fmri_data[0].shape[1]))
+print("fmri_data_shape: " + str(len(fmri_data)))
 
-df_out = multiset_feats(fmri_data, subject_ids, inf_method='rlogspect', cov_method='glasso',feats='graph')
+#df_out = multiset_feats(fmri_data, subject_ids, inf_method='rlogspect', cov_method='glasso',feats='graph')
 
-print("df_out:\n", df_out)
-print("Feature list: ",list(df_out.columns))
+#print("df_out:\n", df_out)
+#print("Feature list: ",list(df_out.columns))
