@@ -2,29 +2,37 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
-import os,glob,re,random
+import os,glob,re,random, contextlib, io
 import pandas as pd
 import seaborn as sns
 import networkx.algorithms.community as nx_comm
 import cvxpy as cp
-from scipy.stats import pearsonr,skew, kurtosis
+from joblib import Parallel, delayed
+from tqdm import tqdm
+from scipy.stats import pearsonr,skew, kurtosis, entropy
 from sklearn.covariance import GraphicalLasso, GraphicalLassoCV, LedoitWolf, empirical_covariance
+from sklearn.linear_model import Ridge, Lasso
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import mutual_info_regression
 from itertools import combinations
 from scipy.signal import find_peaks
 from sklearn.decomposition import FastICA,PCA
-from scipy.linalg import pinv, eigh
-from statsmodels.tsa.stattools import adfuller
-from statsmodels.tsa.tsatools import detrend
+from scipy.linalg import pinv, eigh, norm
+from statsmodels.tsa.stattools import adfuller, grangercausalitytests
+from statsmodels.tsa.api import VAR
 from nilearn import datasets, image
 from nilearn.input_data import NiftiLabelsMasker
 from typing import List, Union
+from networkx.linalg.laplacianmatrix import laplacian_matrix
+from sklearn.metrics import adjusted_rand_score
 
 from featuredesign.graph_inference.GSP_methods import normalized_laplacian, normalized_laplacian_reweighted, adjacency_reweighted, learn_adjacency_rLogSpecT
 
 import warnings
+warnings.filterwarnings("once", category=UserWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.simplefilter("ignore", category=UserWarning)
+_issued_warnings = set()
 
 def check_stationarity(fmri_data, alpha=0.05):
     nonstationary_counts = []
@@ -116,6 +124,39 @@ Features: avg peak interval, max peak, avg peak amplitude
 
     return pd.DataFrame(all_stats)
 
+def stat_feats(x):
+    """
+    Compute classic statistical features based on some time series data and stores it to a panda dataframe.
+
+    Features:
+    - Mean, Standard Deviation, Skewness, Kurtosis, Slope, Correlation, Covariance, Signal-to-noise ratio etc.
+    """
+    # Transpose back so each row is one ROI's time series
+    if x.shape[0] > x.shape[1]:
+        x = x.T
+
+    # Extract features for each time series
+    feature_list = []
+    for ts in x:
+        features = {
+            'mean': np.mean(ts, axis=0),
+            'std': np.std(ts, axis=0),
+            'SNR': np.mean(ts, axis=0) / (np.std(ts, axis=0) + 1e-10),
+            'Skewness': skew(ts, axis=0),
+            'Kurtosis': kurtosis(ts, axis=0)
+        }
+        feature_list.append(features)
+
+    # Compute peak statistics
+    df_pk = pk_stats(x)
+    df = pd.DataFrame(feature_list)
+    df = pd.concat([df, df_pk], axis=1)
+    # Generate ROI labels
+    aal_labels = [f"ROI_{i + 1}" for i in range(len(df))]
+    df.insert(0, 'ROI', aal_labels)
+
+    return df
+
 def laplacian(A):
     D = np.diag(np.sum(A, axis=1))
     return D-A
@@ -190,6 +231,55 @@ def eig_centrality(G, max_attempts=3):
     # Final fallback to degree centrality
     return nx.degree_centrality(G)
 
+def quadratic_nvar(ts_data, lag=2, alpha=0.5):
+    """
+    ts_data: np.array of shape (T, N) — time x regions
+    Returns: residues from quadratic NVAR model
+    """
+    T, N = ts_data.shape
+    X = []
+    Y = []
+
+    # Build lagged design matrix with linear and quadratic terms
+    for t in range(lag, T):
+        x_lag = ts_data[t - lag]
+        linear_terms = x_lag
+        quadratic_terms = np.outer(x_lag, x_lag).flatten()
+        X.append(np.concatenate([linear_terms, quadratic_terms]))
+        Y.append(ts_data[t])
+
+    X = np.array(X)
+    Y = np.array(Y)
+
+    # Fit N separate Ridge regressions (or use multivariate regression)
+    predictions = []
+    for i in range(N):
+        model = Ridge(alpha=alpha) # or Lasso
+        model.fit(X, Y[:, i])
+        predictions.append(model.predict(X))
+
+    predictions = np.array(predictions).T
+    residuals = Y - predictions
+    return residuals
+
+def laplacian_feats(G):
+    L = nx.laplacian_matrix(G).toarray()
+    eigvals = np.linalg.eigvalsh(L)  # Sorted real eigenvalues
+
+    # Normalize eigenvalues to compute spectral entropy
+    eigvals = np.maximum(eigvals, 1e-12)  # avoid log(0)
+    eigvals_norm = eigvals / eigvals.sum()
+    spec_entropy = entropy(eigvals_norm)
+
+    # Return useful scalar stats (propagate spectral info, not full eigvecs)
+    return {
+        "Spectral Entropy": spec_entropy,
+        "Mean Laplacian Eigenvalue": np.mean(eigvals),
+        "Max Laplacian Eigenvalue": np.max(eigvals),
+        "Frobenius Norm (Laplacian Spectrum)": np.linalg.norm(eigvals),
+        "Algebraic Connectivity (λ₂)": eigvals[1] if len(eigvals) > 1 else 0
+    }
+
 def graph_diameter(G):
     """
     Compute graph diameter with robust handling of disconnected graphs.
@@ -224,34 +314,68 @@ def detect_communities(G, method='louvain', **kwargs):
     else:
         raise ValueError(f"Unknown method: {method}. Choose: louvain|greedy_modularity|label_propagation|asyn_lpa|fluid|girvan_newman")
 
-def detect_inf_method(ts_data, method):
+def detect_inf_method(ts_data, inf_method, cov_method=None):
     """Detect inference method"""
-    if method == 'partial_corr_LF':
-        return partial_corr(ts_data, threshold=None)[0]
-    elif method == 'partial_corr_glasso':
-        return partial_corr(ts_data, method="glasso")[0]
-    elif method == 'pearson_corr_binary':
+    cov_dependent_methods = {
+        'partial_corr',
+        'partial_corr',
+        'norm_laplacian',
+        'rlogspect'
+    }
+
+    cov_ignored_methods = {
+        'mutual_info',
+        'pearson_corr',
+        'pearson_corr_binary'
+        'gr_causality'
+    }
+
+    # Unique warning key
+    warning_key = (inf_method, cov_method)
+
+    if inf_method in cov_dependent_methods:
+        if cov_method is None:
+            raise ValueError(
+                f"Method '{inf_method}' requires `cov_method` (choose: 'direct', 'numpy', 'ledoit', 'glasso', 'window', 'var')."
+            )
+    elif cov_method is not None and inf_method in cov_ignored_methods:
+        if warning_key not in _issued_warnings:
+            warnings.warn(
+                f"`cov_method='{cov_method}'` is ignored for method '{inf_method}'.",
+                UserWarning
+            )
+            _issued_warnings.add(warning_key)
+
+    # Dispatch to methods
+    if inf_method == 'sample_cov':
+        return sample_covEst(ts_data, cov_method)
+    elif inf_method == 'partial_corr':
+        C = sample_covEst(ts_data, method=cov_method)
+        return partial_corr(C)[0]
+    elif inf_method == 'pearson_corr_binary':
         return pearson_corr(ts_data)[0]
-    elif method == 'pearson_corr':
+    elif inf_method == 'pearson_corr':
         return pearson_corr(ts_data)[1]
-    elif method == 'mutual_info':
+    elif inf_method == 'mutual_info':
         return mutual_info(ts_data)
-    elif method == 'norm_laplacian':
-        C = sample_covEst(ts_data)
-        V_hat,_,_ = comp_eigen(C)
+    elif inf_method == 'gr_causality':
+        return gr_causality(ts_data)
+    elif inf_method == 'norm_laplacian':
+        C = sample_covEst(ts_data, method=cov_method)
+        V_hat, _, _ = comp_eigen(C)
         S = normalized_laplacian(V_hat)
-        if S is None:
-            raise ValueError("Laplacian matrix is None. Check prior steps for subject.")
         return inv_laplace(S)
-    elif method == 'rlogspect':
-        C = sample_covEst(ts_data)
-        V_hat,_,E_tot = comp_eigen(C)
-        return learn_adjacency_rLogSpecT(V_hat,delta_n=1.5*np.sqrt(np.log(200) / 200)) # threshold dn to remove noisy eigenvalues
+    elif inf_method == 'rlogspect':
+        C = sample_covEst(ts_data, method=cov_method)
+        V_hat, _, E_tot = comp_eigen(C)
+        return learn_adjacency_rLogSpecT(V_hat, delta_n=1.5 * np.sqrt(np.log(200) / 200))
     else:
-        raise ValueError(f"Unknown method: {method}. Choose: partial_corr_LF|partial_corr_glasso|pearson_corr_binary|pearson_corr|mutual_info|norm_laplacian|rlogspect")
+        raise ValueError(f"Unknown inference method: {inf_method} (choose: 'sample_cov','partial_corr', 'pearson_corr_binary', 'pearson_corr', 'mutual_info', 'gr_causality', 'norm_laplacian', 'rlogspect').")
 
 def sample_covEst(ts_data, method='direct'):
     """Compute the sample covariance estimate using various methods"""
+    ts_data = StandardScaler().fit_transform(ts_data) # Standardize data
+
     if method == 'direct':
         return empirical_covariance(ts_data)
     elif method == 'ledoit':
@@ -262,52 +386,63 @@ def sample_covEst(ts_data, method='direct'):
         gl = GraphicalLasso(alpha=1e-5, max_iter=10000)
         gl.fit(ts_data)
         return gl.covariance_
-    elif method == 'window':
-        window_size = 25
+    elif method == 'tv-glasso':
+        w_size = 25  # ~50 seconds for TR=2s
+        overlap = 20  # 80% overlap for smoother estimates
+        alpha = 1e-5  # Regularization parameter
         T, n_ics = ts_data.shape
-        n_windows = T - window_size + 1
+        def process_window(window_data):
+            gl = GraphicalLasso(alpha=alpha, max_iter=10000)
+            gl.fit(window_data - window_data.mean(axis=0))
+            return gl.precision_
+        covs = Parallel(n_jobs=-1)(
+            delayed(process_window)(ts_data[i:i + w_size])
+            for i in range(0, T - w_size + 1, w_size - overlap))
+        return covs # or mean(covs,axis=0)
+    elif method == 'window':
+        w_size = 25
+        T, n_ics = ts_data.shape
+        n_windows = T - w_size + 1
         covs = []
         for i in range(n_windows):
-            window = ts_data[i:i+window_size]
+            window = ts_data[i:i+w_size]
             covs.append(np.cov(window, rowvar=False))
         return np.mean(covs, axis=0)
+    elif method == 'var':
+        ts_df = pd.DataFrame(ts_data)
+        results = VAR(ts_df).fit(2)
+        #A_list = [results.coefs[i] for i in range(results.k_ar)]  # A_1, A_2, ..., A_p
+        sigma_u = results.sigma_u  # Covariance matrix of residuals
+        return sigma_u
+    elif method == 'nvar':
+        residuals = quadratic_nvar(ts_data)
+        gl = GraphicalLasso(alpha=1e-5, max_iter=10000)
+        gl.fit(residuals)
+        return gl.covariance_
     else:
-        raise ValueError(f"Unknown method: {method}. Choose: direct|ledoit|glasso|window")
+        raise ValueError(f"Unknown sample covariance estimation method: {method} (choose: 'direct', 'numpy', 'ledoit', 'glasso', 'tv-glasso', 'window', 'var', 'nvar').")
 
-def stat_feats(x):
-    """
-    Compute classic statistical features based on some time series data and stores it to a panda dataframe.
+def threshold_edges(G, alpha=0.2, min_edges=4):
+    """Percentile-based thresholding (top 20% of edges by default)"""
+    edges = [(u, v, d['weight']) for u, v, d in G.edges(data=True)]
+    if not edges:
+        return []
 
-    Features:
-    - Mean, Standard Deviation, Skewness, Kurtosis, Slope, Correlation, Covariance, Signal-to-noise ratio etc.
-    """
-    # Transpose back so each row is one ROI's time series
-    if x.shape[0] > x.shape[1]:
-        x = x.T
+    weights = [w for _, _, w in edges]
 
-    # Extract features for each time series
-    feature_list = []
-    for ts in x:
-        features = {
-            'mean': np.mean(ts, axis=0),
-            'std': np.std(ts, axis=0),
-            'SNR': np.mean(ts, axis=0) / (np.std(ts, axis=0) + 1e-10),
-            'Skewness': skew(ts, axis=0),
-            'Kurtosis': kurtosis(ts, axis=0)
-        }
-        feature_list.append(features)
+    # Calculate cutoff as (1-alpha) percentile
+    cutoff = np.percentile(weights, 100 * (1 - alpha))
 
-    # Compute peak statistics
-    df_pk = pk_stats(x)
-    df = pd.DataFrame(feature_list)
-    df = pd.concat([df, df_pk], axis=1)
-    # Generate ROI labels
-    aal_labels = [f"ROI_{i + 1}" for i in range(len(df))]
-    df.insert(0, 'ROI', aal_labels)
+    # Get edges above cutoff
+    filtered = [(u, v, w) for u, v, w in edges if w >= cutoff]
 
-    return df
+    # Ensure minimum edges (fallback to strongest connections)
+    if len(filtered) < min_edges:
+        filtered = sorted(edges, key=lambda x: x[2], reverse=True)[:min_edges]
 
-def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=0e-0, min_edges=1):
+    return filtered
+
+def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=0.05, min_edges=1):
     """
     Function converting Adjacency matrix to a Graph
 
@@ -329,14 +464,10 @@ def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=
     if len(G.edges()) < min_edges:
         raise ValueError(f"Graph has only {len(G.edges())} edges (min {min_edges} required)")
 
-    # Extract edge weights and normalize for linewidth
-    edges = G.edges()
-    weights = [G[u][v]['weight'] for u, v in edges]
-
-    # Filter weights to promote sparsity (=weight/edge removal)
-    filtered_data = [(u, v, G[u][v]['weight']) for u, v in edges if G[u][v]['weight'] >= alpha * max(weights)]
-    edges_filt = [(u, v) for u, v, w in filtered_data]  # Just the edges
-    weights_filt = [w for u, v, w in filtered_data]  # Just the weights
+    # Use percentile-based edge thresholding
+    filtered_data = threshold_edges(G, alpha=alpha, min_edges=min_edges)
+    edges_filt = [(u, v) for u, v, _ in filtered_data]
+    weights_filt = [w for _, _, w in filtered_data]
 
     # Compute opacities (normalized weights)
     if weights_filt:
@@ -399,7 +530,6 @@ def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=
 
     # 7. Compute Graph features
     if feats:
-        G.remove_nodes_from(list(nx.isolates(G)))  # Remove isolated nodes
         feature_list = []
 
         # Compute all features
@@ -408,11 +538,9 @@ def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=
             "Closeness Centrality": nx.closeness_centrality(G),
             "Eigenvector Centrality": eig_centrality(G),
             "Clustering Coefficient": nx.clustering(G),
-            "Shortest Paths": dict(nx.all_pairs_shortest_path_length(G)),
             "Average Clustering": nx.average_clustering(G),
             "Edge Betweenness": nx.edge_betweenness_centrality(G),
-            "Diameter": graph_diameter(G),
-            "Laplacian Eigenvectors": np.linalg.eig(laplacian(A))[0].real
+            "Diameter": graph_diameter(G)
 
         }
 
@@ -431,7 +559,9 @@ def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=
         graph_features = {
             "Average Clustering": features["Average Clustering"],
             "Diameter": features["Diameter"],
-            "Laplacian Eigenvectors": features["Laplacian Eigenvectors"] # is not really a graph feature, more so a temporal/spectral feature (its says something about the frequency components)
+            **laplacian_feats(G),  # Spectral features
+            #"Global Efficiency": nx.global_efficiency(G),
+            "Graph Energy": np.sum(np.abs(np.linalg.eigvalsh(A)))
         }
 
         # Create DataFrames
@@ -454,83 +584,107 @@ def adj_heatmap(W):
     plt.tight_layout()
     plt.show()
 
-def pearson_corr(time_series_data, threshold=0.5, absolute_value=True):
+def pearson_corr(data, absolute_value=True):
     """
-    Build a graph based on Pearson correlation between time series.
-
-    Parameters:
-    - time_series_data: 2D numpy array or pandas DataFrame (n_timepoints × n_series)
-    - threshold: correlation threshold for edge creation
-    - absolute_value: if True, uses absolute value of correlation
+    Compute Pearson correlation graph (fully connected).
 
     Returns:
-    - adjacency matrix of the graph
+    - adjacency matrix (binary, excluding diagonal)
     - correlation matrix
     """
-    n_series = time_series_data.shape[1]
-    corr_matrix = np.zeros((n_series, n_series))
-    adj_matrix = np.zeros((n_series, n_series))
+    corr_matrix = np.corrcoef(data.T)
 
-    # Calculate pairwise correlations
-    for i in range(n_series):
-        for j in range(i, n_series):  # Include diagonal for corr_matrix
-            x = time_series_data[:, i]
-            y = time_series_data[:, j]
+    if absolute_value:
+        corr_matrix = np.abs(corr_matrix)
 
-            # Handle constant series cases
-            if i == j:
-                corr = 1.0  # Diagonal
-            elif np.all(x == x[0]) or np.all(y == y[0]):
-                corr = 0.0  # Constant series
-            else:
-                corr = pearsonr(x, y)[0]
+    np.fill_diagonal(corr_matrix, 1.0)
 
-            if absolute_value:
-                corr = abs(corr)
-
-            # Threshold for adjacency (skip diagonal)
-            if i != j and corr > threshold:
-                adj_matrix[i, j] = adj_matrix[j, i] = 1
-                corr_matrix[i, j] = corr
+    # Fully connected graph (excluding self-loops)
+    N = data.shape[1]
+    adj_matrix = np.ones((N, N)) - np.eye(N)
 
     return adj_matrix, corr_matrix
 
-def partial_corr(ts_data, method="glasso", threshold=None):
-    # Standardize the data
-    ts_data = StandardScaler().fit_transform(ts_data)
+def partial_corr(cov_matrix):
+    """
+    Compute partial correlation matrix from covariance.
+    """
+    try:
+        inv_cov = np.linalg.inv(cov_matrix)
+    except np.linalg.LinAlgError:
+        inv_cov = np.linalg.pinv(cov_matrix)
 
-    # Compute inverse covariance
-    if method == "glasso":
-        inv_cov = GraphicalLassoCV(max_iter=5000).fit(ts_data).precision_
-    else:
-        inv_cov = LedoitWolf().fit(ts_data).precision_
-
-    # Compute partial correlations
     diag = np.sqrt(np.diag(inv_cov))
     W = -inv_cov / np.outer(diag, diag)
     np.fill_diagonal(W, 0)
 
-    # Apply threshold if specified
-    if threshold is not None:
-        if 0 < threshold < 1:  # Percentile threshold (0-100)
-            abs_vals = np.abs(W[np.triu_indices_from(W, k=1)])
-            threshold = np.percentile(abs_vals, threshold * 100)
-        W[np.abs(W) < threshold] = 0
-
     return W, inv_cov
 
-def mutual_info(data):
+def mutual_info(data, n_jobs=-1):
+    """
+    Compute mutual information matrix using joblib for parallelism.
+    """
+    def compute_pairwise_mi(data, i, j):
+        """
+        Compute mutual information between two columns.
+        """
+        x = data[:, i]
+        y = data[:, j]
+        return i, j, mutual_info_regression(x.reshape(-1, 1), y, discrete_features=False)[0]
+
     N = data.shape[1]
     mi_matrix = np.zeros((N, N))
 
-    for i in range(N):
-        for j in range(i + 1, N):
-            # sklearn's MI expects 2D input for X and 1D for y
-            mi = mutual_info_regression(data[:, i].reshape(-1, 1), data[:, j])[0]
-            mi_matrix[i, j] = mi_matrix[j, i] = mi
+    pairs = [(i, j) for i in range(N) for j in range(i + 1, N)]
+
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(compute_pairwise_mi)(data, i, j) for i, j in pairs
+    )
+
+    for i, j, mi in results:
+        mi_matrix[i, j] = mi_matrix[j, i] = mi
+
     return mi_matrix
 
-def load_files(folder_path=None, var_filt=True, ica=False, sex='all', max_files=None, shuffle=False):
+def gr_causality(data, max_lag=5, n_jobs=-1, verbose=False):
+    # Initialize
+    N = data.shape[1]
+    gr_matrix = np.zeros((N, N), dtype=np.float32)
+
+    # Pre-allocate test pairs
+    test_pairs = [(i, j) for i in range(N) for j in range(N) if i != j]
+
+    def _granger_test(i, j):
+        """Inner function for parallel execution"""
+        with contextlib.redirect_stdout(io.StringIO()), \
+                warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=FutureWarning)
+            try:
+                test_result = grangercausalitytests(
+                    data[:, [j, i]],
+                    maxlag=max_lag,
+                    verbose=False  # Explicitly set to False
+                )
+                return max(test_result[lag][0]['ssr_ftest'][0] for lag in range(1, max_lag + 1))
+            except Exception:
+                return 0.0
+
+    # Parallel execution
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(_granger_test)(i, j)
+        for i, j in tqdm(test_pairs, disable=not verbose))
+
+    # Fill matrix
+    idx = 0
+    for i in range(N):
+        for j in range(N):
+            if i != j:
+                gr_matrix[i, j] = results[idx]
+                idx += 1
+
+    return gr_matrix
+
+def load_files(folder_path=None, var_filt=True, ica=False, sex='all', site=None, max_files=None, shuffle=False, n_components=20):
     """
     Load .1D fMRI files with options to filter by gender, limit number of files, and shuffle data.
 
@@ -566,6 +720,9 @@ def load_files(folder_path=None, var_filt=True, ica=False, sex='all', max_files=
     for sfolder in sex_folders:
         file_list.extend(glob.glob(os.path.join(sfolder, '*.1D')))
 
+    if site is not None:
+        file_list = [f for f in file_list if os.path.basename(f).split('_005')[0] == site]
+
     if shuffle:
         random.shuffle(file_list)
     else:
@@ -579,6 +736,7 @@ def load_files(folder_path=None, var_filt=True, ica=False, sex='all', max_files=
 
     all_data = []
     subject_ids = []
+    site_ids = []
     loaded_files = []
     file_info = {
         'total_files': 0,
@@ -593,7 +751,9 @@ def load_files(folder_path=None, var_filt=True, ica=False, sex='all', max_files=
             all_data.append(data)
             filename = os.path.basename(file_path)
             subject_id = '005' + filename.split('_005')[1].split('_')[0]
+            site_id = filename.split('_005')[0]
             subject_ids.append(subject_id)
+            site_ids.append(site_id)
             loaded_files.append(file_path)
 
             file_info['timepoints_per_file'].append(data.shape[0])
@@ -608,7 +768,7 @@ def load_files(folder_path=None, var_filt=True, ica=False, sex='all', max_files=
         all_data, subject_ids, _ = zeroVar_filter(all_data, subject_ids)
 
     if ica:
-        all_data = ica_smith(all_data)
+        all_data = ica_smith(all_data, n_components=n_components)
 
 
     return all_data, subject_ids, loaded_files, file_info
@@ -710,44 +870,44 @@ def ica_dimReduc(fmri_data, subject_ids=None, n_components=15, max_iter=10000, t
 
     return ica_components, mixing_matrices, filtered_ids, failed_indices
 
+
 def ica_smith(
         aal_time_series_list: List[np.ndarray],
+        n_components: int = 20,
         standardize: bool = False,
         return_transformation_matrix: bool = False
 ) -> Union[List[np.ndarray], tuple]:
     """
-    Converts AAL time series (116 ROIs) to Smith 2009 ICA component time series (10 RSNs).
+    Converts AAL time series (116 ROIs) to Smith 2009 ICA component time series (10/20/70 RSNs).
 
     Parameters:
     -----------
-    aal_time_series_list : List[np.ndarray]
-        List of 2D arrays, each with shape [n_timepoints × 116] (AAL time series per subject).
-    standardize : bool, optional (default=False)
-        If True, standardizes each subject's time series (z-score) before projection.
-    return_transformation_matrix : bool, optional (default=False)
-        If True, returns the pseudo-inverse transformation matrix (ica_to_aal_inv).
-
-    Returns:
-    --------
-    smith_ics_list : List[np.ndarray]
-        List of 2D arrays, each with shape [n_timepoints × 10] (Smith IC time series per subject).
-    ica_to_aal_inv : np.ndarray (optional)
-        Pseudo-inverse transformation matrix [10 × 116], returned only if return_transformation_matrix=True.
+    n_components, to select number of ICA components
     """
     # --- Input Validation ---
+    valid_components = {10, 20, 70}
+    if n_components not in valid_components:
+        raise ValueError(f"n_components must be one of {valid_components}, got {n_components}")
+
     for i, ts in enumerate(aal_time_series_list):
         if ts.shape[1] != 116:
             raise ValueError(f"Subject {i} has {ts.shape[1]} ROIs (expected 116). Transpose?")
 
     # --- Load Smith 2009 ICA Maps and AAL Atlas ---
     smith = datasets.fetch_atlas_smith_2009()
-    smith_maps = image.load_img(smith.rsn20)  # 10 ICA components
+
+    # Select the appropriate ICA map based on n_components
+    if n_components == 10:
+        smith_maps = image.load_img(smith.rsn10)
+    elif n_components == 20:
+        smith_maps = image.load_img(smith.rsn20)
+    else:  # 70 components
+        smith_maps = image.load_img(smith.rsn70)
 
     aal = datasets.fetch_atlas_aal()
     aal_img = image.load_img(aal.maps)  # AAL atlas
 
     # --- Compute ICA-to-AAL Transformation Matrix ---
-    n_components = smith_maps.shape[-1]  # 10
     n_regions = 116
     ica_to_aal = np.zeros((n_regions, n_components))
 
@@ -758,14 +918,14 @@ def ica_smith(
         ica_to_aal[:, i] = signals[0]  # Spatial map for ICA component i
 
     # Pseudo-inverse for projection (AAL → ICA space)
-    ica_to_aal_inv = np.linalg.pinv(ica_to_aal)  # Shape: [10 × 116]
+    ica_to_aal_inv = np.linalg.pinv(ica_to_aal)  # Shape: [n_components × 116]
 
     # --- Project Each Subject's Data ---
     smith_ics_list = []
     for ts in aal_time_series_list:
         if standardize:
-            ts = (ts - ts.mean(axis=0)) / ts.std(axis=0)  # Z-score
-        smith_ics = ts @ ica_to_aal_inv.T  # [time × 116] @ [116 × 10] → [time × 10]
+            ts = (ts - ts.mean(axis=0)) / (ts.std(axis=0) + 1e-10)  # Z-score with epsilon to avoid division by zero
+        smith_ics = ts @ ica_to_aal_inv.T  # [time × 116] @ [116 × n_components] → [time × n_components]
         smith_ics_list.append(smith_ics)
 
     # --- Return Results ---
@@ -774,107 +934,150 @@ def ica_smith(
     else:
         return smith_ics_list
 
-def multiset_feats(data_list, subject_ids, method="mutual_info"):
+
+def multiset_feats(data_list, subject_ids, inf_method="mutual_info", cov_method=None,
+                   thresh=0.2, n_jobs=-1, feats="graph"):
     """
-    Loops over all data recursively to compute specific features and stores them in a dataframe indexed per individual (subject ID).
+    Parallelized version of subject-wise feature extraction.
 
-    - Input: fmri_dataset of 1D timeseries, corresponding subject_ids
-    - Output: DataFrame indexed per individual with all relative features
-    - Parameters: 'method' to choose graph inference method used
-
+    Parameters:
+    -----------
+    - inf_method, graph inference method used: {'partial_corr', 'pearson_corr_binary', 'pearson_corr', 'mutual_info', 'gr_causality', 'norm_laplacian', 'rlogspect'}
+    - cov_method, sample covariance estimation method used: {'direct', 'numpy', 'ledoit', 'glasso', 'window', 'var'}
+    - feats, select which features to compute: {'both', 'stat', 'graph'}
     """
-    df_app = pd.DataFrame()
-    df_global_list = []
-    expanded_ids = []
 
-    for data, sid in zip(data_list, subject_ids):
+    valid_options = ["both", "stat", "graph"]
+    if feats not in valid_options:
+        raise ValueError(f"compute_features must be one of {valid_options}")
+
+    def process_subject(data, sid, inf_method, cov_method):
+        """
+        Processes a single subject's data with feature selection.
+        """
+        warnings.filterwarnings("ignore", category=UserWarning)
         try:
-            df_stat = stat_feats(data)
+            # Initialize empty DataFrames
+            df_stat = pd.DataFrame()
+            df_graph = pd.DataFrame()
+            df_global = pd.DataFrame()
 
-            try:
-                adj_matrix = detect_inf_method(data, method=method)
-                if np.all(adj_matrix == 0):
-                    raise ValueError("Zero adjacency matrix")
+            # Compute statistical features if requested
+            if feats in ["both", "stat"]:
+                df_stat = stat_feats(data)
 
-                df_graph, df_global = graphing(adj_matrix)
-                df_roi = pd.merge(df_stat, df_graph, on='ROI', how='left')
+            # Compute graph features if requested
+            if feats in ["both", "graph"]:
+                try:
+                    adj_matrix = detect_inf_method(data, inf_method=inf_method, cov_method=cov_method)
+                    if np.all(adj_matrix == 0):
+                        raise ValueError("Zero adjacency matrix")
 
-            except Exception as graph_err:
-                print(f"Graph failed for {sid}: {str(graph_err)}")
-                df_roi = df_stat  # Keep statistical features only
-                df_global = pd.DataFrame()  # Empty global features
+                    df_graph, df_global = graphing(adj_matrix, alpha=thresh)
 
-            # Accumulate results
-            df_global_list.append(df_global)
-            expanded_ids.extend([sid] * len(df_roi)) # Pad subject IDs with copies for all ROIs
-            df_app = pd.concat([df_app, df_roi], ignore_index=True)
+                    # If computing both, merge stat and graph features
+                    if feats == "both":
+                        df_roi = pd.merge(df_stat, df_graph, on='ROI', how='left')
+                    else:
+                        df_roi = df_graph
+
+                except Exception as graph_err:
+                    print(f"Graph failed for {sid}: {str(graph_err)}")
+                    if feats == "both":
+                        df_roi = df_stat  # Fall back to stat features only
+                    else:
+                        df_roi = pd.DataFrame()  # Empty if only graph requested
+
+            # Handle case where only stat features are requested
+            elif feats == "stat":
+                df_roi = df_stat
+
+            # Add subject ID if we have any features
+            if not df_roi.empty:
+                df_roi['subject_id'] = sid
+
+            return df_roi, df_global
 
         except Exception as e:
             print(f"Subject {sid} failed completely: {str(e)}")
-            continue
+            return None, None
 
-    df_global = pd.concat(df_global_list, ignore_index=True)
-
-    # Assign to dataframe
-    df_app['subject_id'] = expanded_ids
-    df_app = df_app.dropna(axis=1)  # Remove NaN columns
-
-    # Automatically pivots all feature columns
-    df_wide = df_app.pivot(
-        index=['subject_id'],
-        columns='ROI',
-        values=df_app.columns.difference(['ROI', 'subject_id'])
+    # Parallel processing (unchanged)
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(process_subject)(data, sid, inf_method, cov_method)
+        for data, sid in tqdm(zip(data_list, subject_ids),
+                              total=len(subject_ids),
+                              desc="Processing subjects")
     )
 
-    # Flatten column names
-    df_wide.columns = [f"{stat}_{roi}" for stat, roi in df_wide.columns]
-    df_wide = df_wide.reset_index()
+    # Filter successful results
+    df_app_list, df_global_list = zip(*[(df_roi, df_global) for (df_roi, df_global) in results if df_roi is not None])
 
-    # Function to extract ROI number for sorting
-    def extract_roi_num(col):
-        match = re.search(r'_(\d+)$', col)
-        return int(match.group(1)) if match else -1
+    # Handle case where no graph features were computed
+    if feats != "graph":
+        df_global_list = [df for df in df_global_list if not df.empty]
 
-    # Sort columns: keep subject_id and institute first, then group by ROI
-    cols = df_wide.columns.tolist()
-    id_cols = ['subject_id']
-    feature_cols = [col for col in cols if col not in id_cols]
+    # Fast concatenation without sorting columns
+    df_app = pd.concat(df_app_list, ignore_index=True, sort=False)
+    df_global = pd.concat(df_global_list, ignore_index=True, sort=False) if df_global_list else pd.DataFrame()
 
-    # Group by ROI number
-    features_grouped = sorted(feature_cols, key=lambda x: (extract_roi_num(x), x.split('_')[0]))
-    df_wide = pd.concat([df_wide[id_cols + features_grouped], df_global], axis=1)
+    # Drop columns that are entirely NaN
+    df_app.dropna(axis=1, how='all', inplace=True)
 
+    # Skip pivoting if only global features were requested
+    if not df_app.empty:
+        # Pivot to wide format
+        df_wide = df_app.pivot_table(
+            index='subject_id',
+            columns='ROI',
+            values=df_app.columns.difference(['ROI', 'subject_id']),
+            aggfunc='first'
+        )
+        # Flatten MultiIndex columns
+        df_wide.columns = [f"{stat}_{roi}" for stat, roi in df_wide.columns]
+        df_wide.reset_index(inplace=True)
+
+        # Sort feature columns
+        def extract_roi_num(col):
+            match = re.search(r'_(\d+)$', col)
+            return int(match.group(1)) if match else -1
+
+        id_cols = ['subject_id']
+        feature_cols = [col for col in df_wide.columns if col not in id_cols]
+        features_grouped = sorted(feature_cols, key=lambda x: (extract_roi_num(x), x.split('_')[0]))
+        df_wide = df_wide[id_cols + features_grouped]
+    else:
+        df_wide = pd.DataFrame({'subject_id': subject_ids})
+
+    # Join with global features if they exist
+    if not df_global.empty:
+        df_final = pd.concat([df_wide, df_global.reset_index(drop=True)], axis=1)
+    else:
+        df_final = df_wide
+
+    # Append phenotypic data
     def multiset_pheno(df_wide):
-        """
-        Function that loads phenotypic data and merges it into the input dataframe.
+        # Fix the path construction
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        parent_path = os.path.join(base_path, "..", "..")
+        pheno_path = os.path.join(parent_path, "abide", "Phenotypic_V1_0b_preprocessed1.csv")
 
-        - DX_GROUP: 1=ASD,2=ALL
-        - SEX: 1=Male,2=Female
+        df_labels = pd.read_csv(pheno_path)
 
-        """
-        df_labels = pd.read_csv(
-            os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")), "abide",
-                         "Phenotypic_V1_0b_preprocessed1.csv"))
-
-        # Convert SUB_ID to match subject_id format
         df_labels['SUB_ID'] = df_labels['SUB_ID'].astype(str).str.zfill(7)
         df_wide['subject_id'] = df_wide['subject_id'].astype(str).str.zfill(7)
 
-        # Select desired phenotypic columns
         df_pheno = df_labels[['SUB_ID', 'SITE_ID', 'DX_GROUP', 'SEX']]
-
-        # Merge and drop SUB_ID
         df_merged = df_wide.merge(df_pheno, left_on='subject_id', right_on='SUB_ID', how='left')
         df_merged.drop(columns='SUB_ID', inplace=True)
 
-        # Reorder phenotypic columns
         phenotype_cols = ['DX_GROUP', 'SEX', 'SITE_ID']
         cols = phenotype_cols + [col for col in df_merged.columns if col not in phenotype_cols]
         df_merged = df_merged[cols]
 
         return df_merged
 
-    return multiset_pheno(df_wide)
+    return multiset_pheno(df_final)
 
 def adjacency_df(data_list, subject_ids, method="mutual_info"):
     rows = []
@@ -902,18 +1105,13 @@ def adjacency_df(data_list, subject_ids, method="mutual_info"):
     df_wide =  pd.DataFrame(rows, index=index, columns=col_names).reset_index().rename(columns={'index': 'subject_id'})
     
     def multiset_pheno(df_wide):
-        """
-        Function that loads phenotypic data and merges it into the input dataframe.
+        # Fix the path construction
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        parent_path = os.path.join(base_path, "..", "..")
+        pheno_path = os.path.join(parent_path, "abide", "Phenotypic_V1_0b_preprocessed1.csv")
 
-        - DX_GROUP: 1=ASD,2=ALL
-        - SEX: 1=Male,2=Female
+        df_labels = pd.read_csv(pheno_path)
 
-        """
-        df_labels = pd.read_csv(
-            os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")), "abide",
-                         "Phenotypic_V1_0b_preprocessed1.csv"))
-
-        # Convert SUB_ID to match subject_id format
         df_labels['SUB_ID'] = df_labels['SUB_ID'].astype(str).str.zfill(7)
         df_wide['subject_id'] = df_wide['subject_id'].astype(str).str.zfill(7)
 
@@ -931,20 +1129,17 @@ def adjacency_df(data_list, subject_ids, method="mutual_info"):
 
         return df_merged
 
-    return multiset_pheno(df_wide)
+    return multiset_pheno(df_final)
 
 #-------{Main for testing}-------#
 # fmri_data, subject_ids, file_paths, metadata = load_files() # represents format of load_files()
 # output_df = multiset_feats(fmri_data,subject_ids)           # represents multiset_feats() usage, add another index '[]' to load_files to select data amount
 
-# fmri_data, subject_ids, _, _ = load_files(sex='all', max_files=800, shuffle=True, var_filt=True, ica=True)
+fmri_data, subject_ids, _, _ = load_files(sex='all', site='NYU', max_files=None, shuffle=True, var_filt=False, ica=True)
 
-# print(f"Final data: {len(fmri_data)} subjects")
-# print(f"Final IDs: {len(subject_ids)}")
+print("fmri_data_shape: " + str(len(fmri_data)))
 
-# # df_out = multiset_feats(fmri_data, subject_ids, method='rlogspect')
-# df_out = adjacency_df(fmri_data, subject_ids, method="rlogspect")
-# print("df_out:\n", df_out)
+#df_out = multiset_feats(fmri_data, subject_ids, inf_method='rlogspect', cov_method='glasso',feats='graph')
 
-
-# %%
+#print("df_out:\n", df_out)
+#print("Feature list: ",list(df_out.columns))
