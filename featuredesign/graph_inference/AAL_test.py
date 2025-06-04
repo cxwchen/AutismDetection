@@ -121,6 +121,39 @@ Features: avg peak interval, max peak, avg peak amplitude
 
     return pd.DataFrame(all_stats)
 
+def stat_feats(x):
+    """
+    Compute classic statistical features based on some time series data and stores it to a panda dataframe.
+
+    Features:
+    - Mean, Standard Deviation, Skewness, Kurtosis, Slope, Correlation, Covariance, Signal-to-noise ratio etc.
+    """
+    # Transpose back so each row is one ROI's time series
+    if x.shape[0] > x.shape[1]:
+        x = x.T
+
+    # Extract features for each time series
+    feature_list = []
+    for ts in x:
+        features = {
+            'mean': np.mean(ts, axis=0),
+            'std': np.std(ts, axis=0),
+            'SNR': np.mean(ts, axis=0) / (np.std(ts, axis=0) + 1e-10),
+            'Skewness': skew(ts, axis=0),
+            'Kurtosis': kurtosis(ts, axis=0)
+        }
+        feature_list.append(features)
+
+    # Compute peak statistics
+    df_pk = pk_stats(x)
+    df = pd.DataFrame(feature_list)
+    df = pd.concat([df, df_pk], axis=1)
+    # Generate ROI labels
+    aal_labels = [f"ROI_{i + 1}" for i in range(len(df))]
+    df.insert(0, 'ROI', aal_labels)
+
+    return df
+
 def laplacian(A):
     D = np.diag(np.sum(A, axis=1))
     return D-A
@@ -269,7 +302,7 @@ def detect_inf_method(ts_data, inf_method, cov_method=None):
     if inf_method in cov_dependent_methods:
         if cov_method is None:
             raise ValueError(
-                f"Method '{inf_method}' requires `cov_method` (choose: 'direct', 'numpy', 'ledoit', 'glasso', 'window')."
+                f"Method '{inf_method}' requires `cov_method` (choose: 'direct', 'numpy', 'ledoit', 'glasso', 'window', 'var')."
             )
     elif cov_method is not None and inf_method in cov_ignored_methods:
         if warning_key not in _issued_warnings:
@@ -340,39 +373,6 @@ def sample_covEst(ts_data, method='glasso'):
     else:
         raise ValueError(f"Unknown sample covariance estimation method: {method} (choose: 'direct', 'numpy', 'ledoit', 'glasso', 'window').")
 
-def stat_feats(x):
-    """
-    Compute classic statistical features based on some time series data and stores it to a panda dataframe.
-
-    Features:
-    - Mean, Standard Deviation, Skewness, Kurtosis, Slope, Correlation, Covariance, Signal-to-noise ratio etc.
-    """
-    # Transpose back so each row is one ROI's time series
-    if x.shape[0] > x.shape[1]:
-        x = x.T
-
-    # Extract features for each time series
-    feature_list = []
-    for ts in x:
-        features = {
-            'mean': np.mean(ts, axis=0),
-            'std': np.std(ts, axis=0),
-            'SNR': np.mean(ts, axis=0) / (np.std(ts, axis=0) + 1e-10),
-            'Skewness': skew(ts, axis=0),
-            'Kurtosis': kurtosis(ts, axis=0)
-        }
-        feature_list.append(features)
-
-    # Compute peak statistics
-    df_pk = pk_stats(x)
-    df = pd.DataFrame(feature_list)
-    df = pd.concat([df, df_pk], axis=1)
-    # Generate ROI labels
-    aal_labels = [f"ROI_{i + 1}" for i in range(len(df))]
-    df.insert(0, 'ROI', aal_labels)
-
-    return df
-
 def threshold_edges(G, alpha=0.2, min_edges=4):
     """Percentile-based thresholding (top 20% of edges by default)"""
     edges = [(u, v, d['weight']) for u, v, d in G.edges(data=True)]
@@ -393,7 +393,7 @@ def threshold_edges(G, alpha=0.2, min_edges=4):
 
     return filtered
 
-def graphing(A, community_method=None, feats=True, plot=True, deg_trh=0, alpha=0.05, min_edges=1):
+def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=0.05, min_edges=1):
     """
     Function converting Adjacency matrix to a Graph
 
@@ -635,7 +635,7 @@ def gr_causality(data, max_lag=5, n_jobs=-1, verbose=False):
 
     return gr_matrix
 
-def load_files(folder_path=None, var_filt=True, ica=False, sex='all', max_files=None, shuffle=False):
+def load_files(folder_path=None, var_filt=True, ica=False, sex='all', max_files=None, shuffle=False, n_components=20):
     """
     Load .1D fMRI files with options to filter by gender, limit number of files, and shuffle data.
 
@@ -713,7 +713,7 @@ def load_files(folder_path=None, var_filt=True, ica=False, sex='all', max_files=
         all_data, subject_ids, _ = zeroVar_filter(all_data, subject_ids)
 
     if ica:
-        all_data = ica_smith(all_data)
+        all_data = ica_smith(all_data, n_components=n_components)
 
 
     return all_data, subject_ids, loaded_files, file_info
@@ -815,44 +815,44 @@ def ica_dimReduc(fmri_data, subject_ids=None, n_components=15, max_iter=10000, t
 
     return ica_components, mixing_matrices, filtered_ids, failed_indices
 
+
 def ica_smith(
         aal_time_series_list: List[np.ndarray],
+        n_components: int = 20,
         standardize: bool = False,
         return_transformation_matrix: bool = False
 ) -> Union[List[np.ndarray], tuple]:
     """
-    Converts AAL time series (116 ROIs) to Smith 2009 ICA component time series (10 RSNs).
+    Converts AAL time series (116 ROIs) to Smith 2009 ICA component time series (10/20/70 RSNs).
 
     Parameters:
     -----------
-    aal_time_series_list : List[np.ndarray]
-        List of 2D arrays, each with shape [n_timepoints × 116] (AAL time series per subject).
-    standardize : bool, optional (default=False)
-        If True, standardizes each subject's time series (z-score) before projection.
-    return_transformation_matrix : bool, optional (default=False)
-        If True, returns the pseudo-inverse transformation matrix (ica_to_aal_inv).
-
-    Returns:
-    --------
-    smith_ics_list : List[np.ndarray]
-        List of 2D arrays, each with shape [n_timepoints × 10] (Smith IC time series per subject).
-    ica_to_aal_inv : np.ndarray (optional)
-        Pseudo-inverse transformation matrix [10 × 116], returned only if return_transformation_matrix=True.
+    n_components, to select number of ICA components
     """
     # --- Input Validation ---
+    valid_components = {10, 20, 70}
+    if n_components not in valid_components:
+        raise ValueError(f"n_components must be one of {valid_components}, got {n_components}")
+
     for i, ts in enumerate(aal_time_series_list):
         if ts.shape[1] != 116:
             raise ValueError(f"Subject {i} has {ts.shape[1]} ROIs (expected 116). Transpose?")
 
     # --- Load Smith 2009 ICA Maps and AAL Atlas ---
     smith = datasets.fetch_atlas_smith_2009()
-    smith_maps = image.load_img(smith.rsn10)  # 10 ICA components
+
+    # Select the appropriate ICA map based on n_components
+    if n_components == 10:
+        smith_maps = image.load_img(smith.rsn10)
+    elif n_components == 20:
+        smith_maps = image.load_img(smith.rsn20)
+    else:  # 70 components
+        smith_maps = image.load_img(smith.rsn70)
 
     aal = datasets.fetch_atlas_aal()
     aal_img = image.load_img(aal.maps)  # AAL atlas
 
     # --- Compute ICA-to-AAL Transformation Matrix ---
-    n_components = smith_maps.shape[-1]  # 10
     n_regions = 116
     ica_to_aal = np.zeros((n_regions, n_components))
 
@@ -863,14 +863,14 @@ def ica_smith(
         ica_to_aal[:, i] = signals[0]  # Spatial map for ICA component i
 
     # Pseudo-inverse for projection (AAL → ICA space)
-    ica_to_aal_inv = np.linalg.pinv(ica_to_aal)  # Shape: [10 × 116]
+    ica_to_aal_inv = np.linalg.pinv(ica_to_aal)  # Shape: [n_components × 116]
 
     # --- Project Each Subject's Data ---
     smith_ics_list = []
     for ts in aal_time_series_list:
         if standardize:
-            ts = (ts - ts.mean(axis=0)) / ts.std(axis=0)  # Z-score
-        smith_ics = ts @ ica_to_aal_inv.T  # [time × 116] @ [116 × 10] → [time × 10]
+            ts = (ts - ts.mean(axis=0)) / (ts.std(axis=0) + 1e-10)  # Z-score with epsilon to avoid division by zero
+        smith_ics = ts @ ica_to_aal_inv.T  # [time × 116] @ [116 × n_components] → [time × n_components]
         smith_ics_list.append(smith_ics)
 
     # --- Return Results ---
@@ -879,88 +879,135 @@ def ica_smith(
     else:
         return smith_ics_list
 
-def multiset_feats(data_list, subject_ids, inf_method="pearson_corr", cov_method=None, thresh=0.2, n_jobs=-1):
+
+def multiset_feats(data_list, subject_ids, inf_method="mutual_info", cov_method=None,
+                   thresh=0.2, n_jobs=-1, feats="graph"):
     """
     Parallelized version of subject-wise feature extraction.
+
+    Parameters:
+    -----------
+    - inf_method, graph inference method used: {'partial_corr', 'pearson_corr_binary', 'pearson_corr', 'mutual_info', 'gr_causality', 'norm_laplacian', 'rlogspect'}
+    - cov_method, sample covariance estimation method used: {'direct', 'numpy', 'ledoit', 'glasso', 'window', 'var'}
+    - feats, select which features to compute: {'both', 'stat', 'graph'}
     """
+
+    valid_options = ["both", "stat", "graph"]
+    if feats not in valid_options:
+        raise ValueError(f"compute_features must be one of {valid_options}")
 
     def process_subject(data, sid, inf_method, cov_method):
         """
-        Processes a single subject's data and returns per-ROI and global features.
+        Processes a single subject's data with feature selection.
         """
         warnings.filterwarnings("ignore", category=UserWarning)
         try:
-            df_stat = stat_feats(data)
+            # Initialize empty DataFrames
+            df_stat = pd.DataFrame()
+            df_graph = pd.DataFrame()
+            df_global = pd.DataFrame()
 
-            try:
-                adj_matrix = detect_inf_method(data, inf_method=inf_method, cov_method=cov_method)
-                if np.all(adj_matrix == 0):
-                    raise ValueError("Zero adjacency matrix")
+            # Compute statistical features if requested
+            if feats in ["both", "stat"]:
+                df_stat = stat_feats(data)
 
-                df_graph, df_global = graphing(adj_matrix, alpha=thresh)
-                df_roi = pd.merge(df_stat, df_graph, on='ROI', how='left')
+            # Compute graph features if requested
+            if feats in ["both", "graph"]:
+                try:
+                    adj_matrix = detect_inf_method(data, inf_method=inf_method, cov_method=cov_method)
+                    if np.all(adj_matrix == 0):
+                        raise ValueError("Zero adjacency matrix")
 
-            except Exception as graph_err:
-                print(f"Graph failed for {sid}: {str(graph_err)}")
+                    df_graph, df_global = graphing(adj_matrix, alpha=thresh)
+
+                    # If computing both, merge stat and graph features
+                    if feats == "both":
+                        df_roi = pd.merge(df_stat, df_graph, on='ROI', how='left')
+                    else:
+                        df_roi = df_graph
+
+                except Exception as graph_err:
+                    print(f"Graph failed for {sid}: {str(graph_err)}")
+                    if feats == "both":
+                        df_roi = df_stat  # Fall back to stat features only
+                    else:
+                        df_roi = pd.DataFrame()  # Empty if only graph requested
+
+            # Handle case where only stat features are requested
+            elif feats == "stat":
                 df_roi = df_stat
-                df_global = pd.DataFrame()
 
-            df_roi['subject_id'] = sid
+            # Add subject ID if we have any features
+            if not df_roi.empty:
+                df_roi['subject_id'] = sid
+
             return df_roi, df_global
 
         except Exception as e:
             print(f"Subject {sid} failed completely: {str(e)}")
             return None, None
 
-    # After Parallel processing finishes
+    # Parallel processing (unchanged)
     results = Parallel(n_jobs=n_jobs)(
         delayed(process_subject)(data, sid, inf_method, cov_method)
-        for data, sid in tqdm(zip(data_list, subject_ids), total=len(subject_ids), desc="Processing subjects")
+        for data, sid in tqdm(zip(data_list, subject_ids),
+                              total=len(subject_ids),
+                              desc="Processing subjects")
     )
 
     # Filter successful results
     df_app_list, df_global_list = zip(*[(df_roi, df_global) for (df_roi, df_global) in results if df_roi is not None])
 
+    # Handle case where no graph features were computed
+    if feats != "graph":
+        df_global_list = [df for df in df_global_list if not df.empty]
+
     # Fast concatenation without sorting columns
     df_app = pd.concat(df_app_list, ignore_index=True, sort=False)
-    df_global = pd.concat(df_global_list, ignore_index=True, sort=False)
+    df_global = pd.concat(df_global_list, ignore_index=True, sort=False) if df_global_list else pd.DataFrame()
 
     # Drop columns that are entirely NaN
     df_app.dropna(axis=1, how='all', inplace=True)
 
-    # Pivot to wide format (fastest safe method)
-    df_wide = df_app.pivot_table(
-        index='subject_id',
-        columns='ROI',
-        values=df_app.columns.difference(['ROI', 'subject_id']),
-        aggfunc='first'  # Assumes one entry per subject/ROI
-    )
+    # Skip pivoting if only global features were requested
+    if not df_app.empty:
+        # Pivot to wide format
+        df_wide = df_app.pivot_table(
+            index='subject_id',
+            columns='ROI',
+            values=df_app.columns.difference(['ROI', 'subject_id']),
+            aggfunc='first'
+        )
+        # Flatten MultiIndex columns
+        df_wide.columns = [f"{stat}_{roi}" for stat, roi in df_wide.columns]
+        df_wide.reset_index(inplace=True)
 
-    # Flatten MultiIndex columns
-    df_wide.columns = [f"{stat}_{roi}" for stat, roi in df_wide.columns]
-    df_wide.reset_index(inplace=True)
+        # Sort feature columns
+        def extract_roi_num(col):
+            match = re.search(r'_(\d+)$', col)
+            return int(match.group(1)) if match else -1
 
-    # Optional: define once for reuse
-    def extract_roi_num(col):
-        match = re.search(r'_(\d+)$', col)
-        return int(match.group(1)) if match else -1
+        id_cols = ['subject_id']
+        feature_cols = [col for col in df_wide.columns if col not in id_cols]
+        features_grouped = sorted(feature_cols, key=lambda x: (extract_roi_num(x), x.split('_')[0]))
+        df_wide = df_wide[id_cols + features_grouped]
+    else:
+        df_wide = pd.DataFrame({'subject_id': subject_ids})
 
-    # Sort feature columns by ROI number then stat name
-    id_cols = ['subject_id']
-    feature_cols = [col for col in df_wide.columns if col not in id_cols]
-    features_grouped = sorted(feature_cols, key=lambda x: (extract_roi_num(x), x.split('_')[0]))
-
-    # Reorder columns efficiently
-    df_wide = df_wide[id_cols + features_grouped]
-
-    # Join with global features (assumed to be indexed by row order)
-    df_final = pd.concat([df_wide, df_global.reset_index(drop=True)], axis=1)
+    # Join with global features if they exist
+    if not df_global.empty:
+        df_final = pd.concat([df_wide, df_global.reset_index(drop=True)], axis=1)
+    else:
+        df_final = df_wide
 
     # Append phenotypic data
     def multiset_pheno(df_wide):
-        df_labels = pd.read_csv(
-            os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")), "abide",
-                         "Phenotypic_V1_0b_preprocessed1.csv"))
+        # Fix the path construction
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        parent_path = os.path.join(base_path, "..", "..")
+        pheno_path = os.path.join(parent_path, "abide", "Phenotypic_V1_0b_preprocessed1.csv")
+
+        df_labels = pd.read_csv(pheno_path)
 
         df_labels['SUB_ID'] = df_labels['SUB_ID'].astype(str).str.zfill(7)
         df_wide['subject_id'] = df_wide['subject_id'].astype(str).str.zfill(7)
@@ -982,11 +1029,11 @@ def multiset_feats(data_list, subject_ids, inf_method="pearson_corr", cov_method
 # fmri_data, subject_ids, file_paths, metadata = load_files() # represents format of load_files()
 # output_df = multiset_feats(fmri_data,subject_ids)           # represents multiset_feats() usage, add another index '[]' to load_files to select data amount
 
-fmri_data, subject_ids, _, _ = load_files(sex='all', max_files=10, shuffle=True, var_filt=True, ica=True)
+fmri_data, subject_ids, _, _ = load_files(sex='all', max_files=100, shuffle=True, var_filt=True, ica=True)
 
 print("fmri_data_shape: " + str(fmri_data[0].shape[1]))
 
-df_out = multiset_feats(fmri_data, subject_ids, inf_method='partial_corr', cov_method='glasso')
+df_out = multiset_feats(fmri_data, subject_ids, inf_method='rlogspect', cov_method='glasso',feats='graph')
 
 print("df_out:\n", df_out)
 print("Feature list: ",list(df_out.columns))
