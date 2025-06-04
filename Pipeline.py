@@ -1,25 +1,34 @@
+#%%
 from sklearn.metrics import classification_report, confusion_matrix
 import numpy as np
 import pandas as pd
 import os
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.metrics import mean_squared_error, accuracy_score
 from classification.src import classifiers as cl
 from featureselection.src import feature_selection_methods as fs
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
-from featuredesign.graph_inference.AAL_test import multiset_feats, load_files
+from featuredesign.graph_inference.AAL_test import multiset_feats, load_files, adjacency_df
+import cvxpy as cp
+import seaborn as sns
 
 def load_file():
     #folder_path = r"C:\Users\guus\Python_map\AutismDetection-main\abide\female-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
-    data_arrays, file_paths, subject_ids, institude_names, metadata = load_files()
+    fmri_data, subject_ids, _, _ = load_files(sex='all', max_files=800, shuffle=True, var_filt=True, ica=True)
 
-    full_df = multiset_feats(data_arrays)
+    print(f"Final data: {len(fmri_data)} subjects")
+    print(f"Final IDs: {len(subject_ids)}")
 
+    full_df = adjacency_df(fmri_data, subject_ids, method = 'norm_laplacian')
     print("Merged feature+label shape:\n", full_df.shape)
 
     print(full_df)
-
+    
+    subject_id_to_plot = '0050524'  # Change this to any valid subject ID
+    plot_adjacency_matrix(full_df, subject_id_to_plot)
+    
     full_df = full_df.sample(frac=1, random_state=42).reset_index(drop=True)  # Shuffle the DataFrame
 
     X = full_df.drop(columns=['DX_GROUP', 'subject_id'])
@@ -36,7 +45,7 @@ def load_file():
     # Fill rows with NaN values
     X= X.fillna(X.median())
 
-    return X, y
+    return X, y, fmri_data
 
 def load_data():
     # Load with encoding fix
@@ -67,13 +76,13 @@ def train_and_evaluate(X, y):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=40, stratify=y)
 
     #scale the data for the classifier
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    # scaler = StandardScaler()
+    # X_train_scaled = scaler.fit_transform(X_train)
+    # X_test_scaled = scaler.transform(X_test)
 
     #applying the classifier to the total data
-    model_raw = cl.applySVM(X_train_scaled, y_train)
-    y_pred_raw = model_raw.predict(X_test_scaled)
+    model_raw = cl.applySVM(X_train, y_train)
+    y_pred_raw = model_raw.predict(X_test)
 
     #finding mse and accuracy
     mse_raw = mean_squared_error(y_test, y_pred_raw)
@@ -85,7 +94,7 @@ def train_and_evaluate(X, y):
     #acc, mse, selected_feature_names = cross_validate_model(X, y, selected_features)
     print(f"Train/Test Accuracy raw: {acc_raw:.4f}, MSE: {mse_raw:.4f}")
 
-    return X_train_scaled, X_test_scaled, y_train, y_test
+    return X_train, X_test, y_train, y_test
 
 def classify(X, X_train, X_test, y_train, y_test, selected_features, classifier):
 
@@ -171,33 +180,66 @@ def print_selected_features(acc, mse, selected_features, selected_feature_names)
     for name in selected_feature_names:
         print("-", name)
 
+def plot_adjacency_matrix(df, subject_id, matrix_size=20):
+    """
+    This function takes the dataframe containing the flattened adjacency matrices,
+    extracts the matrix for a specific subject, reshapes it, and plots the adjacency matrix.
+
+    Parameters:
+    - df: DataFrame containing the flattened adjacency matrices.
+    - subject_id: The subject ID for which to plot the adjacency matrix.
+    - matrix_size: The size of the square adjacency matrix (default is 20x20).
+    """
+    # Extract the row for the specific subject_id
+    subject_row = df[df['subject_id'] == subject_id]
+
+    # If the subject is not found in the DataFrame
+    if subject_row.empty:
+        print(f"Subject {subject_id} not found in the DataFrame.")
+        return
+    
+    # Extract the flattened adjacency matrix values
+    adj_values = subject_row.drop(columns=['subject_id', 'DX_GROUP', 'SEX', 'SITE_ID']).values.flatten()
+    
+    # Reshape the flattened array back into a square matrix
+    adj_matrix = adj_values.reshape(matrix_size, matrix_size)
+    
+    # Plot the adjacency matrix
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(adj_matrix, cmap="YlGnBu", annot=False, xticklabels=False, yticklabels=False)
+    plt.title(f"Adjacency Matrix for Subject {subject_id}")
+    plt.show()
+    
 def main():
 
-    X, y = load_file()
+    X, y, fmri_data = load_file()
 
     classifier = "SVM"
 
     X_train_scaled, X_test_scaled, y_train, y_test = train_and_evaluate(X, y)
 
-    selected_features_lars = fs.lars_lasso(X_train_scaled, y_train, alpha=0.1)
-    acc, mse, selected_feature_names = classify(X, X_train_scaled, X_test_scaled, y_train, y_test, selected_features_lars, classifier)
-    print("LARS Lasso selected features:")
-    print_selected_features(acc, mse, selected_features_lars, selected_feature_names)
-    print("\n\n")
+    # selected_features_lars = fs.lars_lasso(X_train_scaled, y_train, alpha=0.1)
+    # acc, mse, selected_feature_names = classify(X, X_train_scaled, X_test_scaled, y_train, y_test, selected_features_lars, classifier)
+    # print("LARS Lasso selected features:")
+    # print_selected_features(acc, mse, selected_features_lars, selected_feature_names)
+    # print("\n\n")
 
-    selected_features_lars = fs.LAND(X_train_scaled, y_train, lambda_reg=0.01)
-    acc, mse, selected_feature_names = classify(X, X_train_scaled, X_test_scaled, y_train, y_test, selected_features_lars, classifier)
-    print("LAND selected features:")
-    print_selected_features(acc, mse, selected_features_lars, selected_feature_names)
-    print("\n\n")
+    # selected_features_lars = fs.LAND(X_train_scaled, y_train, lambda_reg=0.01)
+    # acc, mse, selected_feature_names = classify(X, X_train_scaled, X_test_scaled, y_train, y_test, selected_features_lars, classifier)
+    # print("LAND selected features:")
+    # print_selected_features(acc, mse, selected_features_lars, selected_feature_names)
+    # print("\n\n")
 
-    X_train_scaled = fs.low_variance(X_train_scaled, threshold=0.01)
-    X_test_scaled = fs.low_variance(X_test_scaled, threshold=0.01)
-    selected_features_rfe = fs.backwards_SFS(X_train_scaled, y_train, 10, classifier)
-    acc, mse, selected_feature_names = classify(X, X_train_scaled, X_test_scaled, y_train, y_test, selected_features_rfe, classifier)
-    print("SFS selected features:")
-    print_selected_features(acc, mse, selected_features_rfe, selected_feature_names)
-    print("\n\n")
-
+    # X_train_scaled = fs.low_variance(X_train_scaled, threshold=0.01)
+    # X_test_scaled = fs.low_variance(X_test_scaled, threshold=0.01)
+    # selected_features_rfe = fs.backwards_SFS(X_train_scaled, y_train, 10, classifier)
+    # acc, mse, selected_feature_names = classify(X, X_train_scaled, X_test_scaled, y_train, y_test, selected_features_rfe, classifier)
+    # print("SFS selected features:")
+    # print_selected_features(acc, mse, selected_features_rfe, selected_feature_names)
+    # print("\n\n")
+    return fmri_data
 if __name__ == '__main__':
-    main()
+    fmri_data = main()
+
+
+# %%
