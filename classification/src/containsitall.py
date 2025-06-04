@@ -1,5 +1,6 @@
 import os
 import sys
+import importlib
 import datetime
 from dotenv import load_dotenv
 import numpy as np
@@ -10,14 +11,19 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import StratifiedKFold, LeaveOneGroupOut
-
-sys.path.insert(0, 'C:\\Users\\carme\\OneDrive\\Documenten\\AutismDetection\\featureselection\\src')
-from feature_selection_methods import hsiclasso
-
 from loaddata import *
 from classification import *
 from classifiers import *
 from hyperparametertuning import *
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+fs_src = os.path.join(project_root, 'featureselection', 'src')
+
+if fs_src not in sys.path:
+    sys.path.append(fs_src)
+
+fs = importlib.import_module('feature_selection_methods')
+
 
 # Create a timestamped log file
 os.makedirs('logs', exist_ok=True)
@@ -67,13 +73,6 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False):
         imputer = SimpleImputer(strategy='mean')
         Xtrain = imputer.fit_transform(Xtrain)
         Xtest = imputer.transform(Xtest)
-
-        # --- Feature Selection (Optional) --- 
-        if useFS:
-            print("Running HSIC Lasso feature selection...")
-            selected_idx = hsiclasso(Xtrain, ytrain, numfeats=100)
-            Xtrain = Xtrain[:, selected_idx]
-            Xtest = Xtest[:, selected_idx]
         
         # --- Harmonization with NeuroHarmonize (Optional) ---
         if useHarmo:
@@ -93,6 +92,16 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False):
             site_test = site_test[mask].reset_index(drop=True)
             meta_test = meta_test[mask].reset_index(drop=True)
             site_train = site_train.reset_index(drop=True)
+
+            Xtrain, Xtest = applyHarmo(Xtrain, Xtest, site_train, site_test)
+            
+        # --- Feature Selection (Optional) --- 
+        if useFS:
+            print("Running HSIC Lasso feature selection...")
+            selected_idx = fs.hsiclasso(Xtrain, ytrain, numfeats=100)
+            Xtrain = Xtrain[:, selected_idx]
+            Xtest = Xtest[:, selected_idx]
+        
 
         Xtrain, Xtest = normalizer(Xtrain, Xtest)
 
@@ -131,7 +140,7 @@ def runLOGO(df, label="female", useFS=False, groupeval=False):
         # --- Feature Selection (Optional) --- 
         if useFS:
             print("Running HSIC Lasso feature selection...")
-            selected_idx = hsiclasso(Xtrain, ytrain, numfeats=100)
+            selected_idx = fs.hsiclasso(Xtrain, ytrain, numfeats=100)
             Xtrain = Xtrain[:, selected_idx]
             Xtest = Xtest[:, selected_idx]
 
