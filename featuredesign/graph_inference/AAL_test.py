@@ -10,6 +10,7 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 from scipy.stats import pearsonr,skew, kurtosis, entropy
 from sklearn.covariance import GraphicalLasso, GraphicalLassoCV, LedoitWolf
+from sklearn.linear_model import Ridge, Lasso
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import mutual_info_regression
 from itertools import combinations
@@ -22,6 +23,7 @@ from nilearn import datasets, image
 from nilearn.input_data import NiftiLabelsMasker
 from typing import List, Union
 from networkx.linalg.laplacianmatrix import laplacian_matrix
+from sklearn.metrics import adjusted_rand_score
 
 from featuredesign.graph_inference.GSP_methods import normalized_laplacian, normalized_laplacian_reweighted, adjacency_reweighted, learn_adjacency_rLogSpecT
 
@@ -228,6 +230,37 @@ def eig_centrality(G, max_attempts=3):
     # Final fallback to degree centrality
     return nx.degree_centrality(G)
 
+def quadratic_nvar(ts_data, lag=2, alpha=0.5):
+    """
+    ts_data: np.array of shape (T, N) — time x regions
+    Returns: residues from quadratic NVAR model
+    """
+    T, N = ts_data.shape
+    X = []
+    Y = []
+
+    # Build lagged design matrix with linear and quadratic terms
+    for t in range(lag, T):
+        x_lag = ts_data[t - lag]
+        linear_terms = x_lag
+        quadratic_terms = np.outer(x_lag, x_lag).flatten()
+        X.append(np.concatenate([linear_terms, quadratic_terms]))
+        Y.append(ts_data[t])
+
+    X = np.array(X)
+    Y = np.array(Y)
+
+    # Fit N separate Ridge regressions (or use multivariate regression)
+    predictions = []
+    for i in range(N):
+        model = Ridge(alpha=alpha) # or Lasso
+        model.fit(X, Y[:, i])
+        predictions.append(model.predict(X))
+
+    predictions = np.array(predictions).T
+    residuals = Y - predictions
+    return residuals
+
 def laplacian_feats(G):
     L = nx.laplacian_matrix(G).toarray()
     eigvals = np.linalg.eigvalsh(L)  # Sorted real eigenvalues
@@ -313,7 +346,9 @@ def detect_inf_method(ts_data, inf_method, cov_method=None):
             _issued_warnings.add(warning_key)
 
     # Dispatch to methods
-    if inf_method == 'partial_corr':
+    if inf_method == 'sample_cov':
+        return sample_covEst(ts_data, cov_method)
+    elif inf_method == 'partial_corr':
         C = sample_covEst(ts_data, method=cov_method)
         return partial_corr(C)[0]
     elif inf_method == 'pearson_corr_binary':
@@ -334,7 +369,7 @@ def detect_inf_method(ts_data, inf_method, cov_method=None):
         V_hat, _, E_tot = comp_eigen(C)
         return learn_adjacency_rLogSpecT(V_hat, delta_n=0.2 * np.sqrt(E_tot))
     else:
-        raise ValueError(f"Unknown inference method: {inf_method} (choose: 'partial_corr', 'pearson_corr_binary', 'pearson_corr', 'mutual_info', 'gr_causality', 'norm_laplacian', 'rlogspect').")
+        raise ValueError(f"Unknown inference method: {inf_method} (choose: 'sample_cov','partial_corr', 'pearson_corr_binary', 'pearson_corr', 'mutual_info', 'gr_causality', 'norm_laplacian', 'rlogspect').")
 
 def sample_covEst(ts_data, method='glasso'):
     """Compute the sample covariance estimate using various methods"""
@@ -355,13 +390,26 @@ def sample_covEst(ts_data, method='glasso'):
         gl = GraphicalLasso(alpha=1e-5, max_iter=10000)
         gl.fit(ts_data)
         return gl.covariance_
-    elif method == 'window':
-        window_size = 25
+    elif method == 'tv-glasso':
+        w_size = 25  # ~50 seconds for TR=2s
+        overlap = 20  # 80% overlap for smoother estimates
+        alpha = 1e-5  # Regularization parameter
         T, n_ics = ts_data.shape
-        n_windows = T - window_size + 1
+        def process_window(window_data):
+            gl = GraphicalLasso(alpha=alpha, max_iter=10000)
+            gl.fit(window_data - window_data.mean(axis=0))
+            return gl.precision_
+        covs = Parallel(n_jobs=-1)(
+            delayed(process_window)(ts_data[i:i + w_size])
+            for i in range(0, T - w_size + 1, w_size - overlap))
+        return covs # or mean(covs,axis=0)
+    elif method == 'window':
+        w_size = 25
+        T, n_ics = ts_data.shape
+        n_windows = T - w_size + 1
         covs = []
         for i in range(n_windows):
-            window = ts_data[i:i+window_size]
+            window = ts_data[i:i+w_size]
             covs.append(np.cov(window, rowvar=False))
         return np.mean(covs, axis=0)
     elif method == 'var':
@@ -370,8 +418,13 @@ def sample_covEst(ts_data, method='glasso'):
         #A_list = [results.coefs[i] for i in range(results.k_ar)]  # A_1, A_2, ..., A_p
         sigma_u = results.sigma_u  # Covariance matrix of residuals
         return sigma_u
+    elif method == 'nvar':
+        residuals = quadratic_nvar(ts_data)
+        gl = GraphicalLasso(alpha=1e-5, max_iter=10000)
+        gl.fit(residuals)
+        return gl.covariance_
     else:
-        raise ValueError(f"Unknown sample covariance estimation method: {method} (choose: 'direct', 'numpy', 'ledoit', 'glasso', 'window').")
+        raise ValueError(f"Unknown sample covariance estimation method: {method} (choose: 'direct', 'numpy', 'ledoit', 'glasso', 'tv-glasso', 'window', 'var', 'nvar').")
 
 def threshold_edges(G, alpha=0.2, min_edges=4):
     """Percentile-based thresholding (top 20% of edges by default)"""
