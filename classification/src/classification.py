@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 
-def performCA(func, feat_train, feat_test, ytrain, ytest, groupeval=False, fold=None, tag="", meta=None, **kwargs):
+def performCA(func, feat_train, feat_test, ytrain, ytest, groupeval=False, fold=None, tag="", meta=None, timestamp="", **kwargs):
     """
     --------------------------------------------------------------------------------
     This function performs the classification, prediction and performance analysis
@@ -53,8 +53,11 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, groupeval=False, fold=
 
     metrics = get_metrics(ytest, ypred, yprob)
 
+    if timestamp is not None:
+        os.makedirs(f"plots/{timestamp}", exist_ok=True)
+
     clf_name = model.__class__.__name__
-    plot_confusion_matrix(ytest, ypred, model, fold=fold, tag=tag)
+    plot_confusion_matrix(ytest, ypred, model, fold=fold, tag=tag, timestamp=timestamp)
     print_metrics(metrics, clf_name)
     toCSV(DEFAULT_CSV_PATH, fold, clf_name, tag, "Overall", "ALL", metrics)
 
@@ -68,3 +71,4 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, groupeval=False, fold=
         meta['AGE_GROUP'] = pd.cut(meta['AGE'], bins=[0, 11, 18, 30, 100], labels=["0-11", "12-18", "19-30", "30+"])
         perGroupEval(ytest, ypred, yprob, meta, group_col='AGE_GROUP', group_name='AgeGroup', fold=fold, classifier_name=clf_name, tag=tag)
     
+    return ytest, ypred, yprob

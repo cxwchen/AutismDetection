@@ -15,6 +15,7 @@ from loaddata import *
 from classification import *
 from classifiers import *
 from hyperparametertuning import *
+from performance import *
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 fs_src = os.path.join(project_root, 'featureselection', 'src')
@@ -24,10 +25,10 @@ if fs_src not in sys.path:
 
 fs = importlib.import_module('feature_selection_methods')
 
-
+timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 # Create a timestamped log file
 os.makedirs('logs', exist_ok=True)
-log_filename = f'logs/run_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+log_filename = f'logs/run_{timestamp}.log'
 log_file = open(log_filename, 'w')
 
 # Redirect all prints to the log file and still see them in the terminal
@@ -64,6 +65,9 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False):
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     print("Running Stratified KFold Cross-Validation...")
 
+    all_ytrue = {}
+    all_yprob = {}
+    all_ypred = {}
     for fold, (trainidx, testidx) in enumerate(skf.split(X, y), 1):
         print(f"\n=== Fold {fold} | {label.upper()} Data ===")
         Xtrain, Xtest = X.iloc[trainidx], X.iloc[testidx]
@@ -94,7 +98,7 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False):
             site_train = site_train.reset_index(drop=True)
 
             Xtrain, Xtest = applyHarmo(Xtrain, Xtest, site_train, site_test)
-            
+
         # --- Feature Selection (Optional) --- 
         if useFS:
             print("Running HSIC Lasso feature selection...")
@@ -105,18 +109,42 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False):
 
         Xtrain, Xtest = normalizer(Xtrain, Xtest)
 
-        svcparams = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, SVC())
-        # rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, RandomForestClassifier())
-        dtparams = bestDT(Xtrain, Xtest, ytrain, ytest, DecisionTreeClassifier())
-        mlpparams = bestMLP(Xtrain, Xtest, ytrain, ytest, MLPClassifier())
+        for cfunc in [applyLogR, applySVM, applyRandForest, applyDT, applyMLP, applyLDA, applyKNN]:
+            clfname = cfunc.__name__.replace("apply", "")
+            print(f"\n=== Fold {fold} | {clfname}")
 
-        performCA(applyLogR, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test)
-        performCA(applySVM, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = svcparams)
-        performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = None)
-        performCA(applyDT, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = dtparams)
-        performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = mlpparams)
-        performCA(applyLDA, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test)
-        performCA(applyKNN, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test)
+            if cfunc == applySVM:
+                params = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, SVC())
+            elif cfunc == applyDT:
+                params = bestDT(Xtrain, Xtest, ytrain, ytest, DecisionTreeClassifier())
+            elif cfunc == applyMLP:
+                params = bestMLP(Xtrain, Xtest, ytrain, ytest, MLPClassifier())
+        # rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, RandomForestClassifier())
+            else:
+                params = None
+            
+            ytrue, ypred, yprob = performCA(cfunc, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, timestamp=timestamp, params=params)
+
+            all_ytrue.setdefault(clfname, []).append(ytrue)
+            all_ypred.setdefault(clfname, []).append(ypred)
+            if yprob is not None:
+                all_yprob.setdefault(clfname, []).append(yprob)
+
+    for clf in all_ytrue:
+        ytrueAll = np.concatenate(all_ytrue[clf])
+        ypredAll = np.concatenate(all_ypred[clf])
+        pltAggrConfMatr(ytrueAll, ypredAll, modelname=clf, tag=label, timestamp=timestamp)
+        yprobAll = np.concatenate(all_yprob[clf])
+        pltROCCurve(ytrueAll, yprobAll, modelname=clf, tag=label, timestamp=timestamp)
+
+
+        # performCA(applyLogR, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test)
+        # performCA(applySVM, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = svcparams)
+        # performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = None)
+        # performCA(applyDT, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = dtparams)
+        # performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = mlpparams)
+        # performCA(applyLDA, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test)
+        # performCA(applyKNN, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test)
 
 def runLOGO(df, label="female", useFS=False, groupeval=False):
     X = df.iloc[:, 5:]
