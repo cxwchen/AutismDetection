@@ -198,14 +198,20 @@ def run_singlesite():
     runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf_combined_onlyNYU_nofs", useFS=False, useHarmo=False)
 
     # Run skf cross-validation with female data, only NYU, no feature selection
-    runCV(female_df[female_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf_female_onlyNYU_nofs", useFS=True, useHarmo=False)
+    runCV(female_df[female_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf_female_onlyNYU_nofs", useFS=False, useHarmo=False)
     
     # Run skf cross-validation with male data, only NYU, no feature selection
-    runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf_male_onlyNYU_nofs", useFS=True, useHarmo=False)
+    runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf_male_onlyNYU_nofs", useFS=False, useHarmo=False)
     
     # ============ SINGLE SITE WITH FEATURE SELECTION ============================
     #Run skf cross-validation with combined data, only NYU, with feature selection
     runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf_combined_onlyNYU_fs", useFS=True, useHarmo=False)
+
+    # Run skf cross-validation with female data, only NYU, with feature selection
+    runCV(female_df[female_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf_female_onlyNYU_fs", useFS=True, useHarmo=False)
+    
+    # Run skf cross-validation with male data, only NYU, with feature selection
+    runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf_male_onlyNYU_fs", useFS=True, useHarmo=False)
 
 def run_multisite_comb():
     # runCV(female_df, label="female")
