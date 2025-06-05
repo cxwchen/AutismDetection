@@ -244,7 +244,7 @@ def run_multisite_female():
     runCV(female_df, label="skf_female_nofs", useFS=False)
 
     # run skf cross-validation with female data, no harmonisation, with feature selection
-    runCV(female_df, label="skf_female_nofs", useFS=True)
+    runCV(female_df, label="skf_female_fs", useFS=True)
 
 def run_multisite_male():
     # REMOVE CMU DUE TO LOW NUMBER OF ENTRIES
