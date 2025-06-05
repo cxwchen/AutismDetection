@@ -83,9 +83,9 @@ def applyHarmo(Xtrain, Xtest, meta_train, meta_test, ytest, ref_batch='NYU'):
         meta_test = meta_test[mask].reset_index(drop=True)
         ytest = ytest[mask].reset_index(drop=True)
 
-        model, XtrainHarm = harmonizationLearn(Xtrain, covars=meta_train, ref_batch=ref_batch)
-        XtestHarm = harmonizationApply(Xtest, covars=meta_test, model=model)
-        return XtrainHarm, XtestHarm, ytest
+    model, XtrainHarm = harmonizationLearn(Xtrain, covars=meta_train, ref_batch=ref_batch)
+    XtestHarm = harmonizationApply(Xtest, covars=meta_test, model=model)
+    return XtrainHarm, XtestHarm, ytest
     # site_train_df = pd.DataFrame({'SITE': site_train})
     # site_test_df = pd.DataFrame({'SITE': site_test})
 
