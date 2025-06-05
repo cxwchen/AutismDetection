@@ -52,7 +52,7 @@ def applySVM(feat_train, y, params=None, use_probabilities=True):
     return model
 
 
-def applyLogR(feat_train, y):
+def applyLogR(feat_train, y, params=None):
     """
     -----------------------------------------------------------------------------------------
     This function applies Logistic Regression (LR) from sklearn on the training features
@@ -157,7 +157,7 @@ def applyMLP(feat_train, y, params=None):
     model.fit(feat_train, y)
     return model
 
-def applyLDA(feat_train, y):
+def applyLDA(feat_train, y, params=None):
     """
     ----------------------------------------------------------------------------------------------
     This function applies Linear Discriminant Analysis (LDA) from sklearn on the training features
@@ -181,7 +181,7 @@ def applyLDA(feat_train, y):
     model.fit(feat_train, y)
     return model
 
-def applyKNN(feat_train, y):
+def applyKNN(feat_train, y, params=None):
     """
     -------------------------------------------------------------------------------------
     This function applies K-Nearest Neighbour (KNN) from sklearn on the training features

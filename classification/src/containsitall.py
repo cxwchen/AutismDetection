@@ -72,6 +72,9 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False):
         print(f"\n=== Fold {fold} | {label.upper()} Data ===")
         Xtrain, Xtest = X.iloc[trainidx], X.iloc[testidx]
         ytrain, ytest = y.iloc[trainidx], y.iloc[testidx]
+        ytrain = ytrain.reset_index(drop=True)
+        ytest = ytest.reset_index(drop=True)
+        meta_train = meta.iloc[trainidx].reset_index(drop=True)
         meta_test = meta.iloc[testidx].reset_index(drop=True)
 
         imputer = SimpleImputer(strategy='mean')
@@ -81,28 +84,28 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False):
         # --- Harmonization with NeuroHarmonize (Optional) ---
         if useHarmo:
             print("Using NeuroHarmonize...")
-            site_train = meta['SITE_ID'].iloc[trainidx].reset_index(drop=True)
-            site_test = meta['SITE_ID'].iloc[testidx].reset_index(drop=True)
+            # site_train = meta['SITE_ID'].iloc[trainidx].reset_index(drop=True)
+            # site_test = meta['SITE_ID'].iloc[testidx].reset_index(drop=True)
 
-            # NeuroHarmonize relies on Combat which requires sites in test to be seen in train
-            # Drop test sites absent in train
-            seen_sites = set(site_train)
-            mask = site_test.isin(seen_sites)
-            if (~mask).any(): #if any test site is unseen
-                print(f"There are unseen sites. Dropping: {site_test[~mask].unique().tolist()}")
+            # # NeuroHarmonize relies on Combat which requires sites in test to be seen in train
+            # # Drop test sites absent in train
+            # seen_sites = set(site_train)
+            # mask = site_test.isin(seen_sites)
+            # if (~mask).any(): #if any test site is unseen
+            #     print(f"There are unseen sites. Dropping: {site_test[~mask].unique().tolist()}")
 
-            Xtest = Xtest[mask]
-            ytest = ytest[mask]
-            site_test = site_test[mask].reset_index(drop=True)
-            meta_test = meta_test[mask].reset_index(drop=True)
-            site_train = site_train.reset_index(drop=True)
+            # Xtest = Xtest[mask]
+            # ytest = ytest[mask]
+            # site_test = site_test[mask].reset_index(drop=True)
+            # meta_test = meta_test[mask].reset_index(drop=True)
+            # site_train = site_train.reset_index(drop=True)
 
-            Xtrain, Xtest = applyHarmo(Xtrain, Xtest, site_train, site_test)
+            Xtrain, Xtest, ytest = applyHarmo(Xtrain, Xtest, meta_train, meta_test, ytest)
 
         # --- Feature Selection (Optional) --- 
         if useFS:
             print("Running HSIC Lasso feature selection...")
-            selected_idx = fs.hsiclasso(Xtrain, ytrain, numfeats=100)
+            selected_idx = fs.hsiclasso(Xtrain, ytrain, num_feat=100)
             Xtrain = Xtrain[:, selected_idx]
             Xtest = Xtest[:, selected_idx]
         
@@ -168,7 +171,7 @@ def runLOGO(df, label="female", useFS=False, groupeval=False):
         # --- Feature Selection (Optional) --- 
         if useFS:
             print("Running HSIC Lasso feature selection...")
-            selected_idx = fs.hsiclasso(Xtrain, ytrain, numfeats=100)
+            selected_idx = fs.hsiclasso(Xtrain, ytrain, num_feat=100)
             Xtrain = Xtrain[:, selected_idx]
             Xtest = Xtest[:, selected_idx]
 
