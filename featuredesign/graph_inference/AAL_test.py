@@ -123,38 +123,52 @@ Features: avg peak interval, max peak, avg peak amplitude
 
     return pd.DataFrame(all_stats)
 
-def stat_feats(x):
+def stat_feats(x, include_stat_features=True, include_corr_matrix=True):
     """
     Compute classic statistical features based on some time series data and stores it to a panda dataframe.
 
     Features:
     - Mean, Standard Deviation, Skewness, Kurtosis, Slope, Correlation, Covariance, Signal-to-noise ratio etc.
     """
-    # Transpose back so each row is one ROI's time series
+    # Ensure shape is (n_rois, n_timepoints)
     if x.shape[0] > x.shape[1]:
         x = x.T
 
-    # Extract features for each time series
-    feature_list = []
-    for ts in x:
-        features = {
-            'mean': np.mean(ts, axis=0),
-            'std': np.std(ts, axis=0),
-            'SNR': np.mean(ts, axis=0) / (np.std(ts, axis=0) + 1e-10),
-            'Skewness': skew(ts, axis=0),
-            'Kurtosis': kurtosis(ts, axis=0)
+    n_rois = x.shape[0]
+    output_parts = []
+
+    if include_stat_features:
+        feature_list = []
+        for ts in x:
+            features = {
+                'mean': np.mean(ts),
+                'std': np.std(ts),
+                'SNR': np.mean(ts) / (np.std(ts) + 1e-10),
+                'Skewness': skew(ts),
+                'Kurtosis': kurtosis(ts)
+            }
+            feature_list.append(features)
+
+        df_stats = pd.DataFrame(feature_list)
+        df_stats.insert(0, 'ROI', [f"ROI_{i + 1}" for i in range(n_rois)])
+        output_parts.append(df_stats)
+
+    if include_corr_matrix:
+        corr_matrix = np.corrcoef(x)
+        corr_features = {
+            f"corr_ROI_{i+1}_ROI_{j+1}": corr_matrix[i, j]
+            for i, j in combinations(range(n_rois), 2)
         }
-        feature_list.append(features)
+        df_corr = pd.DataFrame([corr_features])  # one row for all pairwise correlations
+        # Repeat it to match stat rows if both are selected, else just return df_corr
+        if include_stat_features:
+            df_corr = df_corr.reindex(df_stats.index, method='ffill')
+        output_parts.append(df_corr)
 
-    # Compute peak statistics
-    df_pk = pk_stats(x)
-    df = pd.DataFrame(feature_list)
-    df = pd.concat([df, df_pk], axis=1)
-    # Generate ROI labels
-    aal_labels = [f"ROI_{i + 1}" for i in range(len(df))]
-    df.insert(0, 'ROI', aal_labels)
+    if not output_parts:
+        raise ValueError("At least one of `include_stat_features` or `include_corr_matrix` must be True.")
 
-    return df
+    return pd.concat(output_parts, axis=1)
 
 def laplacian(A):
     D = np.diag(np.sum(A, axis=1))
@@ -335,7 +349,7 @@ def detect_inf_method(ts_data, inf_method, cov_method=None):
     if inf_method in cov_dependent_methods:
         if cov_method is None:
             raise ValueError(
-                f"Method '{inf_method}' requires `cov_method` (choose: 'direct', 'numpy', 'ledoit', 'glasso', 'window', 'var')."
+                f"Method '{inf_method}' requires `cov_method` (choose: 'direct', 'numpy', 'ledoit', 'glasso', 'tv-glasso', 'window', 'var', 'nvar')."
             )
     elif cov_method is not None and inf_method in cov_ignored_methods:
         if warning_key not in _issued_warnings:
@@ -417,7 +431,7 @@ def sample_covEst(ts_data, method='glasso'):
         results = VAR(ts_df).fit(2)
         #A_list = [results.coefs[i] for i in range(results.k_ar)]  # A_1, A_2, ..., A_p
         sigma_u = results.sigma_u  # Covariance matrix of residuals
-        return sigma_u
+        return sigma_u.values
     elif method == 'nvar':
         residuals = quadratic_nvar(ts_data)
         gl = GraphicalLasso(alpha=1e-5, max_iter=10000)
@@ -545,7 +559,6 @@ def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=
             "Average Clustering": nx.average_clustering(G),
             "Edge Betweenness": nx.edge_betweenness_centrality(G),
             "Diameter": graph_diameter(G)
-
         }
 
         # Node-level features
@@ -564,18 +577,30 @@ def graphing(A, community_method=None, feats=True, plot=False, deg_trh=0, alpha=
             "Average Clustering": features["Average Clustering"],
             "Diameter": features["Diameter"],
             **laplacian_feats(G),  # Spectral features
-            #"Global Efficiency": nx.global_efficiency(G),
+            # "Global Efficiency": nx.global_efficiency(G),
             "Graph Energy": np.sum(np.abs(np.linalg.eigvalsh(A)))
         }
 
-        # Create DataFrames
+        # Create DataFrames for nodes and graph features
         node_df = pd.DataFrame(feature_list)
-        node_df['ROI'] = node_df['Node'].apply(lambda x: f'ROI_{x + 1}')    # Set nodes equal to ROIs in dataframe and remove nodes index
+        node_df['ROI'] = node_df['Node'].apply(lambda x: f'ROI_{x + 1}')  # Label nodes as ROIs
         node_df = node_df.drop(columns=['Node'])
         roi_col = node_df.pop('ROI')
         node_df.insert(0, 'ROI', roi_col)
         graph_df = pd.DataFrame([graph_features])
 
+        # --- New: Edge-level features ---
+        # Extract edges with weights from the graph
+        edges_data = []
+        for u, v, data in G.edges(data=True):
+            weight = data.get('weight', 1.0)  # If no weight attribute, default to 1.0
+            edges_data.append({
+                "Node1": f'ROI_{u + 1}',
+                "Node2": f'ROI_{v + 1}',
+                "EdgeWeight": weight
+            })
+
+        edge_df = pd.DataFrame(edges_data)
         return node_df, graph_df
 
 def adj_heatmap(W):
@@ -938,6 +963,42 @@ def ica_smith(
     else:
         return smith_ics_list
 
+def group_ica(data_list, n_components=30):
+    """
+    Perform group ICA (GIG-ICA approximation) on a list of AAL time series arrays.
+
+    Parameters:
+    - data_list: list of np.ndarray, each with shape (T, 116)
+    - n_components: number of ICA components
+
+    Returns:
+    - group_components: group-level ICs (n_components x features)
+    - individual_timecourses: list of individual subject component time series (T x n_components)
+    """
+    # Step 1: Z-score each subject's time series across time
+    standardized = [StandardScaler().fit_transform(ts) for ts in data_list]
+
+    # Step 2: Concatenate all subjects' time series along time axis
+    concat_data = np.vstack(standardized)  # shape (sum(T), 116)
+
+    # Step 3: Group ICA using FastICA
+    group_ica = FastICA(n_components=n_components, max_iter=1000, random_state=42)
+    group_sources = group_ica.fit_transform(concat_data)  # shape (sum(T), n_components)
+
+    # Step 4: Unmixing matrix for individual back-reconstruction
+    unmixing_matrix = group_ica.components_  # shape (n_components, 116)
+
+    # Step 5: Back-reconstruct individual timecourses
+    lengths = [ts.shape[0] for ts in data_list]
+    cumulative = np.cumsum([0] + lengths)
+
+    individual_timecourses = []
+    for i in range(len(data_list)):
+        subject_data = standardized[i]  # shape (T, 116)
+        subject_sources = subject_data @ unmixing_matrix.T  # shape (T, n_components)
+        individual_timecourses.append(subject_sources)
+
+    return group_ica.components_, individual_timecourses
 
 def multiset_feats(data_list, subject_ids, inf_method="mutual_info", cov_method=None,
                    thresh=0.2, n_jobs=-1, feats="graph"):
@@ -1088,9 +1149,9 @@ def multiset_feats(data_list, subject_ids, inf_method="mutual_info", cov_method=
 # fmri_data, subject_ids, file_paths, metadata = load_files() # represents format of load_files()
 # output_df = multiset_feats(fmri_data,subject_ids)           # represents multiset_feats() usage, add another index '[]' to load_files to select data amount
 
-fmri_data, subject_ids, _, _ = load_files(sex='all', site='NYU', max_files=None, shuffle=True, var_filt=False, ica=True)
+#fmri_data, subject_ids, _, _ = load_files(sex='all', site='NYU', max_files=10, shuffle=True, var_filt=False, ica=True)
 
-print("fmri_data_shape: " + str(len(fmri_data)))
+#print("fmri_data_shape: " + str(len(fmri_data)))
 
 #df_out = multiset_feats(fmri_data, subject_ids, inf_method='rlogspect', cov_method='glasso',feats='graph')
 
