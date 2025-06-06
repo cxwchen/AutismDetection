@@ -68,8 +68,9 @@ def normalizer(feat_train, feat_test):
 def applyHarmo(Xtrain, Xtest, meta_train, meta_test, ytest, ref_batch='NYU'):
     meta_train = meta_train.copy()
     meta_test = meta_test.copy()
-    meta_train['SEX'] = meta_train['SEX'].map({'F': 0, 'M': 1})
-    meta_test['SEX'] = meta_test['SEX'].map({'F': 0, 'M': 1})
+    if meta_train['SEX'].dtype == object:
+        meta_train['SEX'] = meta_train['SEX'].map({'F': 0, 'M': 1})
+        meta_test['SEX'] = meta_test['SEX'].map({'F': 0, 'M': 1})
 
     meta_train = meta_train.rename(columns={'SITE_ID': 'SITE'})
     meta_test = meta_test.rename(columns={'SITE_ID': 'SITE'})
@@ -83,9 +84,26 @@ def applyHarmo(Xtrain, Xtest, meta_train, meta_test, ytest, ref_batch='NYU'):
         meta_test = meta_test[mask].reset_index(drop=True)
         ytest = ytest[mask].reset_index(drop=True)
 
-    model, XtrainHarm = harmonizationLearn(Xtrain, covars=meta_train, ref_batch=ref_batch)
-    XtestHarm = harmonizationApply(Xtest, covars=meta_test, model=model)
-    return XtrainHarm, XtestHarm, ytest
+    covariates = ['SITE']
+    if meta_train['SEX'].nunique() > 1:
+        covariates.append('SEX')
+    if meta_train['AGE'].nunique() > 1:
+        covariates.append('AGE')
+
+    print(f"Harmonizing with covariates: {covariates}")
+
+    try:
+        model, XtrainHarm = harmonizationLearn(Xtrain, covars=meta_train[covariates], ref_batch=ref_batch)
+
+        # Make sure test covars match exactly in column names and order
+        meta_test_covars = meta_test.reindex(columns=covariates)
+        XtestHarm = harmonizationApply(Xtest, covars=meta_test_covars, model=model)
+
+        return XtrainHarm, XtestHarm, ytest
+    except Exception as e:
+        print("ERROR during harmonization:", e)
+        print("Skipping harmonization for this fold.")
+        return Xtrain, Xtest, ytest
     # site_train_df = pd.DataFrame({'SITE': site_train})
     # site_test_df = pd.DataFrame({'SITE': site_test})
 
