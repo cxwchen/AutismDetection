@@ -244,7 +244,7 @@ def run_multisite_female():
     runCV(female_df, label="skf_female_nofs", useFS=False)
 
     # run skf cross-validation with female data, no harmonisation, with feature selection
-    runCV(female_df, label="skf_female_nofs", useFS=True)
+    runCV(female_df, label="skf_female_fs", useFS=True)
 
 def run_multisite_male():
     # REMOVE CMU DUE TO LOW NUMBER OF ENTRIES
@@ -261,8 +261,8 @@ def run_multisite_male():
     runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_male_harmo_nofs", useFS=False, useHarmo=True)
 
 if __name__ == "__main__":
-    run_singlesite() # To run by Carmen
+    # run_singlesite() # To run by Carmen
     run_multisite_comb() # To run by Hannah-Rhys
     run_multisite_female() # To run by Hannah-Rhys
-    run_multisite_male() # To run by Carmen
-    # print("Able to use feature selection package")
+    # run_multisite_male() # To run by Carmen
+    print("Able to use feature selection package")
