@@ -253,13 +253,13 @@ def run_multisite_female():
 def run_multisite_male():
     # REMOVE CMU DUE TO LOW NUMBER OF ENTRIES
     #Run skf cross-validation with combined data, harmonization=true, feature-selection=true
-    runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_harmo_fs", useFS=True, useHarmo=True)
+    # runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_harmo_fs", useFS=True, useHarmo=True)
 
     #Run skf cross-validation with combined data, no harmonization, no feature selection
-    runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_noharmo_nofs", useFS=False, useHarmo=False)
+    # runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_noharmo_nofs", useFS=False, useHarmo=False)
 
     #Run skf cross-validation with combined data, no harmo, with feature selection
-    runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_noharmo_fs", useFS=True, useHarmo=False)
+    # runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_noharmo_fs", useFS=True, useHarmo=False)
 
     #Run skf cross-validation with combined data, with harmonization, no feature-selection
     runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_harmo_nofs", useFS=False, useHarmo=True)
