@@ -193,13 +193,13 @@ def runLOGO(df, label="female", useFS=False, groupeval=False, numfeats=100):
 def run_singlesite():
     # ============ SINGLE SITE NO FEATURE SELECTION ============================
     # Run skf 5 fold cross-validation with combined data, only NYU, no feature selection
-    runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_combined_onlyNYU_nofs", useFS=False, useHarmo=False)
+    # runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_combined_onlyNYU_nofs", useFS=False, useHarmo=False)
 
     # Run skf 5 fold cross-validation with female data, only NYU, no feature selection
-    runCV(female_df[female_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_female_onlyNYU_nofs", useFS=False, useHarmo=False)
+    # runCV(female_df[female_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_female_onlyNYU_nofs", useFS=False, useHarmo=False)
     
     # Run skf 5 fold cross-validation with male data, only NYU, no feature selection
-    runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_male_onlyNYU_nofs", useFS=False, useHarmo=False)
+    # runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_male_onlyNYU_nofs", useFS=False, useHarmo=False)
 
     # Run skf 10 fold cross-validation with combined data, only NYU, no feature selection, no group evaluation
     runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf10_combined_onlyNYU_nofs", groupeval=False, useFS=False, useHarmo=False, ncv=10)
@@ -209,13 +209,13 @@ def run_singlesite():
     
     # ============ SINGLE SITE WITH FEATURE SELECTION ============================
     # Run skf 5 fold cross-validation with combined data, only NYU, with feature selection
-    runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_combined_onlyNYU_fs", useFS=True, useHarmo=False)
+    # runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_combined_onlyNYU_fs", useFS=True, useHarmo=False)
 
     # Run skf 5 fold cross-validation with female data, only NYU, with feature selection
-    runCV(female_df[female_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_female_onlyNYU_fs", useFS=True, useHarmo=False)
+    # runCV(female_df[female_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_female_onlyNYU_fs", useFS=True, useHarmo=False)
     
     # Run skf 5 fold cross-validation with male data, only NYU, with feature selection
-    runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_male_onlyNYU_fs", useFS=True, useHarmo=False)
+    # runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_male_onlyNYU_fs", useFS=True, useHarmo=False)
 
 def run_multisite_comb():
     # runCV(female_df, label="female")
@@ -253,21 +253,21 @@ def run_multisite_female():
 def run_multisite_male():
     # REMOVE CMU DUE TO LOW NUMBER OF ENTRIES
     #Run skf cross-validation with combined data, harmonization=true, feature-selection=true
-    # runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_harmo_fs", useFS=True, useHarmo=True)
+    runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_harmo_fs", useFS=True, useHarmo=True)
 
     #Run skf cross-validation with combined data, no harmonization, no feature selection
-    # runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_noharmo_nofs", useFS=False, useHarmo=False)
+    runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_noharmo_nofs", useFS=False, useHarmo=False)
 
     #Run skf cross-validation with combined data, no harmo, with feature selection
-    # runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_noharmo_fs", useFS=True, useHarmo=False)
+    runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_noharmo_fs", useFS=True, useHarmo=False)
 
     #Run skf cross-validation with combined data, with harmonization, no feature-selection
     runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_harmo_nofs", useFS=False, useHarmo=True)
 
 if __name__ == "__main__":
-    # run_singlesite() # To run by Carmen
+    run_singlesite() # To run by Carmen
     # run_multisite_comb() # To run by Hannah-Rhys
     # run_multisite_female() # To run by Hannah-Rhys
-    run_multisite_male() # To run by Carmen
+    # run_multisite_male() # To run by Carmen
     # print("Able to use feature selection package")
     # print(female_df['SITE_ID'].value_counts())
