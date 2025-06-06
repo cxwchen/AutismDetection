@@ -1,7 +1,9 @@
+#%%
 from sklearn.metrics import classification_report, confusion_matrix
 import numpy as np
 import pandas as pd
-import matplotlib as plt
+import os
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.metrics import mean_squared_error, accuracy_score, recall_score, precision_score, f1_score, roc_auc_score, confusion_matrix, ConfusionMatrixDisplay, roc_curve
 from classification.src import classifiers as cl
@@ -10,21 +12,25 @@ from featureselection.src import cluster
 from featureselection.src import Compute_HSIC_Lasso as hsic_lasso
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
-from featuredesign.graph_inference.AAL_test import multiset_feats, load_files
-import os
+from featuredesign.graph_inference.AAL_test import multiset_feats, load_files, adjacency_df
+import cvxpy as cp
+import seaborn as sns
 
 def load_file(sex='all', method='pearson_corr'):
-    
-
     #folder_path = r"C:\Users\guus\Python_map\AutismDetection-main\abide\female-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
-    fmri_data, subject_ids, _, _ = load_files(sex=sex, shuffle=True, var_filt=False, ica=False)
+    fmri_data, subject_ids, _, _ = load_files(sex=sex, max_files=800, shuffle=True, var_filt=True, ica=True)
 
-    full_df = multiset_feats(fmri_data, subject_ids, method=method)
+    print(f"Final data: {len(fmri_data)} subjects")
+    print(f"Final IDs: {len(subject_ids)}")
 
+    full_df = adjacency_df(fmri_data, subject_ids, method = 'norm_laplacian')
     print("Merged feature+label shape:\n", full_df.shape)
 
     print(full_df)
-
+    
+    subject_id_to_plot = '0050524'  # Change this to any valid subject ID
+    plot_adjacency_matrix(full_df, subject_id_to_plot)
+    
     full_df = full_df.sample(frac=1, random_state=42).reset_index(drop=True)  # Shuffle the DataFrame
 
     X = full_df.drop(columns=['DX_GROUP', 'subject_id', 'SEX'])
@@ -41,7 +47,7 @@ def load_file(sex='all', method='pearson_corr'):
     # NaN values are filled with the median of the column
     X= X.fillna(X.median())
 
-    return X, y
+    return X, y, fmri_data
 
 def evaluate_performance(y_true, y_pred, y_proba=None, show_plots=False, classifier_name="", fold_idx=None, verbose=True):
     # Compute basic metrics
@@ -101,9 +107,9 @@ def train_and_evaluate(X, y, classifier):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=40, stratify=y)
 
     #scale the data for the classifier
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    # scaler = StandardScaler()
+    # X_train_scaled = scaler.fit_transform(X_train)
+    # X_test_scaled = scaler.transform(X_test)
 
     if classifier == "SVM":
         model_raw = cl.applySVM(X_train_scaled, y_train)
@@ -118,7 +124,13 @@ def train_and_evaluate(X, y, classifier):
     else:
         print("Classifier not supported: choose from SVM, RandomForest, LogR, DecisionTree or MLP")
     #applying the classifier to the total data
-    y_pred_raw = model_raw.predict(X_test_scaled)
+    model_raw = cl.applySVM(X_train, y_train)
+    y_pred_raw = model_raw.predict(X_test)
+
+    try:
+        y_proba_raw = model_raw.predict_proba(X_test_scaled)[:, 1]
+    except:
+        y_proba_raw = None
 
     try:
         y_proba_raw = model_raw.predict_proba(X_test_scaled)[:, 1]
@@ -339,6 +351,36 @@ def cross_validate_model(X, y, feature_selection, classifier, raw=True, n_splits
 
     return selected_features, selected_feature_names
 
+def plot_adjacency_matrix(df, subject_id, matrix_size=20):
+    """
+    This function takes the dataframe containing the flattened adjacency matrices,
+    extracts the matrix for a specific subject, reshapes it, and plots the adjacency matrix.
+
+    Parameters:
+    - df: DataFrame containing the flattened adjacency matrices.
+    - subject_id: The subject ID for which to plot the adjacency matrix.
+    - matrix_size: The size of the square adjacency matrix (default is 20x20).
+    """
+    # Extract the row for the specific subject_id
+    subject_row = df[df['subject_id'] == subject_id]
+
+    # If the subject is not found in the DataFrame
+    if subject_row.empty:
+        print(f"Subject {subject_id} not found in the DataFrame.")
+        return
+    
+    # Extract the flattened adjacency matrix values
+    adj_values = subject_row.drop(columns=['subject_id', 'DX_GROUP', 'SEX', 'SITE_ID']).values.flatten()
+    
+    # Reshape the flattened array back into a square matrix
+    adj_matrix = adj_values.reshape(matrix_size, matrix_size)
+    
+    # Plot the adjacency matrix
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(adj_matrix, cmap="YlGnBu", annot=False, xticklabels=False, yticklabels=False)
+    plt.title(f"Adjacency Matrix for Subject {subject_id}")
+    plt.show()
+    
 def main():
 
     #Choose method: partial_corr_LF|partial_corr_glasso|pearson_corr_binary|pearson_corr|mutual_info|norm_laplacian|rlogspect
@@ -403,5 +445,16 @@ def main():
     print_selected_features(selected_features_sfs_mRMR, selected_features_names_sfs_mRMR, print_feat=True)
     print("\n\n")
 
+    # X_train_scaled = fs.low_variance(X_train_scaled, threshold=0.01)
+    # X_test_scaled = fs.low_variance(X_test_scaled, threshold=0.01)
+    # selected_features_rfe = fs.backwards_SFS(X_train_scaled, y_train, 10, classifier)
+    # acc, mse, selected_feature_names = classify(X, X_train_scaled, X_test_scaled, y_train, y_test, selected_features_rfe, classifier)
+    # print("SFS selected features:")
+    # print_selected_features(acc, mse, selected_features_rfe, selected_feature_names)
+    # print("\n\n")
+
 if __name__ == '__main__':
-    main()
+    fmri_data = main()
+
+
+# %%

@@ -3,13 +3,13 @@ import cvxpy as cp
 from numpy.linalg import eigh, norm
 from math import sqrt, log
 import matplotlib.pyplot as plt
-from tqdm import trange, tqdm  # Add this at the top with other imports
-from algorithms import *
-from generator import *
+from tqdm import trange, tqdm  
+from featuredesign.graph_inference.algorithms import *
+from featuredesign.graph_inference.generator import *
 from sklearn.covariance import empirical_covariance
 
 # --------- Laplacian Learning ---------
-def normalized_laplacian(V_hat, epsilon=1e-1, alpha=0.5):
+def normalized_laplacian(V_hat, epsilon=1.8e-1, alpha=0.5):
     """
     Learns a normalized Laplacian S such that:
     - S is PSD, symmetric, with 1s on diagonal
@@ -125,7 +125,7 @@ def adjacency_reweighted(V_hat, tau=1.0, delta=1e-5, epsilon=0.1, max_iter=10, b
         
     return S_est
 
-def learn_adjacency_rLogSpecT(V_hat, delta_n, alpha=0.1):
+def learn_adjacency_rLogSpecT(V_hat, delta_n, alpha=0.5):
     """
     Learn adjacency matrix using rLogSpecT formulation without reweighting
     
@@ -159,10 +159,10 @@ def learn_adjacency_rLogSpecT(V_hat, delta_n, alpha=0.1):
     
     if S.value is None:
         raise ValueError("Optimization failed to converge")
-        
-    return S.value
+    
+    return normalize_adjacency_weights(S.value)
 
-def binarize_adjacency_matrix(adj_matrix, threshold=0.1, keep_diagonal=False):
+def binarize_adjacency_matrix(adj_matrix, threshold=0.15, keep_diagonal=False):
     """
     Binarizes an adjacency matrix based on a threshold value.
     
@@ -191,3 +191,22 @@ def binarize_adjacency_matrix(adj_matrix, threshold=0.1, keep_diagonal=False):
         np.fill_diagonal(binary_matrix, 0)
     
     return binary_matrix
+
+def normalize_adjacency_weights(adj_matrix):
+    """
+    Normalizes the weights of the adjacency matrix to be between 0 and 1 using min-max normalization.
+    
+    Parameters:
+    - adj_matrix: A numpy 2D array representing the adjacency matrix.
+    
+    Returns:
+    - normalized_adj: The adjacency matrix with normalized weights between 0 and 1.
+    """
+    # Find the minimum and maximum values in the adjacency matrix
+    min_val = np.min(adj_matrix)
+    max_val = np.max(adj_matrix)
+    
+    # Apply min-max normalization
+    normalized_adj = (adj_matrix - min_val) / (max_val - min_val)  # Scales the values between 0 and 1
+    
+    return normalized_adj

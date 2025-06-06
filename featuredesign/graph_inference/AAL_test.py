@@ -1,3 +1,4 @@
+#%%
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
@@ -5,11 +6,11 @@ import os,glob,re,random, contextlib, io
 import pandas as pd
 import seaborn as sns
 import networkx.algorithms.community as nx_comm
-
+import cvxpy as cp
 from joblib import Parallel, delayed
 from tqdm import tqdm
 from scipy.stats import pearsonr,skew, kurtosis, entropy
-from sklearn.covariance import GraphicalLasso, GraphicalLassoCV, LedoitWolf
+from sklearn.covariance import GraphicalLasso, GraphicalLassoCV, LedoitWolf, empirical_covariance
 from sklearn.linear_model import Ridge, Lasso
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import mutual_info_regression
@@ -381,21 +382,16 @@ def detect_inf_method(ts_data, inf_method, cov_method=None):
     elif inf_method == 'rlogspect':
         C = sample_covEst(ts_data, method=cov_method)
         V_hat, _, E_tot = comp_eigen(C)
-        return learn_adjacency_rLogSpecT(V_hat, delta_n=0.2 * np.sqrt(E_tot))
+        return learn_adjacency_rLogSpecT(V_hat, delta_n=1.5 * np.sqrt(np.log(200) / 200))
     else:
         raise ValueError(f"Unknown inference method: {inf_method} (choose: 'sample_cov','partial_corr', 'pearson_corr_binary', 'pearson_corr', 'mutual_info', 'gr_causality', 'norm_laplacian', 'rlogspect').")
 
-def sample_covEst(ts_data, method='glasso'):
+def sample_covEst(ts_data, method='direct'):
     """Compute the sample covariance estimate using various methods"""
     ts_data = StandardScaler().fit_transform(ts_data) # Standardize data
 
     if method == 'direct':
-        T, n_ics = ts_data.shape
-        X_centered = ts_data - np.mean(ts_data, axis=0)
-        cov = (X_centered.T @ X_centered) / (T - 1)
-        return cov
-    elif method == 'numpy':
-        return np.cov(ts_data)
+        return empirical_covariance(ts_data)
     elif method == 'ledoit':
         lw = LedoitWolf()
         lw.fit(ts_data)
@@ -1144,6 +1140,57 @@ def multiset_feats(data_list, subject_ids, inf_method="mutual_info", cov_method=
 
     return multiset_pheno(df_final)
 
+def adjacency_df(data_list, subject_ids, method="mutual_info"):
+    rows = []
+    index = []
+
+    for i, (data, sid) in enumerate(zip(data_list, subject_ids)):
+        try:
+            print(f"[{i+1}/{len(data_list)}] Processing subject {sid}...", flush=True)
+            adj_matrix = detect_inf_method(data, method=method)
+            if adj_matrix is None or np.all(adj_matrix == 0):
+                print(f" - Empty or zero matrix for subject {sid}. Skipping.")
+                continue
+            flat_adj = adj_matrix.flatten()
+            rows.append(flat_adj)
+            index.append(sid)
+        except Exception as e:
+            print(f" - Failed for subject {sid}: {str(e)}")
+            continue
+
+    if not rows:
+        raise RuntimeError("No valid adjacency matrices were computed.")
+
+    n = data_list[0].shape[1]
+    col_names = [f"A_{i}_{j}" for i in range(n) for j in range(n)]
+    df_wide =  pd.DataFrame(rows, index=index, columns=col_names).reset_index().rename(columns={'index': 'subject_id'})
+    
+    def multiset_pheno(df_wide):
+        # Fix the path construction
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        parent_path = os.path.join(base_path, "..", "..")
+        pheno_path = os.path.join(parent_path, "abide", "Phenotypic_V1_0b_preprocessed1.csv")
+
+        df_labels = pd.read_csv(pheno_path)
+
+        df_labels['SUB_ID'] = df_labels['SUB_ID'].astype(str).str.zfill(7)
+        df_wide['subject_id'] = df_wide['subject_id'].astype(str).str.zfill(7)
+
+        # Select desired phenotypic columns
+        df_pheno = df_labels[['SUB_ID', 'SITE_ID', 'DX_GROUP', 'SEX']]
+
+        # Merge and drop SUB_ID
+        df_merged = df_wide.merge(df_pheno, left_on='subject_id', right_on='SUB_ID', how='left')
+        df_merged.drop(columns='SUB_ID', inplace=True)
+
+        # Reorder phenotypic columns
+        phenotype_cols = ['DX_GROUP', 'SEX', 'SITE_ID']
+        cols = phenotype_cols + [col for col in df_merged.columns if col not in phenotype_cols]
+        df_merged = df_merged[cols]
+
+        return df_merged
+
+    return multiset_pheno(df_final)
 
 #-------{Main for testing}-------#
 # fmri_data, subject_ids, file_paths, metadata = load_files() # represents format of load_files()
