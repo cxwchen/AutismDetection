@@ -16,25 +16,25 @@ from featuredesign.graph_inference.AAL_test import multiset_feats, load_files, a
 import cvxpy as cp
 import seaborn as sns
 
-def load_file(sex='all', method='pearson_corr'):
+def load_file(sex='all', method='pearson_corr', alpha=5):
     #folder_path = r"C:\Users\guus\Python_map\AutismDetection-main\abide\female-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
-    fmri_data, subject_ids, _, _ = load_files(sex=sex, max_files=800, shuffle=True, var_filt=True, ica=True)
+    fmri_data, subject_ids, _, _ = load_files(sex=sex, max_files=800, site="NYU", shuffle=True, var_filt=True, ica=True)
 
     print(f"Final data: {len(fmri_data)} subjects")
     print(f"Final IDs: {len(subject_ids)}")
 
-    full_df = adjacency_df(fmri_data, subject_ids, method = 'norm_laplacian')
+    full_df = adjacency_df(fmri_data, subject_ids, method = method, alpha = alpha)
     print("Merged feature+label shape:\n", full_df.shape)
 
-    print(full_df)
+    #print(full_df)
     
-    subject_id_to_plot = '0050524'  # Change this to any valid subject ID
+    subject_id_to_plot = '0051044'  # Change this to any valid subject ID
     plot_adjacency_matrix(full_df, subject_id_to_plot)
     
     full_df = full_df.sample(frac=1, random_state=42).reset_index(drop=True)  # Shuffle the DataFrame
 
     X = full_df.drop(columns=['DX_GROUP', 'subject_id', 'SEX'])
-    y = full_df['DX_GROUP'].map({1: 1, 2: 0})
+    y = full_df['DX_GROUP'].map({1: 1, 2: 0}) #1 ASD, 0 ALL
 
     # Making sure the data is numeric
     X = X.apply(pd.to_numeric, errors='coerce')
@@ -47,7 +47,7 @@ def load_file(sex='all', method='pearson_corr'):
     # NaN values are filled with the median of the column
     X= X.fillna(X.median())
 
-    return X, y, fmri_data
+    return X, y
 
 def evaluate_performance(y_true, y_pred, y_proba=None, show_plots=False, classifier_name="", fold_idx=None, verbose=True):
     # Compute basic metrics
@@ -107,9 +107,9 @@ def train_and_evaluate(X, y, classifier):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=40, stratify=y)
 
     #scale the data for the classifier
-    # scaler = StandardScaler()
-    # X_train_scaled = scaler.fit_transform(X_train)
-    # X_test_scaled = scaler.transform(X_test)
+    #scaler = StandardScaler()
+    X_train_scaled = X_train #scaler.fit_transform(X_train)
+    X_test_scaled = X_test #scaler.transform(X_test)
 
     if classifier == "SVM":
         model_raw = cl.applySVM(X_train_scaled, y_train)
@@ -126,11 +126,6 @@ def train_and_evaluate(X, y, classifier):
     #applying the classifier to the total data
     model_raw = cl.applySVM(X_train, y_train)
     y_pred_raw = model_raw.predict(X_test)
-
-    try:
-        y_proba_raw = model_raw.predict_proba(X_test_scaled)[:, 1]
-    except:
-        y_proba_raw = None
 
     try:
         y_proba_raw = model_raw.predict_proba(X_test_scaled)[:, 1]
@@ -158,8 +153,8 @@ def classify(X_train, X_test, y_train, y_test, selected_features, classifier, pe
 
     #scale the data for the classifier
     scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    X_train_scaled = X_train #scaler.fit_transform(X_train)
+    X_test_scaled = X_test #scaler.transform(X_test)
 
     selected_train_x = X_train_scaled.iloc[:, selected_features]
     selected_test_x = X_test_scaled.iloc[:, selected_features]
@@ -240,8 +235,8 @@ def cross_validate_model(X, y, feature_selection, classifier, raw=True, n_splits
 
         #Scaling the data
         scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train)
-        X_test_scaled = scaler.transform(X_test)
+        X_train_scaled = X_train #scaler.fit_transform(X_train)
+        X_test_scaled = X_test #scaler.transform(X_test)
         
         selected_features = failsafe_feature_selection(feature_selection, X_train_scaled, y_train, classifier=classifier, **feature_selection_kwargs)
 
@@ -314,7 +309,7 @@ def cross_validate_model(X, y, feature_selection, classifier, raw=True, n_splits
             avg_precision_raw = np.mean(precision_scores_raw)
             avg_recall_raw = np.mean(recall_scores_raw)
             avg_F1_raw = np.mean(F1_scores_raw)
-            avg_AUC_raw = np.mean(AUC_scores_raw)
+            avg_AUC_raw = np.mean([score for score in AUC_scores_raw if score is not None])
 
             print(f"Average accuracy raw: {avg_acc_raw}")
             print(f"Average mse raw: {avg_mse_raw}")
@@ -382,7 +377,7 @@ def plot_adjacency_matrix(df, subject_id, matrix_size=20):
     plt.show()
     
 def main():
-
+    
     #Choose method: partial_corr_LF|partial_corr_glasso|pearson_corr_binary|pearson_corr|mutual_info|norm_laplacian|rlogspect
     X, y = load_file(sex='female', method='rlogspect')
 
@@ -453,8 +448,9 @@ def main():
     # print_selected_features(acc, mse, selected_features_rfe, selected_feature_names)
     # print("\n\n")
 
-if __name__ == '__main__':
-    fmri_data = main()
+
+# if __name__ == '__main__':
+#     main()
 
 
 # %%

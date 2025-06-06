@@ -26,7 +26,7 @@ from typing import List, Union
 from networkx.linalg.laplacianmatrix import laplacian_matrix
 from sklearn.metrics import adjusted_rand_score
 
-from featuredesign.graph_inference.GSP_methods import normalized_laplacian, normalized_laplacian_reweighted, adjacency_reweighted, learn_adjacency_rLogSpecT
+from featuredesign.graph_inference.GSP_methods import *
 
 import warnings
 warnings.filterwarnings("once", category=UserWarning)
@@ -314,7 +314,7 @@ def detect_communities(G, method='louvain', **kwargs):
     else:
         raise ValueError(f"Unknown method: {method}. Choose: louvain|greedy_modularity|label_propagation|asyn_lpa|fluid|girvan_newman")
 
-def detect_inf_method(ts_data, inf_method, cov_method=None):
+def detect_inf_method(ts_data, inf_method, cov_method=None, alpha = 5):
     """Detect inference method"""
     cov_dependent_methods = {
         'partial_corr',
@@ -362,13 +362,14 @@ def detect_inf_method(ts_data, inf_method, cov_method=None):
         return gr_causality(ts_data)
     elif inf_method == 'norm_laplacian':
         C = sample_covEst(ts_data, method=cov_method)
-        V_hat, _, _ = comp_eigen(C)
-        S = normalized_laplacian(V_hat)
-        return inv_laplace(S)
+        S = normalized_laplacian(C, epsilon=0.45, threshold=alpha)
+        return S
     elif inf_method == 'rlogspect':
         C = sample_covEst(ts_data, method=cov_method)
-        V_hat, _, E_tot = comp_eigen(C)
-        return learn_adjacency_rLogSpecT(V_hat, delta_n=1.5 * np.sqrt(np.log(200) / 200))
+        return learn_adjacency_rLogSpecT(C, delta_n=15*np.sqrt(np.log(176) / 176), threshold=alpha)
+    elif inf_method == 'LADMM':
+        C = sample_covEst(ts_data, method=cov_method)
+        return learn_adjacency_LADMM(C, delta_n=15*np.sqrt(np.log(176) / 176), threshold=alpha)
     else:
         raise ValueError(f"Unknown inference method: {inf_method} (choose: 'sample_cov','partial_corr', 'pearson_corr_binary', 'pearson_corr', 'mutual_info', 'gr_causality', 'norm_laplacian', 'rlogspect').")
 
@@ -760,7 +761,7 @@ def load_files(folder_path=None, var_filt=True, ica=False, sex='all', site=None,
             file_info['series_per_file'].append(data.shape[1])
             file_info['total_files'] += 1
 
-            print(f"Loaded {filename}: {data.shape[0]} timepoints × {data.shape[1]} series")
+            #print(f"Loaded {filename}: {data.shape[0]} timepoints × {data.shape[1]} series")
         except Exception as e:
             print(f"Error loading {file_path}: {str(e)}")
 
@@ -870,7 +871,6 @@ def ica_dimReduc(fmri_data, subject_ids=None, n_components=15, max_iter=10000, t
 
     return ica_components, mixing_matrices, filtered_ids, failed_indices
 
-
 def ica_smith(
         aal_time_series_list: List[np.ndarray],
         n_components: int = 20,
@@ -933,7 +933,6 @@ def ica_smith(
         return smith_ics_list, ica_to_aal_inv
     else:
         return smith_ics_list
-
 
 def multiset_feats(data_list, subject_ids, inf_method="mutual_info", cov_method=None,
                    thresh=0.2, n_jobs=-1, feats="graph"):
@@ -1079,14 +1078,14 @@ def multiset_feats(data_list, subject_ids, inf_method="mutual_info", cov_method=
 
     return multiset_pheno(df_final)
 
-def adjacency_df(data_list, subject_ids, method="mutual_info"):
+def adjacency_df(data_list, subject_ids, method="mutual_info", alpha =5):
     rows = []
     index = []
 
     for i, (data, sid) in enumerate(zip(data_list, subject_ids)):
         try:
-            print(f"[{i+1}/{len(data_list)}] Processing subject {sid}...", flush=True)
-            adj_matrix = detect_inf_method(data, method=method)
+            #print(f"[{i+1}/{len(data_list)}] Processing subject {sid}...", flush=True)
+            adj_matrix = detect_inf_method(data, inf_method=method, cov_method='direct', alpha=alpha)
             if adj_matrix is None or np.all(adj_matrix == 0):
                 print(f" - Empty or zero matrix for subject {sid}. Skipping.")
                 continue
@@ -1129,15 +1128,15 @@ def adjacency_df(data_list, subject_ids, method="mutual_info"):
 
         return df_merged
 
-    return multiset_pheno(df_final)
+    return multiset_pheno(df_wide)
 
 #-------{Main for testing}-------#
 # fmri_data, subject_ids, file_paths, metadata = load_files() # represents format of load_files()
 # output_df = multiset_feats(fmri_data,subject_ids)           # represents multiset_feats() usage, add another index '[]' to load_files to select data amount
 
-fmri_data, subject_ids, _, _ = load_files(sex='all', site='NYU', max_files=None, shuffle=True, var_filt=False, ica=True)
+# fmri_data, subject_ids, _, _ = load_files(sex='all', site='NYU', max_files=None, shuffle=True, var_filt=False, ica=True)
 
-print("fmri_data_shape: " + str(len(fmri_data)))
+# print("fmri_data_shape: " + str(len(fmri_data)))
 
 #df_out = multiset_feats(fmri_data, subject_ids, inf_method='rlogspect', cov_method='glasso',feats='graph')
 
