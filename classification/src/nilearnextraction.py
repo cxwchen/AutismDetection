@@ -11,7 +11,7 @@ import seaborn as sns
 def nilearnextract():
     data = fetch_abide_pcp(pipeline='cpac', band_pass_filtering=False, global_signal_regression=False, derivatives='rois_aal', quality_checked=True)
     phenotypic = data.phenotypic
-    aal = datasets.fetch_atlas_aal(version='SPM12')
+    aal = fetch_atlas_aal(version='SPM12')
     labels = aal.labels
     maps = aal.maps
     indices = aal.indices
