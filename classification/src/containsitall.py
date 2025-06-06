@@ -103,6 +103,8 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False, numfe
 
             Xtrain, Xtest, ytest = applyHarmo(Xtrain, Xtest, meta_train, meta_test, ytest)
 
+        Xtrain, Xtest = normalizer(Xtrain, Xtest)
+
         # --- Feature Selection (Optional) --- 
         if useFS:
             print("Running HSIC Lasso feature selection...")
@@ -110,8 +112,6 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False, numfe
             Xtrain = Xtrain[:, selected_idx]
             Xtest = Xtest[:, selected_idx]
         
-
-        Xtrain, Xtest = normalizer(Xtrain, Xtest)
 
         for cfunc in [applyLogR, applySVM, applyRandForest, applyDT, applyMLP, applyLDA, applyKNN]:
             clfname = cfunc.__name__.replace("apply", "")
@@ -169,6 +169,7 @@ def runLOGO(df, label="female", useFS=False, groupeval=False, numfeats=100):
         Xtrain = imputer.fit_transform(Xtrain)
         Xtest = imputer.transform(Xtest)
 
+        Xtrain, Xtest = normalizer(Xtrain, Xtest)
         # --- Feature Selection (Optional) --- 
         if useFS:
             print("Running HSIC Lasso feature selection...")
@@ -176,7 +177,6 @@ def runLOGO(df, label="female", useFS=False, groupeval=False, numfeats=100):
             Xtrain = Xtrain[:, selected_idx]
             Xtest = Xtest[:, selected_idx]
 
-        Xtrain, Xtest = normalizer(Xtrain, Xtest)
 
         svcparams = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, SVC())
         # rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, RandomForestClassifier())
