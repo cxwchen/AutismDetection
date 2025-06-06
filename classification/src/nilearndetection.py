@@ -47,9 +47,8 @@ sys.stdout = Tee(sys.stdout, log_file)
 
 comb_df = pd.read_csv("nilearnfeatscomb.csv.gz").sample(frac=1, random_state=42).reset_index(drop=True)
 comb_df.rename(columns={"AGE_AT_SCAN": "AGE"}, inplace=True)
-comb_df["DX_GROUP"] = comb_df['DX_GROUP'].map({1: 1, 2: 0})
-female_df = comb_df[comb_df['SITE_ID'] == 2].sample(frac=1, random_state=42).reset_index(drop=True)
-male_df = comb_df[comb_df['SITE_ID'] == 1].sample(frac=1, random_state=42).reset_index(drop=True)
+female_df = comb_df[comb_df['SEX'] == 2].sample(frac=1, random_state=42).reset_index(drop=True)
+male_df = comb_df[comb_df['SEX'] == 1].sample(frac=1, random_state=42).reset_index(drop=True)
 
 def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False, numfeats=100):
     # version for Jochem
@@ -260,8 +259,9 @@ def run_multisite_male():
     runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_male_harmo_nofs", useFS=False, useHarmo=True)
 
 if __name__ == "__main__":
-    run_singlesite() # To run by Carmen
+    # run_singlesite() # To run by Carmen
     # run_multisite_comb() # To run by Hannah-Rhys
     # run_multisite_female() # To run by Hannah-Rhys
     # run_multisite_male() # To run by Carmen
     # print("Able to use feature selection package")
+    print(female_df['SITE_ID'].value_counts())

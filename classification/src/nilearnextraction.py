@@ -9,7 +9,7 @@ import seaborn as sns
 
 # Function to process one atlas
 def nilearnextract():
-    data = fetch_abide_pcp(pipeline='cpac', band_pass_filtering=False, global_signal_regression=False, derivatives='rois_aal', quality_checked=True)
+    data = fetch_abide_pcp(pipeline='cpac', band_pass_filtering=False, global_signal_regression=True, derivatives='rois_aal', quality_checked=True)
     phenotypic = data.phenotypic
     aal = fetch_atlas_aal(version='SPM12')
     labels = aal.labels
@@ -33,4 +33,4 @@ def nilearnextract():
 
 if __name__ == "__main__":
     data, labels, maps, indices = nilearnextract()
-    data.to_csv('nilearnfeats.csv.gz', compression='gzip')
+    data.to_csv('nilearnfeatscomb.csv.gz', index=False, compression='gzip')
