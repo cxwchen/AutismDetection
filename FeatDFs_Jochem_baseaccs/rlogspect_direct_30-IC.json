@@ -1,0 +1,7 @@
+{
+    "inf_method": "rlogspect",
+    "cov_method": "direct",
+    "accuracy": 0.41714285714285715,
+    "f1": 0.3108108108108108,
+    "auc": 0.43669556080903593
+}

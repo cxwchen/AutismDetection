@@ -1,0 +1,7 @@
+{
+    "inf_method": "pearson_corr",
+    "cov_method": null,
+    "accuracy": 0.5028571428571429,
+    "f1": 0.32558139534883723,
+    "auc": 0.479117415287628
+}

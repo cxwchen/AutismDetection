@@ -1,0 +1,7 @@
+{
+    "inf_method": "sample_cov",
+    "cov_method": "ledoit",
+    "accuracy": 0.5085714285714286,
+    "f1": 0.1568627450980392,
+    "auc": 0.42999737325978454
+}

@@ -1,0 +1,7 @@
+{
+    "inf_method": "sample_cov",
+    "cov_method": "direct",
+    "accuracy": 0.5314285714285715,
+    "f1": 0.21153846153846154,
+    "auc": 0.4365642237982663
+}

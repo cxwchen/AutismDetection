@@ -1,0 +1,7 @@
+{
+    "inf_method": "gr_causality",
+    "cov_method": null,
+    "accuracy": 0.5257142857142857,
+    "f1": 0.22429906542056074,
+    "auc": 0.49028106120304704
+}

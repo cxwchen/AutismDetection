@@ -1,0 +1,7 @@
+{
+    "inf_method": "partial_corr",
+    "cov_method": "direct",
+    "accuracy": 0.49714285714285716,
+    "f1": 0.21428571428571427,
+    "auc": 0.43538219070133966
+}

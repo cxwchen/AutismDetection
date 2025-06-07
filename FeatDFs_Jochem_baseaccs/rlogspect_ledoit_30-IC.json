@@ -1,0 +1,7 @@
+{
+    "inf_method": "rlogspect",
+    "cov_method": "ledoit",
+    "accuracy": 0.5028571428571429,
+    "f1": 0.4,
+    "auc": 0.48187549251379036
+}

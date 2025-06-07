@@ -1,0 +1,7 @@
+{
+    "inf_method": "partial_corr",
+    "cov_method": "glasso",
+    "accuracy": 0.5297619047619048,
+    "f1": 0.16842105263157894,
+    "auc": 0.46054131054131053
+}

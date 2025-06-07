@@ -1,0 +1,7 @@
+{
+    "inf_method": "mutual_info",
+    "cov_method": null,
+    "accuracy": 0.5485714285714286,
+    "f1": 0.4233576642335766,
+    "auc": 0.5575256107171002
+}

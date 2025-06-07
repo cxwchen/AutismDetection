@@ -1,0 +1,7 @@
+{
+    "inf_method": "partial_corr",
+    "cov_method": "window",
+    "accuracy": 0.4857142857142857,
+    "f1": 0.1509433962264151,
+    "auc": 0.43275545048594694
+}

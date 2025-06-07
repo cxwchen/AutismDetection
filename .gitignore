@@ -4,3 +4,4 @@ __pycache__/
 *.csv
 !classification/src/results/*.csv
 scikit-feature/
+!FeatDFs_Jochem/*.csv

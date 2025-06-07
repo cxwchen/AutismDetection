@@ -1,0 +1,7 @@
+{
+    "inf_method": "sample_cov",
+    "cov_method": "glasso",
+    "accuracy": 0.5535714285714286,
+    "f1": 0.2268041237113402,
+    "auc": 0.4263532763532763
+}

@@ -1,0 +1,7 @@
+{
+    "inf_method": "partial_corr",
+    "cov_method": "ledoit",
+    "accuracy": 0.5142857142857142,
+    "f1": 0.23423423423423423,
+    "auc": 0.5182558444969793
+}

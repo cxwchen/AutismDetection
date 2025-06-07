@@ -1,0 +1,7 @@
+{
+    "inf_method": "rlogspect",
+    "cov_method": "glasso",
+    "accuracy": 0.48214285714285715,
+    "f1": 0.31496062992125984,
+    "auc": 0.5132478632478632
+}

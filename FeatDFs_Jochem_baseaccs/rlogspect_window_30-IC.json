@@ -1,0 +1,7 @@
+{
+    "inf_method": "rlogspect",
+    "cov_method": "window",
+    "accuracy": 0.5028571428571429,
+    "f1": 0.33587786259541985,
+    "auc": 0.51799317047544
+}
