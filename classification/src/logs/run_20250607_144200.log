@@ -1,0 +1,656 @@
+Running Stratified 5Fold Cross-Validation...
+
+=== Fold 1 | SAMPLE-COV_GLASSO_30-IC_GRAPH_THR0.05 Data ===
+
+=== Fold 1 | LogR
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.57      0.87      0.69        90
+           1       0.62      0.26      0.36        78
+
+    accuracy                           0.58       168
+   macro avg       0.60      0.56      0.53       168
+weighted avg       0.60      0.58      0.54       168
+
+
+=== Metrics for LogisticRegression ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.574
+    Recall:    0.867
+    F1 Score:  0.690
+    Support:   90
+  Autism:
+    Precision: 0.625
+    Recall:    0.256
+    F1 Score:  0.364
+    Support:   78
+
+Overall Metrics:
+  Specificity:          0.867
+  Sensitivity:          0.256
+  AUROC:                0.635
+  Accuracy:             0.583
+  Balanced Accuracy:    0.562
+=====================================
+
+=== Metrics by Site ===
+
+ Site: PITT
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.38      0.60      0.46         5
+           1       0.50      0.29      0.36         7
+
+    accuracy                           0.42        12
+   macro avg       0.44      0.44      0.41        12
+weighted avg       0.45      0.42      0.40        12
+
+
+=== Metrics for Site=PITT ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.375
+    Recall:    0.600
+    F1 Score:  0.462
+    Support:   5
+  Autism:
+    Precision: 0.500
+    Recall:    0.286
+    F1 Score:  0.364
+    Support:   7
+
+Overall Metrics:
+  Specificity:          0.600
+  Sensitivity:          0.286
+  AUROC:                0.486
+  Accuracy:             0.417
+  Balanced Accuracy:    0.443
+=====================================
+
+ Site: OLIN
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.25      0.50      0.33         2
+           1       0.67      0.40      0.50         5
+
+    accuracy                           0.43         7
+   macro avg       0.46      0.45      0.42         7
+weighted avg       0.55      0.43      0.45         7
+
+
+=== Metrics for Site=OLIN ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.250
+    Recall:    0.500
+    F1 Score:  0.333
+    Support:   2
+  Autism:
+    Precision: 0.667
+    Recall:    0.400
+    F1 Score:  0.500
+    Support:   5
+
+Overall Metrics:
+  Specificity:          0.500
+  Sensitivity:          0.400
+  AUROC:                0.500
+  Accuracy:             0.429
+  Balanced Accuracy:    0.450
+=====================================
+
+ Site: SDSU
+Classification report:
+               precision    recall  f1-score   support
+
+           0       1.00      0.67      0.80         3
+           1       0.50      1.00      0.67         1
+
+    accuracy                           0.75         4
+   macro avg       0.75      0.83      0.73         4
+weighted avg       0.88      0.75      0.77         4
+
+
+=== Metrics for Site=SDSU ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 1.000
+    Recall:    0.667
+    F1 Score:  0.800
+    Support:   3
+  Autism:
+    Precision: 0.500
+    Recall:    1.000
+    F1 Score:  0.667
+    Support:   1
+
+Overall Metrics:
+  Specificity:          0.667
+  Sensitivity:          1.000
+  AUROC:                1.000
+  Accuracy:             0.750
+  Balanced Accuracy:    0.833
+=====================================
+
+ Site: TRINITY
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.75      0.86      0.80         7
+           1       0.80      0.67      0.73         6
+
+    accuracy                           0.77        13
+   macro avg       0.78      0.76      0.76        13
+weighted avg       0.77      0.77      0.77        13
+
+
+=== Metrics for Site=TRINITY ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.750
+    Recall:    0.857
+    F1 Score:  0.800
+    Support:   7
+  Autism:
+    Precision: 0.800
+    Recall:    0.667
+    F1 Score:  0.727
+    Support:   6
+
+Overall Metrics:
+  Specificity:          0.857
+  Sensitivity:          0.667
+  AUROC:                0.786
+  Accuracy:             0.769
+  Balanced Accuracy:    0.762
+=====================================
+
+ Site: UM_1
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.62      0.81      0.70        16
+           1       0.25      0.11      0.15         9
+
+    accuracy                           0.56        25
+   macro avg       0.43      0.46      0.43        25
+weighted avg       0.49      0.56      0.51        25
+
+
+=== Metrics for Site=UM_1 ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.619
+    Recall:    0.812
+    F1 Score:  0.703
+    Support:   16
+  Autism:
+    Precision: 0.250
+    Recall:    0.111
+    F1 Score:  0.154
+    Support:   9
+
+Overall Metrics:
+  Specificity:          0.812
+  Sensitivity:          0.111
+  AUROC:                0.347
+  Accuracy:             0.560
+  Balanced Accuracy:    0.462
+=====================================
+
+ Site: UM_2
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.86      1.00      0.92         6
+           1       0.00      0.00      0.00         1
+
+    accuracy                           0.86         7
+   macro avg       0.43      0.50      0.46         7
+weighted avg       0.73      0.86      0.79         7
+
+
+=== Metrics for Site=UM_2 ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.857
+    Recall:    1.000
+    F1 Score:  0.923
+    Support:   6
+  Autism:
+    Precision: 0.000
+    Recall:    0.000
+    F1 Score:  0.000
+    Support:   1
+
+Overall Metrics:
+  Specificity:          1.000
+  Sensitivity:          0.000
+  AUROC:                0.833
+  Accuracy:             0.857
+  Balanced Accuracy:    0.500
+=====================================
+
+ Site: USM
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.50      1.00      0.67         4
+           1       1.00      0.33      0.50         6
+
+    accuracy                           0.60        10
+   macro avg       0.75      0.67      0.58        10
+weighted avg       0.80      0.60      0.57        10
+
+
+=== Metrics for Site=USM ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.500
+    Recall:    1.000
+    F1 Score:  0.667
+    Support:   4
+  Autism:
+    Precision: 1.000
+    Recall:    0.333
+    F1 Score:  0.500
+    Support:   6
+
+Overall Metrics:
+  Specificity:          1.000
+  Sensitivity:          0.333
+  AUROC:                0.750
+  Accuracy:             0.600
+  Balanced Accuracy:    0.667
+=====================================
+
+ Site: YALE
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.43      0.75      0.55         4
+           1       0.50      0.20      0.29         5
+
+    accuracy                           0.44         9
+   macro avg       0.46      0.47      0.42         9
+weighted avg       0.47      0.44      0.40         9
+
+
+=== Metrics for Site=YALE ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.429
+    Recall:    0.750
+    F1 Score:  0.545
+    Support:   4
+  Autism:
+    Precision: 0.500
+    Recall:    0.200
+    F1 Score:  0.286
+    Support:   5
+
+Overall Metrics:
+  Specificity:          0.750
+  Sensitivity:          0.200
+  AUROC:                0.300
+  Accuracy:             0.444
+  Balanced Accuracy:    0.475
+=====================================
+Skipping Site = CMU --> only one class present.
+Skipping Site = LEUVEN_1 --> only one class present.
+
+ Site: LEUVEN_2
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.33      1.00      0.50         1
+           1       0.00      0.00      0.00         2
+
+    accuracy                           0.33         3
+   macro avg       0.17      0.50      0.25         3
+weighted avg       0.11      0.33      0.17         3
+
+
+=== Metrics for Site=LEUVEN_2 ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.333
+    Recall:    1.000
+    F1 Score:  0.500
+    Support:   1
+  Autism:
+    Precision: 0.000
+    Recall:    0.000
+    F1 Score:  0.000
+    Support:   2
+
+Overall Metrics:
+  Specificity:          1.000
+  Sensitivity:          0.000
+  AUROC:                1.000
+  Accuracy:             0.333
+  Balanced Accuracy:    0.500
+=====================================
+
+ Site: KKI
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.83      1.00      0.91         5
+           1       0.00      0.00      0.00         1
+
+    accuracy                           0.83         6
+   macro avg       0.42      0.50      0.45         6
+weighted avg       0.69      0.83      0.76         6
+
+
+=== Metrics for Site=KKI ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.833
+    Recall:    1.000
+    F1 Score:  0.909
+    Support:   5
+  Autism:
+    Precision: 0.000
+    Recall:    0.000
+    F1 Score:  0.000
+    Support:   1
+
+Overall Metrics:
+  Specificity:          1.000
+  Sensitivity:          0.000
+  AUROC:                0.600
+  Accuracy:             0.833
+  Balanced Accuracy:    0.500
+=====================================
+
+ Site: NYU
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.55      0.85      0.67        20
+           1       0.40      0.12      0.19        16
+
+    accuracy                           0.53        36
+   macro avg       0.47      0.49      0.43        36
+weighted avg       0.48      0.53      0.46        36
+
+
+=== Metrics for Site=NYU ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.548
+    Recall:    0.850
+    F1 Score:  0.667
+    Support:   20
+  Autism:
+    Precision: 0.400
+    Recall:    0.125
+    F1 Score:  0.190
+    Support:   16
+
+Overall Metrics:
+  Specificity:          0.850
+  Sensitivity:          0.125
+  AUROC:                0.666
+  Accuracy:             0.528
+  Balanced Accuracy:    0.487
+=====================================
+
+ Site: STANFORD
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.29      1.00      0.44         2
+           1       0.00      0.00      0.00         5
+
+    accuracy                           0.29         7
+   macro avg       0.14      0.50      0.22         7
+weighted avg       0.08      0.29      0.13         7
+
+
+=== Metrics for Site=STANFORD ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.286
+    Recall:    1.000
+    F1 Score:  0.444
+    Support:   2
+  Autism:
+    Precision: 0.000
+    Recall:    0.000
+    F1 Score:  0.000
+    Support:   5
+
+Overall Metrics:
+  Specificity:          1.000
+  Sensitivity:          0.000
+  AUROC:                1.000
+  Accuracy:             0.286
+  Balanced Accuracy:    0.500
+=====================================
+
+ Site: UCLA_1
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.45      1.00      0.62         5
+           1       1.00      0.14      0.25         7
+
+    accuracy                           0.50        12
+   macro avg       0.73      0.57      0.44        12
+weighted avg       0.77      0.50      0.41        12
+
+
+=== Metrics for Site=UCLA_1 ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.455
+    Recall:    1.000
+    F1 Score:  0.625
+    Support:   5
+  Autism:
+    Precision: 1.000
+    Recall:    0.143
+    F1 Score:  0.250
+    Support:   7
+
+Overall Metrics:
+  Specificity:          1.000
+  Sensitivity:          0.143
+  AUROC:                0.743
+  Accuracy:             0.500
+  Balanced Accuracy:    0.571
+=====================================
+
+ Site: UCLA_2
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.67      1.00      0.80         2
+           1       1.00      0.50      0.67         2
+
+    accuracy                           0.75         4
+   macro avg       0.83      0.75      0.73         4
+weighted avg       0.83      0.75      0.73         4
+
+
+=== Metrics for Site=UCLA_2 ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.667
+    Recall:    1.000
+    F1 Score:  0.800
+    Support:   2
+  Autism:
+    Precision: 1.000
+    Recall:    0.500
+    F1 Score:  0.667
+    Support:   2
+
+Overall Metrics:
+  Specificity:          1.000
+  Sensitivity:          0.500
+  AUROC:                0.750
+  Accuracy:             0.750
+  Balanced Accuracy:    0.750
+=====================================
+
+ Site: MAX_MUN
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.50      1.00      0.67         1
+           1       1.00      0.67      0.80         3
+
+    accuracy                           0.75         4
+   macro avg       0.75      0.83      0.73         4
+weighted avg       0.88      0.75      0.77         4
+
+
+=== Metrics for Site=MAX_MUN ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.500
+    Recall:    1.000
+    F1 Score:  0.667
+    Support:   1
+  Autism:
+    Precision: 1.000
+    Recall:    0.667
+    F1 Score:  0.800
+    Support:   3
+
+Overall Metrics:
+  Specificity:          1.000
+  Sensitivity:          0.667
+  AUROC:                0.667
+  Accuracy:             0.750
+  Balanced Accuracy:    0.833
+=====================================
+Skipping Site = CALTECH --> only one class present.
+
+ Site: SBL
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.67      1.00      0.80         2
+           1       1.00      0.50      0.67         2
+
+    accuracy                           0.75         4
+   macro avg       0.83      0.75      0.73         4
+weighted avg       0.83      0.75      0.73         4
+
+
+=== Metrics for Site=SBL ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.667
+    Recall:    1.000
+    F1 Score:  0.800
+    Support:   2
+  Autism:
+    Precision: 1.000
+    Recall:    0.500
+    F1 Score:  0.667
+    Support:   2
+
+Overall Metrics:
+  Specificity:          1.000
+  Sensitivity:          0.500
+  AUROC:                1.000
+  Accuracy:             0.750
+  Balanced Accuracy:    0.750
+=====================================
+
+=== Metrics by Sex ===
+
+ Sex: 1
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.58      0.91      0.71        75
+           1       0.72      0.27      0.39        67
+
+    accuracy                           0.61       142
+   macro avg       0.65      0.59      0.55       142
+weighted avg       0.65      0.61      0.56       142
+
+
+=== Metrics for Sex=1 ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.581
+    Recall:    0.907
+    F1 Score:  0.708
+    Support:   75
+  Autism:
+    Precision: 0.720
+    Recall:    0.269
+    F1 Score:  0.391
+    Support:   67
+
+Overall Metrics:
+  Specificity:          0.907
+  Sensitivity:          0.269
+  AUROC:                0.676
+  Accuracy:             0.606
+  Balanced Accuracy:    0.588
+=====================================
+
+ Sex: 2
+Classification report:
+               precision    recall  f1-score   support
+
+           0       0.53      0.67      0.59        15
+           1       0.29      0.18      0.22        11
+
+    accuracy                           0.46        26
+   macro avg       0.41      0.42      0.41        26
+weighted avg       0.42      0.46      0.43        26
+
+
+=== Metrics for Sex=2 ===
+
+Per-Class Metrics:
+  Control:
+    Precision: 0.526
+    Recall:    0.667
+    F1 Score:  0.588
+    Support:   15
+  Autism:
+    Precision: 0.286
+    Recall:    0.182
+    F1 Score:  0.222
+    Support:   11
+
+Overall Metrics:
+  Specificity:          0.667
+  Sensitivity:          0.182
+  AUROC:                0.418
+  Accuracy:             0.462
+  Balanced Accuracy:    0.424
+=====================================

@@ -62,13 +62,15 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, groupeval=False, fold=
     toCSV(DEFAULT_CSV_PATH, fold, clf_name, tag, "Overall", "ALL", metrics)
 
     if groupeval and meta is not None:
-        perGroupEval(ytest, ypred, yprob, meta, group_col='SITE_ID', group_name='Site', fold=fold, classifier_name=clf_name, tag=tag)
+        if 'SITE_ID' in meta.columns and meta['SITE_ID'].nunique() > 1: #no per site evaluation for single site
+            perGroupEval(ytest, ypred, yprob, meta, group_col='SITE_ID', group_name='Site', fold=fold, classifier_name=clf_name, tag=tag)
         if 'SEX' in meta.columns and meta['SEX'].nunique() > 1: # only perform per sex evaluation if the df is M and F combined 
             perGroupEval(ytest, ypred, yprob, meta, group_col='SEX', group_name='Sex', fold=fold, classifier_name=clf_name, tag=tag)
 
         # Bin age into groups and evaluate
         meta = meta.copy()
-        meta['AGE_GROUP'] = pd.cut(meta['AGE'], bins=[0, 11, 18, 30, 100], labels=["0-11", "12-18", "19-30", "30+"])
-        perGroupEval(ytest, ypred, yprob, meta, group_col='AGE_GROUP', group_name='AgeGroup', fold=fold, classifier_name=clf_name, tag=tag)
+        if 'AGE' in meta.columns:
+            meta['AGE_GROUP'] = pd.cut(meta['AGE'], bins=[0, 11, 18, 30, 100], labels=["0-11", "12-18", "19-30", "30+"])
+            perGroupEval(ytest, ypred, yprob, meta, group_col='AGE_GROUP', group_name='AgeGroup', fold=fold, classifier_name=clf_name, tag=tag)
     
     return ytest, ypred, yprob
