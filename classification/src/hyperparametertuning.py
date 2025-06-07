@@ -135,7 +135,7 @@ def bestDT(Xtrain, Xtest, ytrain, ytest, dtdefault):
         'max_depth': [None] + list(np.arange(2, 20)),
         'min_samples_split': randint(2, 20),
         'min_samples_leaf': randint(1, 20),
-        'criterion': ['gini', 'entropy', 'log_loss']
+        'criterion': ['gini', 'entropy']
     }
 
     weighted_recall_scorer = make_scorer(weighted_recall)
