@@ -85,11 +85,29 @@ def runGCV(df, ncv, label="female", groupeval=True):
         yprobAll = np.concatenate(all_yprob[clf])
         pltROCCurve(ytrueAll, yprobAll, modelname=clf, tag=label, timestamp=timestamp)
 
-if __name__ == "__main__":
+def GordonClassAll():
     load_dotenv()
     graphdir = os.getenv('GRAPHS_PATH')
-    for fname in glob.glob(graphdir):
-        df = pd.read_csv(fname)
+
+    if not graphdir:
+        raise ValueError("GRAPHS_PATH environment variable is not set.")
+    
+    resume_from = "cpac_rois-aal_nogsr_filt_norm-laplacian_ledoit_20ICA_graph_thr0.3.csv" #crashed during this one
+    resume = False
+
+    for fname in sorted(glob.glob(graphdir)):
         basename = os.path.basename(fname)
+
+        if not resume:
+            if basename == resume_from:
+                resume = True
+            else:
+                print(f"Skipping {basename}")
+                continue
+        
+        df = pd.read_csv(fname)
         label = basename.replace("cpac_rois-aal_nogsr_filt_", "").replace(".csv", "")
         runGCV(df, ncv=10, label=label)
+
+if __name__ == "__main__":
+    GordonClassAll()
