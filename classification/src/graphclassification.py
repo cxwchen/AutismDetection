@@ -9,12 +9,13 @@ from classification import *
 from classifiers import *
 from hyperparametertuning import *
 from performance import *
+from loaddata import normalizer
 
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 # Create a timestamped log file
 os.makedirs('logs', exist_ok=True)
 log_filename = f'logs/run_{timestamp}.log'
-log_file = open(log_filename, 'w')
+log_file = open(log_filename, 'w', encoding='utf-8')
 
 # Redirect all prints to the log file and still see them in the terminal
 class Tee:
@@ -32,6 +33,7 @@ sys.stdout = Tee(sys.stdout, log_file)
 
 def runGCV(df, ncv, label="female", groupeval=True):
     X = df.iloc[:, 4:]
+    X = X.loc[:, X.var() > 1e-6]
     y = df['DX_GROUP']
     if set(y.unique()) == {1, 2}: #make sure true labels are mapped correctly
         y = y.map({1: 1, 2: 0})
@@ -56,6 +58,8 @@ def runGCV(df, ncv, label="female", groupeval=True):
         imputer = SimpleImputer(strategy='mean')
         Xtrain = imputer.fit_transform(Xtrain)
         Xtest = imputer.transform(Xtest)
+
+        Xtrain, Xtest = normalizer(Xtrain, Xtest)
 
         for cfunc in [applyLogR, applySVM, applyRandForest, applyDT, applyMLP, applyLDA, applyKNN]:
             clfname = cfunc.__name__.replace("apply", "")
@@ -109,14 +113,32 @@ def GordonClassAll():
         label = basename.replace("cpac_rois-aal_nogsr_filt_", "").replace(".csv", "")
         runGCV(df, ncv=10, label=label)
 
+# def JochemClass():
+#     load_dotenv()
+#     graphdir = os.getenv('GRAPHS_PATH_JOCHEM')
+#     basename = os.path.basename(graphdir)
+#     df = pd.read_csv(graphdir)
+#     label = basename.replace("cpac_rois-aal_nogsr_filt_","").replace(".csv","")
+#     runGCV(df, ncv=5, label=label)
 def JochemClass():
-    load_dotenv()
-    graphdir = os.getenv('GRAPHS_PATH_JOCHEM')
-    basename = os.path.basename(graphdir)
-    df = pd.read_csv(graphdir)
-    label = basename.replace("cpac_rois-aal_nogsr_filt_","").replace(".csv","")
-    runGCV(df, ncv=5, label=label)
-
+    try:
+        load_dotenv()
+        graphdir = os.getenv('GRAPHS_PATH_JOCHEM')
+        if not graphdir:
+            raise ValueError("GRAPHS_PATH_JOCHEM is not set.")
+        print(f"Loading {graphdir}")
+        basename = os.path.basename(graphdir)
+        df = pd.read_csv(graphdir)
+        print("Data Loaded. Columns:", df.columns)
+        label = basename.replace("cpac_rois-aal_nogsr_filt_","").replace(".csv","")
+        # X = df.iloc[:, 4:]
+        # X = X.loc[:, X.var() > 1e-6] 
+        # print(X.columns)
+        runGCV(df, ncv=5, label=label)
+    except Exception as e:
+        print("Crash in JochemClass()", e)
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
