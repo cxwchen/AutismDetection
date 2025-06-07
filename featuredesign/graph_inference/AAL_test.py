@@ -328,7 +328,7 @@ def detect_communities(G, method='louvain', **kwargs):
     else:
         raise ValueError(f"Unknown method: {method}. Choose: louvain|greedy_modularity|label_propagation|asyn_lpa|fluid|girvan_newman")
 
-def detect_inf_method(ts_data, inf_method, cov_method=None, alpha = 5):
+def detect_inf_method(ts_data, inf_method, alpha, thresh, cov_method=None):
     """Detect inference method"""
     cov_dependent_methods = {
         'partial_corr',
@@ -376,14 +376,14 @@ def detect_inf_method(ts_data, inf_method, cov_method=None, alpha = 5):
         return gr_causality(ts_data)
     elif inf_method == 'norm_laplacian':
         C = sample_covEst(ts_data, method=cov_method)
-        S = normalized_laplacian(C, epsilon=0.45, threshold=alpha)
+        S = normalized_laplacian(C, epsilon=0.45, threshold=0)
         return S
     elif inf_method == 'rlogspect':
         C = sample_covEst(ts_data, method=cov_method)
-        return learn_adjacency_rLogSpecT(C, delta_n=15*np.sqrt(np.log(176) / 176), threshold=alpha)
+        return learn_adjacency_rLogSpecT(C, delta_n=15*np.sqrt(np.log(176) / 176), threshold=0)
     elif inf_method == 'LADMM':
         C = sample_covEst(ts_data, method=cov_method)
-        return learn_adjacency_LADMM(C, delta_n=15*np.sqrt(np.log(176) / 176), threshold=alpha)
+        return learn_adjacency_LADMM(C, delta_n=15*np.sqrt(np.log(176) / 176), threshold=0)
     else:
         raise ValueError(f"Unknown inference method: {inf_method} (choose: 'sample_cov','partial_corr', 'pearson_corr_binary', 'pearson_corr', 'mutual_info', 'gr_causality', 'norm_laplacian', 'rlogspect').")
 
@@ -1140,14 +1140,14 @@ def multiset_feats(data_list, subject_ids, inf_method="mutual_info", cov_method=
 
     return multiset_pheno(df_final)
 
-def adjacency_df(data_list, subject_ids, method="mutual_info", alpha =5):
+def adjacency_df(data_list, subject_ids, inf_method, cov_method, alpha, thresh):
     rows = []
     index = []
 
     for i, (data, sid) in enumerate(zip(data_list, subject_ids)):
         try:
             #print(f"[{i+1}/{len(data_list)}] Processing subject {sid}...", flush=True)
-            adj_matrix = detect_inf_method(data, inf_method=method, cov_method='direct', alpha=alpha)
+            adj_matrix = detect_inf_method(data, inf_method=inf_method, cov_method=cov_method, alpha=alpha, thresh=thresh)
             if adj_matrix is None or np.all(adj_matrix == 0):
                 print(f" - Empty or zero matrix for subject {sid}. Skipping.")
                 continue
