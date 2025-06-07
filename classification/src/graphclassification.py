@@ -87,10 +87,10 @@ def runGCV(df, ncv, label="female", groupeval=True):
 
 def GordonClassAll():
     load_dotenv()
-    graphdir = os.getenv('GRAPHS_PATH')
+    graphdir = os.getenv('GRAPHS_PATH_GORDON')
 
     if not graphdir:
-        raise ValueError("GRAPHS_PATH environment variable is not set.")
+        raise ValueError("GRAPHS_PATH_GORDON environment variable is not set.")
     
     resume_from = "cpac_rois-aal_nogsr_filt_norm-laplacian_ledoit_20ICA_graph_thr0.3.csv" #crashed during this one
     resume = False
@@ -109,5 +109,16 @@ def GordonClassAll():
         label = basename.replace("cpac_rois-aal_nogsr_filt_", "").replace(".csv", "")
         runGCV(df, ncv=10, label=label)
 
+def JochemClass():
+    load_dotenv()
+    graphdir = os.getenv('GRAPHS_PATH_JOCHEM')
+    basename = os.path.basename(graphdir)
+    df = pd.read_csv(graphdir)
+    label = basename.replace("cpac_rois-aal_nogsr_filt_","").replace(".csv","")
+    runGCV(df, ncv=5, label=label)
+
+
+
 if __name__ == "__main__":
-    GordonClassAll()
+    # GordonClassAll()
+    JochemClass()
