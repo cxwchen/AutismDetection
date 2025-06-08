@@ -92,7 +92,7 @@ def normalized_laplacian_reweighted(cov_est, tau=1.0, delta=1e-4, epsilon=0.1, m
     return S_est
 
 # --------- Adjacency Learning ---------
-def adjacency_reweighted(cov_est, tau=1.0, delta=1e-5, epsilon=0.1, max_iter=10, binarize_threshold=0.1):
+def adjacency_reweighted(cov_est, tau=1.0, delta=1e-5, epsilon=0.1, max_iter=10, binarize_threshold=0):
     _, V_hat = eigh(cov_est)
     N = V_hat.shape[0]
     S_est = np.zeros((N, N))

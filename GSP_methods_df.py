@@ -38,7 +38,7 @@ def process_feats(
 
     # Convert output_dir to Path
     if output_dir is None:
-        output_dir = Path.home() / 'Documents' / 'abide_tests'
+        output_dir = Path.home() / 'Documents' / 'abide_multisite_selection'
     else:
         output_dir = Path(output_dir).expanduser()
 
@@ -128,12 +128,15 @@ def process_feats(
     
 def main():
     inf_methods = ['norm_laplacian', 'LADMM']
-    cov_methods = ['direct', 'ledoit', 'glasso', 'window', 'var', 'nvar']
+    cov_methods_dict = {
+        'norm_laplacian': ['direct', 'glasso', 'ledoit', 'var'],
+        'LADMM': ['direct', 'var']
+    }    
     n_components = 20
     for inf in inf_methods:
-        for cov in cov_methods:        
+        for cov in cov_methods_dict[inf]:        
             print(f"Running inf_method={inf}, cov_method={cov}")
-            process_feats(feats='graph', inf_method=inf, cov_method=cov, n_components=n_components, site='NYU')
+            process_feats(feats='graph', inf_method=inf, cov_method=cov, n_components=n_components, site=None)
 
 def cross_validate_model(X, y, classifier, n_splits=5):
     """

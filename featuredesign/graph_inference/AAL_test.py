@@ -376,14 +376,14 @@ def detect_inf_method(ts_data, inf_method, alpha, thresh, cov_method=None):
         return gr_causality(ts_data)
     elif inf_method == 'norm_laplacian':
         C = sample_covEst(ts_data, method=cov_method)
-        S = normalized_laplacian(C, epsilon=0.45, threshold=0)
+        S = normalized_laplacian(C, epsilon=0.45, threshold=0.15)
         return S
     elif inf_method == 'rlogspect':
         C = sample_covEst(ts_data, method=cov_method)
-        return learn_adjacency_rLogSpecT(C, delta_n=15*np.sqrt(np.log(176) / 176), threshold=0)
+        return learn_adjacency_rLogSpecT(C, delta_n=15*np.sqrt(np.log(176) / 176), threshold=0.2)
     elif inf_method == 'LADMM':
         C = sample_covEst(ts_data, method=cov_method)
-        return learn_adjacency_LADMM(C, delta_n=15*np.sqrt(np.log(176) / 176), threshold=0)
+        return learn_adjacency_LADMM(C, delta_n=15*np.sqrt(np.log(176) / 176), threshold=0.2)
     else:
         raise ValueError(f"Unknown inference method: {inf_method} (choose: 'sample_cov','partial_corr', 'pearson_corr_binary', 'pearson_corr', 'mutual_info', 'gr_causality', 'norm_laplacian', 'rlogspect').")
 
@@ -1177,14 +1177,14 @@ def adjacency_df(data_list, subject_ids, inf_method, cov_method, alpha, thresh):
         df_wide['subject_id'] = df_wide['subject_id'].astype(str).str.zfill(7)
 
         # Select desired phenotypic columns
-        df_pheno = df_labels[['SUB_ID', 'SITE_ID', 'DX_GROUP', 'SEX']]
+        df_pheno = df_labels[['SUB_ID', 'SITE_ID', 'DX_GROUP', 'SEX', 'AGE_AT_SCAN']]
 
         # Merge and drop SUB_ID
         df_merged = df_wide.merge(df_pheno, left_on='subject_id', right_on='SUB_ID', how='left')
         df_merged.drop(columns='SUB_ID', inplace=True)
 
         # Reorder phenotypic columns
-        phenotype_cols = ['DX_GROUP', 'SEX', 'SITE_ID']
+        phenotype_cols = ['DX_GROUP', 'SEX', 'SITE_ID', 'AGE_AT_SCAN']
         cols = phenotype_cols + [col for col in df_merged.columns if col not in phenotype_cols]
         df_merged = df_merged[cols]
 
