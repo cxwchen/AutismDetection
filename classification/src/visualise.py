@@ -6,6 +6,26 @@ from nilearnextraction import *
 from featureimportance import *
 
 def plotConnectome(model, featnames):
+    """
+    -------------------------------------------------------------------------------------------
+    This function visualises the most important brain connectivity features based on prediction
+    -------------------------------------------------------------------------------------------
+    This function builds an adjacency matrix weighted by feature importance and plots the 
+    connectome graph using nilearn
+
+    Parameters
+    ----------
+    model : object
+        Fitted estimator
+    
+    featnames : array-like
+        List, numpy array, or pandas Index of feature names (column labels)
+
+    Returns
+    -------
+    None
+    """
+
     labels, maps, indices = extractaal()
     coords = plotting.find_parcellation_cut_coords(maps)
     idx2coord = {idx: coord for idx, coord in zip(indices, coords)}

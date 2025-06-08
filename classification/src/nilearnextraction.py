@@ -9,7 +9,26 @@ import seaborn as sns
 
 # Function to process one atlas
 def nilearnextract():
-    data = fetch_abide_pcp(pipeline='cpac', band_pass_filtering=False, global_signal_regression=True, derivatives='rois_aal', quality_checked=True)
+    """
+    ----------------------------------------------------------------------
+    This function extracts the full correlation between ROIs using Nilearn
+    ----------------------------------------------------------------------
+
+    Returns
+    -------
+    df : DataFrame
+        A DataFrame containing both features as well as the phenotypic info used for evaluation
+    
+    labels : list of str
+        list of the names of the regions. Version: SPM12
+    
+    maps : NiftiImage
+        path to nifti file containing the regions.
+    
+    indices : list of str
+        indices mapping 'labels' to values in the 'maps' image
+    """
+    data = fetch_abide_pcp(pipeline='cpac', band_pass_filtering=True, global_signal_regression=False, derivatives='rois_aal', quality_checked=True)
     phenotypic = data.phenotypic
     aal = fetch_atlas_aal(version='SPM12')
     labels = aal.labels
@@ -32,6 +51,22 @@ def nilearnextract():
     return df, labels, maps, indices
 
 def extractaal():
+    """
+    ------------------------------------
+    This function fetches the AAL atlas
+    ------------------------------------
+
+    Returns
+    -------
+    labels : list of str
+        list of the names of the regions. Version: SPM12
+    
+    maps : NiftiImage
+        path to nifti file containing the regions.
+    
+    indices : list of str
+        indices mapping 'labels' to values in the 'maps' image
+    """
     aal = fetch_atlas_aal(version='SPM12')
     labels = aal.labels
     maps = aal.maps
