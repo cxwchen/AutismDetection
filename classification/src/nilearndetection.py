@@ -51,15 +51,16 @@ female_df = comb_df[comb_df['SEX'] == 2].sample(frac=1, random_state=42).reset_i
 male_df = comb_df[comb_df['SEX'] == 1].sample(frac=1, random_state=42).reset_index(drop=True)
 
 def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False, numfeats=100, ncv=5):
-    # version for Jochem
-    # X = df.iloc[:, 4:]
-    # y = df['DX_GROUP']
-    # meta = df[['SITE_ID', 'SEX', 'AGE']]
+    df.rename(columns={
+        'AGE_AT_SCAN': 'AGE',
+        'subject_id': 'SUB_ID'
+    }, inplace=True)
 
-    # version for us
-    X = df.iloc[:, 4:]
+    # Define phenotypic columns if they exist
+    pheno_cols = df.columns.intersection(["DX_GROUP", "SEX", "SITE_ID", "SUB_ID", "AGE"])
+    X = df.drop(columns=pheno_cols)
     y = df['DX_GROUP']
-    meta = df[['SITE_ID', 'SEX', 'AGE']]
+    meta = df[df.columns.intersection(["SITE_ID", "SEX", "AGE"])]
 
     skf = StratifiedKFold(n_splits=ncv, shuffle=True, random_state=42)
     print("Running Stratified KFold Cross-Validation...")
