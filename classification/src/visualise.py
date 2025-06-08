@@ -1,3 +1,5 @@
+import os
+import json
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -5,7 +7,7 @@ from nilearn import plotting
 from nilearnextraction import *
 from featureimportance import *
 
-def plotConnectome(model, featnames):
+def plotConnectome(model, featnames, k, fold=None, tag="", timestamp="", save_feats=False):
     """
     -------------------------------------------------------------------------------------------
     This function visualises the most important brain connectivity features based on prediction
@@ -29,7 +31,19 @@ def plotConnectome(model, featnames):
     labels, maps, indices = extractaal()
     coords = plotting.find_parcellation_cut_coords(maps)
     idx2coord = {idx: coord for idx, coord in zip(indices, coords)}
-    topfeats = getimportanceK(model, featnames)
+    topfeats = getimportanceK(model, featnames, k=k)
+
+    if save_feats:
+        os.makedirs(f"features/{timestamp}", exist_ok=True)
+        save_path = f"features/{timestamp}/{model.__class__.__name__}"
+        if tag:
+            save_path += f"_{tag}"
+        if fold is not None:
+            save_path += f"_Fold{fold}"
+        save_path += ".json"
+
+        with open(save_path, "w") as f:
+            json.dump(topfeats, f, indent=4)
 
     nodes = set()
     edgeinfo = []
@@ -61,13 +75,17 @@ def plotConnectome(model, featnames):
         i, j = nodeidx[idx1], nodeidx[idx2]
         adjmatr[i,j] = weight
         adjmatr[j,i] = weight
+    
+    filename = f'plots/{timestamp}/{k}feats_{model.__class__.__name__}'
+    if tag:
+        filename += f' - {tag}'
+    if fold is not None:
+        filename += f' - Fold {fold}'
 
-    plotting.plot_connectome(adjacency_matrix=adjmatr, node_coords=nodecoords, title="Top 20 Most Important Connections", black_bg=True, colorbar=True)
-    plt.show()
+    plotting.plot_connectome(adjacency_matrix=adjmatr, node_coords=nodecoords, output_file=f'{filename}.png', title="Top 20 Most Important Connections", black_bg=False, colorbar=True)
+    # plt.show()
 
-if __name__ == "__main__":
-    # Quick testing
-    # labels, maps, indices = extractaal()
+def firsttest():
     df = pd.read_csv('nilearnfeatscomb.csv.gz')
     X = df.iloc[:, 4:]
     y = df['DX_GROUP']
@@ -77,3 +95,8 @@ if __name__ == "__main__":
     Xtrain, Xtest = normalizer(Xtrain, Xtest)
     lrmodel = applyLogR(Xtrain, ytrain)
     plotConnectome(lrmodel, featnames=X.columns)
+
+if __name__ == "__main__":
+    # Quick testing
+    # labels, maps, indices = extractaal()
+    firsttest()
