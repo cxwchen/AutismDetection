@@ -129,7 +129,7 @@ def GordonMultiClassAll():
     for fname in sorted(glob.glob(graphdir)):
         basename = os.path.basename(fname)
         
-        df = pd.read_csv(fname)
+        df = pd.read_csv(fname).sample(frac=1, random_state=42).reset_index(drop=True)
         label = basename.replace("cpac_rois-aal_nogsr_filt_", "").replace(".csv", "")
         runGCV(df, ncv=5, label=label)
 
