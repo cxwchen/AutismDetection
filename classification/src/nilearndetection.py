@@ -5,17 +5,14 @@ import datetime
 from dotenv import load_dotenv
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from sklearn.impute import SimpleImputer
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
-from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import StratifiedKFold, LeaveOneGroupOut
 from loaddata import *
 from classification import *
 from classifiers import *
 from hyperparametertuning import *
 from performance import *
+from visualise import *
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 fs_src = os.path.join(project_root, 'featureselection', 'src')
@@ -141,14 +138,6 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False, numfe
         pltROCCurve(ytrueAll, yprobAll, modelname=clf, tag=label, timestamp=timestamp)
 
 
-        # performCA(applyLogR, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test)
-        # performCA(applySVM, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = svcparams)
-        # performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = None)
-        # performCA(applyDT, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = dtparams)
-        # performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, params = mlpparams)
-        # performCA(applyLDA, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test)
-        # performCA(applyKNN, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test)
-
 def runLOGO(df, label="female", useFS=False, groupeval=False, numfeats=100):
     X = df.iloc[:, 4:]
     y = df['DX_GROUP']
@@ -190,17 +179,74 @@ def runLOGO(df, label="female", useFS=False, groupeval=False, numfeats=100):
         performCA(applyLDA, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, timestamp=timestamp)
         performCA(applyKNN, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, timestamp=timestamp)
 
+def runCVvisu(df, label="female", groupeval=True, ncv=5):
+    df.rename(columns={
+        'AGE_AT_SCAN': 'AGE',
+        'subject_id': 'SUB_ID'
+    }, inplace=True)
+
+    pheno_cols = df.columns.intersection(["DX_GROUP", "SEX", "SITE_ID", "SUB_ID", "AGE"])
+    X = df.drop(columns=pheno_cols)
+    y = df['DX_GROUP']
+    meta = df[df.columns.intersection(["SITE_ID", "SEX", "AGE"])]
+
+    skf = StratifiedKFold(n_splits=ncv, shuffle=True, random_state=42)
+    print("Running Stratified KFold Cross-Validation...")
+
+    all_ytrue = {}
+    all_yprob = {}
+    all_ypred = {}
+    for fold, (trainidx, testidx) in enumerate(skf.split(X, y), 1):
+        print(f"\n=== Fold {fold} | {label.upper()} Data ===")
+        Xtrain, Xtest = X.iloc[trainidx], X.iloc[testidx]
+        ytrain, ytest = y.iloc[trainidx], y.iloc[testidx]
+        ytrain = ytrain.reset_index(drop=True)
+        ytest = ytest.reset_index(drop=True)
+        meta_train = meta.iloc[trainidx].reset_index(drop=True)
+        meta_test = meta.iloc[testidx].reset_index(drop=True)
+
+        imputer = SimpleImputer(strategy='mean')
+        Xtrain = imputer.fit_transform(Xtrain)
+        Xtest = imputer.transform(Xtest)
+
+        Xtrain, Xtest = normalizer(Xtrain, Xtest)
+
+        for cfunc in [applyLogR, applySVM]:
+            clfname = cfunc.__name__.replace("apply", "")
+            print(f"\n=== Fold {fold} | {clfname}")
+
+            if cfunc == applySVM:
+                params = params = {'kernel': 'linear', 'C': 1}
+        # rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, RandomForestClassifier())
+            else:
+                params = None
+            
+            ytrue, ypred, yprob, model = performCA(cfunc, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, timestamp=timestamp, params=params)
+            
+            all_ytrue.setdefault(clfname, []).append(ytrue)
+            all_ypred.setdefault(clfname, []).append(ypred)
+            if yprob is not None:
+                all_yprob.setdefault(clfname, []).append(yprob)
+
+            plotConnectome(model, featnames=X.columns, k=20, fold=fold, tag=label, timestamp=timestamp, save_feats=True)
+    
+    for clf in all_ytrue:
+        ytrueAll = np.concatenate(all_ytrue[clf])
+        ypredAll = np.concatenate(all_ypred[clf])
+        pltAggrConfMatr(ytrueAll, ypredAll, modelname=clf, tag=label, timestamp=timestamp)
+        yprobAll = np.concatenate(all_yprob[clf])
+        pltROCCurve(ytrueAll, yprobAll, modelname=clf, tag=label, timestamp=timestamp)
 
 def run_singlesite():
     # ============ SINGLE SITE NO FEATURE SELECTION ============================
     # Run skf 5 fold cross-validation with combined data, only NYU, no feature selection
-    # runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_combined_onlyNYU_nofs", useFS=False, useHarmo=False)
+    runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_combined_onlyNYU_nofs", useFS=False, useHarmo=False)
 
     # Run skf 5 fold cross-validation with female data, only NYU, no feature selection
-    # runCV(female_df[female_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_female_onlyNYU_nofs", useFS=False, useHarmo=False)
+    runCV(female_df[female_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_female_onlyNYU_nofs", useFS=False, useHarmo=False)
     
     # Run skf 5 fold cross-validation with male data, only NYU, no feature selection
-    # runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_male_onlyNYU_nofs", useFS=False, useHarmo=False)
+    runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_male_onlyNYU_nofs", useFS=False, useHarmo=False)
 
     # Run skf 10 fold cross-validation with combined data, only NYU, no feature selection, no group evaluation
     runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf10_combined_onlyNYU_nofs", groupeval=False, useFS=False, useHarmo=False, ncv=10)
@@ -210,19 +256,15 @@ def run_singlesite():
     
     # ============ SINGLE SITE WITH FEATURE SELECTION ============================
     # Run skf 5 fold cross-validation with combined data, only NYU, with feature selection
-    # runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_combined_onlyNYU_fs", useFS=True, useHarmo=False)
+    runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_combined_onlyNYU_fs", useFS=True, useHarmo=False)
 
     # Run skf 5 fold cross-validation with female data, only NYU, with feature selection
-    # runCV(female_df[female_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_female_onlyNYU_fs", useFS=True, useHarmo=False)
+    runCV(female_df[female_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_female_onlyNYU_fs", useFS=True, useHarmo=False)
     
     # Run skf 5 fold cross-validation with male data, only NYU, with feature selection
-    # runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_male_onlyNYU_fs", useFS=True, useHarmo=False)
+    runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_male_onlyNYU_fs", useFS=True, useHarmo=False)
 
 def run_multisite_comb():
-    # runCV(female_df, label="female")
-    # runCV(male_df, label="male")
-    # comb_df = comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True)
-
     # ======================= STRATIFIED CV =================================================
     #Run skf cross-validation with combined data, harmonization=true, feature-selection=true
     runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_harmo_fs", useFS=True, useHarmo=True)
@@ -266,9 +308,8 @@ def run_multisite_male():
     runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_harmo_nofs", useFS=False, useHarmo=True)
 
 if __name__ == "__main__":
-    run_singlesite() # To run by Carmen
-    run_multisite_comb() # To run by Hannah-Rhys
-    run_multisite_female() # To run by Hannah-Rhys
-    run_multisite_male() # To run by Carmen
-    # print("Able to use feature selection package")
-    # print(female_df['SITE_ID'].value_counts())
+    # run_singlesite() # To run by Carmen
+    # run_multisite_comb() # To run by Hannah-Rhys
+    # run_multisite_female() # To run by Hannah-Rhys
+    # run_multisite_male() # To run by Carmen
+    runCVvisu(comb_df, label="skf5_combined_multisite", groupeval=True, ncv=5)
