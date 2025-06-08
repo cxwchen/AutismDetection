@@ -34,6 +34,9 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, groupeval=False, fold=
 
     meta : array-like
         contains phenotypic data for per-site, per-sex, and per-agegroup evaluation
+
+    timestamp : string
+        String to organise the results in their dedicated folders.
         
     **kwargs : dict
         to pass parameters found using hyperparameter tuning. Default: params = None
@@ -73,4 +76,4 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, groupeval=False, fold=
             meta['AGE_GROUP'] = pd.cut(meta['AGE'], bins=[0, 11, 18, 30, 100], labels=["0-11", "12-18", "19-30", "30+"])
             perGroupEval(ytest, ypred, yprob, meta, group_col='AGE_GROUP', group_name='AgeGroup', fold=fold, classifier_name=clf_name, tag=tag)
     
-    return ytest, ypred, yprob
+    return ytest, ypred, yprob, model

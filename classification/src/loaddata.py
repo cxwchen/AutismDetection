@@ -60,8 +60,8 @@ def performsplit(features, y): #perform train test split for model evaluation
     return Xtrain, Xtest, ytrain, ytest
 
 def normalizer(feat_train, feat_test):
-    scaler = StandardScaler().fit(feat_train)
-    Xtrain = scaler.transform(feat_train)
+    scaler = StandardScaler()
+    Xtrain = scaler.fit_transform(feat_train)
     Xtest = scaler.transform(feat_test)
     return Xtrain, Xtest
 

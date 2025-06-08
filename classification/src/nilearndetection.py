@@ -125,7 +125,7 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False, numfe
             else:
                 params = None
             
-            ytrue, ypred, yprob = performCA(cfunc, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, timestamp=timestamp, params=params)
+            ytrue, ypred, yprob, model = performCA(cfunc, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, timestamp=timestamp, params=params)
 
             all_ytrue.setdefault(clfname, []).append(ytrue)
             all_ypred.setdefault(clfname, []).append(ypred)
@@ -224,20 +224,20 @@ def run_multisite_comb():
 
     # ======================= STRATIFIED CV =================================================
     #Run skf cross-validation with combined data, harmonization=true, feature-selection=true
-    # runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_harmo_fs", useFS=True, useHarmo=True)
+    runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_harmo_fs", useFS=True, useHarmo=True)
 
     #Run skf cross-validation with combined data, no harmonization, no feature selection
-    # runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_noharmo_nofs", useFS=False, useHarmo=False)
+    runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_noharmo_nofs", useFS=False, useHarmo=False)
 
     #Run skf cross-validation with combined data, no harmo, with feature selection
-    # runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_noharmo_fs", useFS=True, useHarmo=False)
+    runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_noharmo_fs", useFS=True, useHarmo=False)
 
     #Run skf cross-validation with combined data, with harmonization, no feature-selection
-    # runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_harmo_nofs", useFS=False, useHarmo=True)
+    runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_harmo_nofs", useFS=False, useHarmo=True)
 
     # ====================== LOGO CV ==================================================
     #Run LOGO cross-validation with combined data, no feature selection
-    # runLOGO(comb_df, label="logo_combined_nofs", useFS=False)
+    runLOGO(comb_df, label="logo_combined_nofs", useFS=False)
 
     #Run LOGO cross-validation with combined data, with feature selection
     runLOGO(comb_df, label="logo_combined_fs", useFS=True)
@@ -265,9 +265,9 @@ def run_multisite_male():
     runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_harmo_nofs", useFS=False, useHarmo=True)
 
 if __name__ == "__main__":
-    # run_singlesite() # To run by Carmen
+    run_singlesite() # To run by Carmen
     run_multisite_comb() # To run by Hannah-Rhys
-    # run_multisite_female() # To run by Hannah-Rhys
-    # run_multisite_male() # To run by Carmen
+    run_multisite_female() # To run by Hannah-Rhys
+    run_multisite_male() # To run by Carmen
     # print("Able to use feature selection package")
     # print(female_df['SITE_ID'].value_counts())
