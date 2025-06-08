@@ -34,10 +34,7 @@ def getimportanceK(model, featnames=None, k=20):
     topidx = np.argsort(np.abs(importances))[::-1][:k]
     return [(featnames[i], importances[i]) for i in topidx]
 
-
-
-if __name__ == "__main__":
-    # Quick test
+def quicktest():
     df = pd.read_csv('nilearnfeatscomb.csv.gz')
     X = df.iloc[:, 4:]
     y = df['DX_GROUP']
@@ -49,4 +46,8 @@ if __name__ == "__main__":
     ypred = lrmodel.predict(Xtest)
     featlist = getimportanceK(lrmodel, featnames=X.columns)
     print(featlist)
+
+if __name__ == "__main__":
+    # Quick test
+    quicktest()
     
