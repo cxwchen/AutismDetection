@@ -28,6 +28,7 @@ def nilearnextract():
     indices : list of str
         indices mapping 'labels' to values in the 'maps' image
     """
+    
     data = fetch_abide_pcp(pipeline='cpac', band_pass_filtering=True, global_signal_regression=False, derivatives='rois_aal', quality_checked=True)
     phenotypic = data.phenotypic
     aal = fetch_atlas_aal(version='SPM12')
@@ -67,6 +68,7 @@ def extractaal():
     indices : list of str
         indices mapping 'labels' to values in the 'maps' image
     """
+
     aal = fetch_atlas_aal(version='SPM12')
     labels = aal.labels
     maps = aal.maps
