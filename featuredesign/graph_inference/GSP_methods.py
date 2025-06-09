@@ -3,13 +3,13 @@ import cvxpy as cp
 from numpy.linalg import eigh, norm
 from math import sqrt, log
 import matplotlib.pyplot as plt
-from tqdm import trange, tqdm  # Add this at the top with other imports
-from algorithms import *
-from generator import *
+from tqdm import trange, tqdm  
+from featuredesign.graph_inference.algorithms import *
+from featuredesign.graph_inference.generator import *
 from sklearn.covariance import empirical_covariance
 
 # --------- Laplacian Learning ---------
-def normalized_laplacian(V_hat, epsilon=1e-1, alpha=0.5):
+def normalized_laplacian(cov_est, epsilon=4.5e-1, threshold=0):
     """
     Learns a normalized Laplacian S such that:
     - S is PSD, symmetric, with 1s on diagonal
@@ -17,6 +17,7 @@ def normalized_laplacian(V_hat, epsilon=1e-1, alpha=0.5):
     - S approximates spectral form S' = ∑ λ_k v_k v_kᵀ
     - S' has smallest eigenvalue (λ₁) = 0, enforced via λ₀ = 0
     """
+    _, V_hat = eigh(cov_est)
     N = V_hat.shape[0]
     S = cp.Variable((N, N), symmetric=True)
     lambda_vec = cp.Variable(N)
@@ -31,23 +32,27 @@ def normalized_laplacian(V_hat, epsilon=1e-1, alpha=0.5):
     constraints = [
         S >> 0,                                   # PSD
         cp.diag(S) == 1,                          # Diagonal = 1
-        #off_diag_entries <= 0,                    # Off-diagonal ≤ 0
+        #off_diag_entries <= 0,                   # Off-diagonal ≤ 0
         off_diag_entries >= -1,                   # Off-diagonal ≥ -1
         cp.norm(S - S_prime, 'fro') <= epsilon,   # Spectral similarity
         lambda_vec[0] == 0,                       # λ₁(S') = 0, right eigenvector picked?
     ]
 
+    alpha = 0.5
+    
     # Objective: sparsity in S
     objective = cp.Minimize(alpha * cp.norm(S, 1))
 
     problem = cp.Problem(objective, constraints)
     problem.solve(solver=cp.SCS)
-
-    # print("Step 2 Optimization Status:", problem.status)
-    return S.value
-
-def normalized_laplacian_reweighted(V_hat, tau=1.0, delta=1e-4, epsilon=0.1, max_iter=10):
     
+    result = threshold_and_normalize_laplacian(S.value, threshold=threshold)
+
+    #print("Step 2 Optimization Status:", problem.status)
+    return result
+
+def normalized_laplacian_reweighted(cov_est, tau=1.0, delta=1e-4, epsilon=0.1, max_iter=10):
+    _, V_hat = eigh(cov_est)
     N = V_hat.shape[0]
     S_est = np.zeros((N, N))
     weights = np.ones((N, N))
@@ -87,8 +92,8 @@ def normalized_laplacian_reweighted(V_hat, tau=1.0, delta=1e-4, epsilon=0.1, max
     return S_est
 
 # --------- Adjacency Learning ---------
-def adjacency_reweighted(V_hat, tau=1.0, delta=1e-5, epsilon=0.1, max_iter=10, binarize_threshold=0.1):
-    
+def adjacency_reweighted(cov_est, tau=1.0, delta=1e-5, epsilon=0.1, max_iter=10, binarize_threshold=0):
+    _, V_hat = eigh(cov_est)
     N = V_hat.shape[0]
     S_est = np.zeros((N, N))
     weights = np.ones((N, N))
@@ -125,7 +130,7 @@ def adjacency_reweighted(V_hat, tau=1.0, delta=1e-5, epsilon=0.1, max_iter=10, b
         
     return S_est
 
-def learn_adjacency_rLogSpecT(V_hat, delta_n, alpha=0.1):
+def learn_adjacency_rLogSpecT(cov_est, delta_n):
     """
     Learn adjacency matrix using rLogSpecT formulation without reweighting
     
@@ -138,10 +143,10 @@ def learn_adjacency_rLogSpecT(V_hat, delta_n, alpha=0.1):
         alpha: Weight for log-barrier term
         delta_n: Commutator constraint threshold
     """
-    N = V_hat.shape[0]
-    
+    N = cov_est.shape[0]
+    alpha = 0.5
     S = cp.Variable((N, N), nonneg=True)
-    
+    print("rLogSpecT")
     # Objective terms
     l1_term = cp.sum(cp.abs(S))  # ||S||_{1,1}
     log_term = cp.sum(cp.log(cp.sum(S, axis=1) + 1e-10))  # 1^T log(S1)
@@ -150,7 +155,7 @@ def learn_adjacency_rLogSpecT(V_hat, delta_n, alpha=0.1):
     constraints = [
         S == S.T,
         cp.diag(S) == 0,
-        cp.sum_squares(S @ V_hat - V_hat @ S) <= delta_n**2
+        cp.sum_squares(S @ cov_est - cov_est @ S) <= delta_n**2
     ]
     
     # Solve problem
@@ -159,10 +164,28 @@ def learn_adjacency_rLogSpecT(V_hat, delta_n, alpha=0.1):
     
     if S.value is None:
         raise ValueError("Optimization failed to converge")
-        
-    return S.value
+    
+    return normalize_adjacency_weights(S.value)
 
-def binarize_adjacency_matrix(adj_matrix, threshold=0.1, keep_diagonal=False):
+def learn_adjacency_LADMM(cov_est, delta_n, threshold=0):
+    m = len(cov_est[0])
+    s0 = np.ones((m, m))
+    q0 = s0.dot(np.ones((m, 1)))
+    Z0 = s0.copy()
+    lambda20 = np.zeros((m, m))
+    lambda30 = np.zeros((m, 1))
+    
+    alpha = 0.5
+    rho = 1.0
+    tau1 = 0.7
+    epsilon = 1e-6
+            
+    # Run lADMM
+    s, ss, r, rrho = lADMM(cov_est, s0, Z0, q0, lambda20, lambda30, alpha, delta_n, rho, tau1, epsilon, kMax = 10000)
+
+    return threshold_and_normalize_adjacency(s, threshold)
+
+def binarize_adjacency_matrix(adj_matrix, threshold=0.15, keep_diagonal=False):
     """
     Binarizes an adjacency matrix based on a threshold value.
     
@@ -191,3 +214,55 @@ def binarize_adjacency_matrix(adj_matrix, threshold=0.1, keep_diagonal=False):
         np.fill_diagonal(binary_matrix, 0)
     
     return binary_matrix
+
+def threshold_and_normalize_laplacian(adj_matrix, threshold=0):
+    """
+    Thresholds the absolute values of an adjacency matrix by setting all values whose absolute 
+    value is below the threshold to 0, and optionally normalizes the matrix.
+    
+    Parameters:
+    - adj_matrix (numpy.ndarray): The adjacency matrix (can contain both negative and positive values).
+    - threshold (float): The threshold value for the absolute values. Values whose absolute value 
+                         is below this threshold will be set to 0.
+    - normalize (bool): Whether to normalize the matrix after thresholding.
+    
+    Returns:
+    - numpy.ndarray: The thresholded and optionally normalized adjacency matrix.
+    """
+    # Diagonal elements set to zero for normalization
+    np.fill_diagonal(adj_matrix, 0)
+
+    # Compute the max absolute value in the thresholded matrix
+    max_abs_value = np.max(np.abs(adj_matrix))
+        
+    # Avoid division by zero if the max absolute value is 0
+    if max_abs_value != 0:
+        adj_matrix_norm = adj_matrix / max_abs_value
+    else:
+        print("Warning: Maximum absolute value is 0, normalization skipped.")
+    
+    # Apply absolute value and then thresholding
+    thresholded_matrix = np.where(np.abs(adj_matrix_norm) >= threshold, adj_matrix_norm, 0)
+    
+    return thresholded_matrix
+
+def threshold_and_normalize_adjacency(adj_matrix, threshold=0):
+    """
+    Normalizes the weights of the adjacency matrix to be between 0 and 1 using min-max normalization.
+    
+    Parameters:
+    - adj_matrix: A numpy 2D array representing the adjacency matrix.
+    
+    Returns:
+    - normalized_adj: The adjacency matrix with normalized weights between 0 and 1.
+    """
+    # Find the minimum and maximum values in the adjacency matrix
+    min_val = np.min(adj_matrix)
+    max_val = np.max(adj_matrix)
+    
+    # Apply min-max normalization
+    normalized_adj = (adj_matrix - min_val) / (max_val - min_val)  # Scales the values between 0 and 1
+    
+    # Apply absolute value and then thresholding
+    normalized_adj = np.where(np.abs(normalized_adj) >= threshold, normalized_adj, 0)    
+    return normalized_adj

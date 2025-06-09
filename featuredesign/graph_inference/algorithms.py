@@ -209,18 +209,4 @@ def lADMM(Hn, s0, Z0, q0, lambda20, lambda30, alpha, delta, rho, tau1, epsilon=1
     # return s, q, Y, Z, ss,r,rrho,funcvalues
     return s, ss, r, rrho
 # linearized ADMM to solve the original problem
-
-def plot_graphs(S_true, S_learned):
-    plt.figure(figsize=(10, 4))
-    plt.subplot(1, 2, 1)
-    plt.imshow(S_true, cmap='viridis')
-    plt.title("True Adjacency Matrix")
-    plt.colorbar()
-
-    plt.subplot(1, 2, 2)
-    plt.imshow(S_learned, cmap='viridis')
-    plt.title("Learned Adjacency Matrix")
-    plt.colorbar()
-    plt.tight_layout()
-    plt.show()
     
