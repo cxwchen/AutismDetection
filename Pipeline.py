@@ -1,33 +1,40 @@
-from scipy import stats
+#%%
+from sklearn.metrics import classification_report, confusion_matrix
 import numpy as np
 import pandas as pd
-import matplotlib as plt
-from sklearn.model_selection import train_test_split, StratifiedKFold, RepeatedStratifiedKFold, KFold, cross_val_score
-from sklearn.metrics import mean_squared_error, accuracy_score, recall_score, precision_score, f1_score, roc_auc_score, confusion_matrix, ConfusionMatrixDisplay, roc_curve, classification_report
-from classification.src import classifiers as cl, basicfeatureextraction
+import os
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split, KFold
+from sklearn.metrics import mean_squared_error, accuracy_score, recall_score, precision_score, f1_score, roc_auc_score, confusion_matrix, ConfusionMatrixDisplay, roc_curve
+from classification.src import classifiers as cl
 from featureselection.src.feature_selection_methods import *
 from featureselection.src import cluster
 from featureselection.src import Compute_HSIC_Lasso as hsic_lasso
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
-from featuredesign.graph_inference.AAL_test import multiset_feats, load_files
-import os
+from sklearn.preprocessing import StandardScaler
+from featuredesign.graph_inference.AAL_test import multiset_feats, load_files, adjacency_df
+import cvxpy as cp
+import seaborn as sns
 
-def load_file(sex='all', method='pearson_corr'):
-
+def load_file(sex='all', method='pearson_corr', alpha=5):
     #folder_path = r"C:\Users\guus\Python_map\AutismDetection-main\abide\female-cpac-filtnoglobal-aal" # Enter your local ABIDE dataset path
-    fmri_data, subject_ids, _, _ = load_files(sex=sex, shuffle=True, var_filt=False, ica=False) #Can add max_files
+    fmri_data, subject_ids, _, _ = load_files(sex=sex, max_files=800, site="NYU", shuffle=True, var_filt=True, ica=True)
 
-    full_df = multiset_feats(fmri_data, subject_ids, inf_method=method)
+    print(f"Final data: {len(fmri_data)} subjects")
+    print(f"Final IDs: {len(subject_ids)}")
 
+    full_df = adjacency_df(fmri_data, subject_ids, method = method, alpha = alpha)
     print("Merged feature+label shape:\n", full_df.shape)
 
-    print(full_df)
-
+    #print(full_df)
+    
+    subject_id_to_plot = '0051044'  # Change this to any valid subject ID
+    plot_adjacency_matrix(full_df, subject_id_to_plot)
+    
     full_df = full_df.sample(frac=1, random_state=42).reset_index(drop=True)  # Shuffle the DataFrame
 
-    X = full_df.drop(columns=['DX_GROUP', 'SEX', 'SITE_ID', 'subject_id'])
-    y = full_df['DX_GROUP'].map({1: 1, 2: 0})
+    X = full_df.drop(columns=['DX_GROUP', 'subject_id', 'SEX'])
+    y = full_df['DX_GROUP'].map({1: 1, 2: 0}) #1 ASD, 0 ALL
 
     # Making sure the data is numeric
     X = X.apply(pd.to_numeric, errors='coerce')
@@ -256,7 +263,8 @@ def train_and_evaluate(X, y, classifier):
     else:
         print("Classifier not supported: choose from SVM, RandomForest, LogR, LDA or KNN")
     #applying the classifier to the total data
-    y_pred_raw = model_raw.predict(X_test_scaled)
+    model_raw = cl.applySVM(X_train, y_train)
+    y_pred_raw = model_raw.predict(X_test)
 
     try:
         y_proba_raw = model_raw.predict_proba(X_test_scaled)[:, 1]
@@ -284,8 +292,8 @@ def classify(X_train, X_test, y_train, y_test, selected_features, classifier, pe
 
     #scale the data for the classifier
     scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    X_train_scaled = X_train #scaler.fit_transform(X_train)
+    X_test_scaled = X_test #scaler.transform(X_test)
 
     if isinstance(X_train_scaled, pd.DataFrame):
         # If it's a DataFrame, use `.iloc[]` for indexing
@@ -448,12 +456,26 @@ def cross_validate_model(X, y, feature_selection, classifier, raw=True, return_m
         if raw==True:
             perf_raw = evaluate_performance(y_test, y_pred_raw, y_proba_raw, classifier_name=classifier, fold_idx=len(acc_scores) + 1, verbose=False)
             # Raw performance
-            acc_scores_raw.append(perf_raw["accuracy"] if perf_raw["accuracy"] is not None else 0.0)
-            mse_scores_raw.append(mean_squared_error(y_test, y_pred_raw))
-            precision_scores_raw.append(perf_raw["precision"] if perf_raw["precision"] is not None else 0.0)
-            recall_scores_raw.append(perf_raw["recall"] if perf_raw["recall"] is not None else 0.0)
-            F1_scores_raw.append(perf_raw["f1"] if perf_raw["f1"] is not None else 0.0)
-            AUC_scores_raw.append(perf_raw["auc"] if perf_raw["auc"] is not None else 0.0)
+            acc_scores_raw.append(perf_raw["accuracy"])
+            mse_scores_raw.append(mean_squared_error(y_test, y_pred))
+            precision_scores_raw.append(perf_raw["precision"])
+            recall_scores_raw.append(perf_raw["recall"])
+            F1_scores_raw.append(perf_raw["f1"])
+            AUC_scores_raw.append(perf_raw["auc"])
+
+            avg_acc_raw = np.mean(acc_scores_raw)
+            avg_mse_raw = np.mean(mse_scores_raw)
+            avg_precision_raw = np.mean(precision_scores_raw)
+            avg_recall_raw = np.mean(recall_scores_raw)
+            avg_F1_raw = np.mean(F1_scores_raw)
+            avg_AUC_raw = np.mean([score for score in AUC_scores_raw if score is not None])
+
+            print(f"Average accuracy raw: {avg_acc_raw}")
+            print(f"Average mse raw: {avg_mse_raw}")
+            print(f"Average precision raw: {avg_precision_raw}")
+            print(f"Average recall raw: {avg_recall_raw}")
+            print(f"Average F1 raw: {avg_F1_raw}")
+            print(f"Average AUC raw: {avg_AUC_raw}")
 
     # Calculate averages (only if we have results)
     if acc_scores:
@@ -652,5 +674,17 @@ def main(classifier="SVM"):
     print_selected_features(selected_features_permutation_mRMR, selected_features_names_perm_mRMR, print_feat=True)
     print("\n\n")
 
-if __name__ == '__main__':
-    main()
+    # X_train_scaled = fs.low_variance(X_train_scaled, threshold=0.01)
+    # X_test_scaled = fs.low_variance(X_test_scaled, threshold=0.01)
+    # selected_features_rfe = fs.backwards_SFS(X_train_scaled, y_train, 10, classifier)
+    # acc, mse, selected_feature_names = classify(X, X_train_scaled, X_test_scaled, y_train, y_test, selected_features_rfe, classifier)
+    # print("SFS selected features:")
+    # print_selected_features(acc, mse, selected_features_rfe, selected_feature_names)
+    # print("\n\n")
+
+
+# if __name__ == '__main__':
+#     main()
+
+
+# %%
