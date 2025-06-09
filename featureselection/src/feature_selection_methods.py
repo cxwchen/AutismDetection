@@ -1,19 +1,20 @@
 from __future__ import division
 import numpy as np
 import pandas as pd
+from sklearn.pipeline import Pipeline
 from sklearn.linear_model import Lasso, LassoLars
 from sklearn.inspection import permutation_importance
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, Lasso, LassoCV
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler, KBinsDiscretizer, LabelEncoder
 from sklearn.metrics import mutual_info_score
-from sklearn.feature_selection import RFE, SequentialFeatureSelector, VarianceThreshold, mutual_info_classif, SelectKBest, f_classif
+from sklearn.feature_selection import RFE, SequentialFeatureSelector, VarianceThreshold, mutual_info_classif, SelectKBest, f_classif, SelectFromModel
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import cross_val_score, StratifiedKFold
+from sklearn.model_selection import cross_val_score, StratifiedKFold, train_test_split
 from skfeature.function.information_theoretical_based import MRMR
 from skfeature.function.similarity_based import reliefF
 from scipy.stats import gamma
@@ -21,6 +22,7 @@ from pyHSICLasso import HSICLasso
 from torch import nn
 import torch
 import torch.nn.functional as F
+import time
 import warnings
 import inspect
 
@@ -285,7 +287,7 @@ def hsic_gam(X, Y, alph = 0.5):
 
     return (width_x)
 
-def hsiclasso(X, y, classifier, num_feat=None, feature_range=(1, 50), verbose=False):
+def hsiclasso(X, y, classifier, num_feat=None, feature_range=(1, 100), verbose=False):
     """
     Perform HSIC Lasso feature selection.
     Parameters:
@@ -511,6 +513,8 @@ def mRMR(X, y, classifier, num_features_to_select=None, range=(1,150), verbose=T
         selected_features = mRMR_selector[0:num_features_to_select]
         return selected_features
 
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
     min_feat, max_feat = range
     max_feat = min(max_feat, X.shape[1]) #Don't exceed available features
 
@@ -701,7 +705,7 @@ def backwards_SFS(X, y, classifier, select_features=None, n_features_to_select=2
     
     # Determine the model based on the classifier name
     model = select_model(classifier) 
-
+    fast_model = LogisticRegression(random_state=42, max_iter=1000)
  # Handle both pandas DataFrame and numpy array inputs
     if isinstance(X, pd.DataFrame):
         X_array = X.values
@@ -731,21 +735,23 @@ def backwards_SFS(X, y, classifier, select_features=None, n_features_to_select=2
     X_scaled = scaler.fit_transform(X_array)
     
     model.fit(X_scaled, y)
+    start_time = time.time()
     # Initialize SequentialFeatureSelector with the base model and the desired number of features to select
-    sfs = SequentialFeatureSelector(model, n_features_to_select=n_features_to_select, direction='backward', n_jobs=-1)
+    sfs = SequentialFeatureSelector(fast_model, n_features_to_select=n_features_to_select, direction='backward', n_jobs=-1)
 
     # Fit SFS
     sfs.fit(X, y)
+    selection_time = time.time() - start_time
 
     # Get the selected feature indices
     selected_features = np.where(sfs.get_support())[0]
 
     return selected_features
 
-def l1_logistic_regression(X, y, C=1, max_iter=10000):
+def Lasso_selection(X, y, alpha=0.000543, max_iter=2000, select_features=None):
 
     """
-    Perform L1 regularized logistic regression to select features.
+    Perform Lasso to select features.
     
     Parameters:
     - X: Input feature matrix (numpy array or pandas DataFrame).
@@ -755,18 +761,44 @@ def l1_logistic_regression(X, y, C=1, max_iter=10000):
     
     Returns:
     - Selected feature indices.
-    """
-
-    # Normalize the data
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    """    
+ # Handle both pandas DataFrame and numpy array inputs
+    if isinstance(X, pd.DataFrame):
+        X_array = X.values
+        original_indices = X.columns.tolist()
+    else:
+        X_array = np.asarray(X)
+        original_indices = list(range(X_array.shape[1]))
     
+    if isinstance(y, (pd.Series, pd.DataFrame)):
+        y = y.values.ravel()
+    else:
+        y = np.asarray(y).ravel()  # Ensure y is a 1D array
+
+    feature_mapping = list(range(X_array.shape[1]))  # Maps from subset to original indices
+
+    if select_features is not None:
+        if isinstance(select_features, list):
+            if isinstance(select_features[0], int):  # Indices-based selection
+                X_array = X_array[:, select_features]  # Subset X_array using indices
+                feature_mapping = select_features
+            elif isinstance(select_features[0], str):  # Names-based selection
+                feature_indices = [original_indices.index(f) for f in select_features]
+                X_array = X_array[:, feature_indices]  # Subset X_array using the corresponding indices
+                feature_mapping = feature_indices
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X_array)
+
     # Fit L1 logistic regression model
-    model = LogisticRegression(penalty='l1', C=C, solver='liblinear', max_iter=max_iter)
+    model = Lasso(alpha=alpha, max_iter=2000, random_state=42)
     model.fit(X_scaled, y)
     
     # Get the selected feature indices
-    selected_features = np.where(model.coef_[0] != 0)[0]
+    selected_mask = model.coef_ != 0
+    selected_subset_indices = np.where(selected_mask)[0]
+
+    selected_features = [feature_mapping[i] for i in selected_subset_indices]
     
     return selected_features
 
@@ -795,4 +827,147 @@ def reliefF_(X, y, num_features_to_select):
     # Select the top 'num_features_to_select' features
     selected_features = sorted_indices[:num_features_to_select]
     
+    return selected_features
+
+def alpha_lasso_selection(X, y, classifier, min_features=1):
+    """Find best alpha for Lasso feature selection (no data leakage, using train/test split)."""
+
+    print("\n=== Finding Best LASSO Alpha for Feature Selection (Train/Test Split, No Data Leakage) ===")
+
+    model = select_model(classifier)
+
+    # Handle X and y formats
+    if isinstance(X, pd.DataFrame):
+        X_array = X.values
+    else:
+        X_array = np.asarray(X)
+
+    if isinstance(y, (pd.Series, pd.DataFrame)):
+        y_array = y.values.ravel()
+    else:
+        y_array = np.asarray(y).ravel()
+
+    feature_mapping = list(range(X_array.shape[1]))
+
+    # Train/test split (use stratify!)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_array, y_array, test_size=0.2, random_state=42, stratify=y_array
+    )
+
+    # Clean data
+    X_train_clean = np.nan_to_num(X_train, nan=0.0, posinf=0.0, neginf=0.0)
+    X_test_clean = np.nan_to_num(X_test, nan=0.0, posinf=0.0, neginf=0.0)
+
+    # Scale features based on training set only!
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train_clean)
+    X_test_scaled = scaler.transform(X_test_clean)
+
+    # Prepare alphas
+    alphas = np.logspace(-4, 1, 50)
+
+    results = []
+
+    for alpha in alphas:
+        try:
+            # Fit Lasso selector on training data only!
+            selector = SelectFromModel(
+                Lasso(alpha=alpha, max_iter=2000, random_state=42),
+                threshold='mean'
+            )
+            selector.fit(X_train_scaled, y_train)
+            selected_mask = selector.get_support()
+            selected_indices = np.where(selected_mask)[0]
+
+            if len(selected_indices) < min_features or len(selected_indices) == X_train_scaled.shape[1]:
+                continue  # skip too few or all features
+
+            # Transform both train and test based on selected features
+            X_train_selected = X_train_scaled[:, selected_indices]
+            X_test_selected = X_test_scaled[:, selected_indices]
+
+            # Fit model on selected training features
+            model.fit(X_train_selected, y_train)
+
+            # Evaluate on test set
+            test_accuracy = model.score(X_test_selected, y_test)
+
+            print(f"Alpha {alpha:.6f} | {len(selected_indices)} features | Test accuracy: {test_accuracy:.4f}")
+
+            results.append({
+                'alpha': alpha,
+                'n_features': len(selected_indices),
+                'accuracy': test_accuracy,
+                'selected_indices': selected_indices,
+                'threshold': 'mean'
+            })
+
+        except Exception as e:
+            print(f"Alpha {alpha:.6f} | Exception occurred: {e}")
+            continue
+
+    # Select best alpha
+    if not results:
+        print("❌ No suitable alpha found! Returning empty selection.")
+        return None
+
+    best_result = max(results, key=lambda x: x['accuracy'])
+
+    print(f"\nBest alpha: {best_result['alpha']:.6f} --> Accuracy: {best_result['accuracy']:.4f} --> {best_result['n_features']} features")
+    selected_features = [feature_mapping[i] for i in best_result['selected_indices']]
+    print(f"Selected feature indices (mapped to original X): {selected_features}")
+
+    return {
+        'best_alpha': best_result['alpha'],
+        'accuracy': best_result['accuracy'],
+        'n_features_selected': best_result['n_features'],
+        'selected_features': selected_features,
+        'threshold': best_result['threshold']
+    }
+
+def forwards_SFS(X, y, classifier, select_features=None, n_features_to_select=20):
+    
+    # Determine the model based on the classifier name
+    model = select_model(classifier) 
+    fast_model = LogisticRegression(random_state=42, max_iter=1000)
+ # Handle both pandas DataFrame and numpy array inputs
+    if isinstance(X, pd.DataFrame):
+        X_array = X.values
+        original_indices = X.columns.tolist()
+    else:
+        X_array = np.asarray(X)
+        original_indices = list(range(X_array.shape[1]))
+    
+    if isinstance(y, (pd.Series, pd.DataFrame)):
+        y = y.values.ravel()
+    else:
+        y = np.asarray(y).ravel()  # Ensure y is a 1D array
+    
+    # Ensure proper data types
+    X_array = X_array.astype(np.float64)  # Ensure X is float64 for compatibility
+
+    if select_features is not None:
+        if isinstance(select_features, list):
+            if isinstance(select_features[0], int):  # Indices-based selection
+                X_array = X_array[:, select_features]  # Subset X_array using indices
+            elif isinstance(select_features[0], str):  # Names-based selection
+                feature_indices = [original_indices.index(f) for f in select_features]
+                X_array = X_array[:, feature_indices]  # Subset X_array using the corresponding indices
+
+    # Normalize the data
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X_array)
+    
+    model.fit(X_scaled, y)
+    start_time = time.time()
+    # Initialize SequentialFeatureSelector with the base model and the desired number of features to select
+    sfs = SequentialFeatureSelector(fast_model, n_features_to_select=n_features_to_select, direction='forward', n_jobs=-1)
+
+    # Fit SFS
+    sfs.fit(X, y)
+    selection_time = time.time() - start_time
+
+    # Get the selected feature indices
+    selected_features = np.where(sfs.get_support())[0]
+
     return selected_features
