@@ -6,7 +6,7 @@ from datetime import datetime
 from joblib import Parallel, delayed
 from classification.src import classifiers as cl
 from featureselection.src.feature_selection_methods import *
-from Pipeline import load_full_corr, train_and_evaluate, cross_validate_model, print_selected_features, failsafe_feature_selection, classify
+from Pipeline import load_full_corr, train_and_evaluate, cross_validate_model, print_selected_features, failsafe_feature_selection, classify, load_dataframe
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
 from featureselection.src import cluster
 
@@ -15,12 +15,12 @@ from featureselection.src import cluster
 classifiers_to_run = ["SVM", "RandomForest", "LogR", "LDA", "KNN"]
 
 feature_selection_methods = [
-    #("Lasso_selection", Lasso_selection, {"alpha": 0.044984, "max_iter": 2000}, "cv"),
-    #("HSIC_Lasso", hsiclasso, {"num_feat": 98}, "cv"),
-    ("mRMR", mRMR, {"num_features_to_select": 100}, "cv"),
+    #("Lasso_selection", Lasso_selection, {"alpha": 0.044984, "max_iter": 2000}, "cv"), #0.044984 for full corr
+    #("HSIC_Lasso", hsiclasso, {"num_feat": 19}, "cv"), #98 for full corr
+    #("mRMR", mRMR, {"num_features_to_select": 100}, "cv"),
     #("Permutation", Perm_importance, {}, "train"),
     ("forwards SFS", forwards_SFS, {"n_features_to_select": 20}, "train"),
-    ("backward SFS", backwards_SFS, {"n_features_to_select": 10}, "train")
+    #("backward SFS", backwards_SFS, {"n_features_to_select": 10}, "train")
 ]
 #("ReliefF", reliefF_, {"num_features_to_select": 200}, "cv")
 # ========== SAVE RESULTS ========== #
@@ -33,8 +33,18 @@ def save_results(classifier, feature_selection_name, results_dict):
     
     filename = f"results/{classifier}/{feature_selection_name}_{timestamp}.json"
     
+        # Helper function to convert numpy types
+    def convert(o):
+        if isinstance(o, np.integer):
+            return int(o)
+        if isinstance(o, np.floating):
+            return float(o)
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        return o
+    
     with open(filename, "w") as f:
-        json.dump(results_dict, f, indent=4)
+        json.dump(results_dict, f, indent=4, default=convert)
     
     print(f"✅ Saved: {filename}")
 
@@ -50,9 +60,8 @@ def main_for_classifier(classifier):
     X_train, X_test, y_train, y_test = train_and_evaluate(X, y, classifier)
 
     # Use clustered features for Perm / SFS
-    X_clustered = cluster.cluster(X_train, y_train, t=3)
+    X_clustered = cluster.cluster(X_train, y_train, t=2)
     X_mRMR = mRMR(X_train, y_train, classifier, num_features_to_select=70)
-    X_mRMR_small = mRMR(X_train, y_train, classifier, num_features_to_select=30)
 
     # Loop over feature selection methods with tqdm per classifier
     for fs_name, fs_func, fs_kwargs, mode in tqdm(feature_selection_methods, desc=f"{classifier} pipeline", position=0, leave=True):
@@ -82,9 +91,9 @@ def main_for_classifier(classifier):
             if fs_name == "Permutation":
                 select_features = X_clustered
             elif fs_name == "forwards SFS":
-                select_features = X_clustered
+                select_features = X_mRMR
             elif fs_name == "backwards SFS":
-                select_features = X_mRMR_small
+                select_features = X_mRMR
             else:
                 select_features = None  # fallback
 
@@ -138,6 +147,7 @@ def main_for_classifier(classifier):
             result["selected_features"] = selected_features
             result["selected_feature_names"] = list(selected_feature_names) if selected_feature_names is not None else []
             result["metrics"] = {
+                "num feat": len(selected_features),
                 "accuracy": acc,
                 "precision": precision,
                 "recall": recall,

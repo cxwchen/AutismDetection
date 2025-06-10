@@ -3,16 +3,18 @@ from sklearn.metrics import classification_report, confusion_matrix
 import numpy as np
 import pandas as pd
 import os
+from scipy import stats
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.metrics import mean_squared_error, accuracy_score, recall_score, precision_score, f1_score, roc_auc_score, confusion_matrix, ConfusionMatrixDisplay, roc_curve
-from classification.src import classifiers as cl
+from classification.src import classifiers as cl, basicfeatureextraction
 from featureselection.src.feature_selection_methods import *
 from featureselection.src import cluster
 from featureselection.src import Compute_HSIC_Lasso as hsic_lasso
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler
 from featuredesign.graph_inference.AAL_test import multiset_feats, load_files, adjacency_df
+import glob
 import cvxpy as cp
 import seaborn as sns
 
@@ -29,7 +31,7 @@ def load_file(sex='all', method='pearson_corr', alpha=5):
     #print(full_df)
     
     subject_id_to_plot = '0051044'  # Change this to any valid subject ID
-    plot_adjacency_matrix(full_df, subject_id_to_plot)
+    #plot_adjacency_matrix(full_df, subject_id_to_plot)
     
     full_df = full_df.sample(frac=1, random_state=42).reset_index(drop=True)  # Shuffle the DataFrame
 
@@ -92,6 +94,53 @@ def load_full_corr(sex='all'):
     # Site effect correction
     if 'SITE_ID' in fc.columns:
         X = correct_site_effects(X, fc['SITE_ID'])
+        #print(f"After site correction: {X.shape}")
+
+    #print(f"X: {X}, y: {y}")
+
+    return X, y
+
+def load_dataframe(path='multi'):
+    if path =='uni':
+        folder_path = 'Feature_Dataframes/first_run'
+    if path == 'multi':
+        folder_path = 'Feature_Dataframes/second_run'
+        file_name = 'cpac_rois-aal_nogsr_filt_LADMM_direct_20ICA_graph_thr0.3.csv'
+
+    file_path = os.path.join(folder_path, file_name)
+    fc = pd.read_csv(file_path)
+    #fc = pd.concat([pd.read_csv(file) for file in glob.glob(os.path.join(folder_path, '*.csv'))], ignore_index=True)
+
+    fc = fc.sample(frac=1, random_state=42).reset_index(drop=True)  # Shuffle the DataFrame
+    #fc = fc.dropna(subset=['DX_GROUP'])
+
+    X = fc.drop(columns=['DX_GROUP', 'SEX', 'SITE_ID', 'subject_id', 'AGE_AT_SCAN'])
+    y = fc['DX_GROUP']
+
+    # Making sure the data is numeric
+    X = X.apply(pd.to_numeric, errors='coerce')
+    X = X.dropna(axis=1,how='all')
+    non_nan_ratio = X.notna().mean()
+    X = X.loc[:, non_nan_ratio > 0.8]  # Keep columns with more than 50% non-NaN values
+    # Making sure there is no 0 var data for the hsic algorithm
+    X = X.loc[:, X.var() > 1e-4]
+    # NaN values are filled with the median of the column
+    X = X.fillna(X.median())
+    print(f"shape dataframe: {X.shape}")
+    # Remove extremely correlated features
+    #X = correlation_filter(X, threshold=0.9)    
+    #print(f"After correlation filter: {X.shape}")
+    # Remove extreme outliers
+    #X = remove_extreme_outliers(X, threshold=3.5)
+    #print(f"After outlier removal: {X.shape}")
+
+    # Apply feature transformations for better distributions
+    #X = apply_feature_transformations(X)
+    #print(f"After transformation: {X.shape}")
+
+    # Site effect correction
+    #if 'SITE_ID' in fc.columns:
+    #    X = correct_site_effects(X, fc['SITE_ID'])
         #print(f"After site correction: {X.shape}")
 
     #print(f"X: {X}, y: {y}")
@@ -575,11 +624,11 @@ def select_model(classifier):
     
     return model
 
-def main(classifier="SVM"):
+def main(classifier="LogR"):
 
     #Choose method: partial_corr_LF|partial_corr_glasso|pearson_corr_binary|pearson_corr|mutual_info|norm_laplacian|rlogspect
     #X, y = load_file(sex='all', method='pearson_corr', max_files=None)
-    X, y = load_full_corr()
+    X, y = load_dataframe()
 
     # Choose from SVM, RandomForest, LogR, LDA, KNN
 
@@ -596,6 +645,9 @@ def main(classifier="SVM"):
     
     alpha_results_lasso = alpha_lasso_selection(X, y, classifier) #0.002812 with 98 features
     best_alpha = alpha_results_lasso['best_alpha']
+    print(f"alpha lasso: {best_alpha}")
+    num_feat_hsic = hsiclasso(X, y, classifier, verbose=False)
+    print(f"num feat hsic: {num_feat_hsic}")
     #best_alpha = 0.002812
     #Cross-validation with feature selection
     selected_features_lasso_cv, selected_feature_names_lasso_cv = cross_validate_model(X, y, Lasso_selection, classifier, alpha=best_alpha, max_iter=2000)
@@ -615,7 +667,7 @@ def main(classifier="SVM"):
     #print_selected_features(selected_features_lasso_mr, selected_feature_names_lasso_mr, print_feat=True)
     #print("\n\n")
 
-    #num_feat_hsic = hsiclasso(X, y, classifier, verbose=False)
+    num_feat_hsic = hsiclasso(X, y, classifier, verbose=False)
     selected_features_hsiclasso_cv, selected_feature_names_hsiclasso_cv = cross_validate_model(X, y, hsiclasso, classifier, num_feat=98) #92,
     print("Cross-validated HSIC Lasso selected features:")
     print_selected_features(selected_features_hsiclasso_cv, selected_feature_names_hsiclasso_cv, print_feat=True)
@@ -683,8 +735,8 @@ def main(classifier="SVM"):
     # print("\n\n")
 
 
-# if __name__ == '__main__':
-#     main()
+if __name__ == '__main__':
+     main()
 
 
 # %%
