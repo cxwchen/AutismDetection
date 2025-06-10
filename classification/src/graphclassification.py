@@ -72,7 +72,8 @@ def runGCV(df, ncv, label="female", groupeval=True):
             print(f"\n=== Fold {fold} | {clfname}")
 
             if cfunc == applySVM:
-                params = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, SVC())
+                params = {'kernel': 'linear', 'C': 1}
+                # params = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, SVC())
             elif cfunc == applyDT:
                 params = bestDT(Xtrain, Xtest, ytrain, ytest, DecisionTreeClassifier())
             elif cfunc == applyMLP:
