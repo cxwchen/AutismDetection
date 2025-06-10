@@ -5,3 +5,6 @@ __pycache__/
 !classification/src/results/*.csv
 scikit-feature/
 !FeatDFs_Jochem/*.csv
+!FeatDFs_Jochem/zerovariance/*.csv
+!Feature_Dataframes/first_run/*.csv
+!Feature_Dataframes/second_run/*.csv
