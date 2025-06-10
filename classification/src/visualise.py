@@ -85,6 +85,37 @@ def plotConnectome(model, featnames, k, fold=None, tag="", timestamp="", save_fe
     plotting.plot_connectome(adjacency_matrix=adjmatr, node_coords=nodecoords, output_file=f'{filename}.png', title="Top 20 Most Important Connections", black_bg=False, colorbar=True)
     # plt.show()
 
+def plotCustomConnectome(featlist, weight=1.0, tag="", filename="custom_top_feats", show=True):
+    labels, maps, indices = extractaal()
+    coords = plotting.find_parcellation_cut_coords(maps)
+    idx2coord = {idx: coord for idx, coord in zip(indices, coords)}
+
+    nodes = set()
+    edgeinfo = []
+    for fname in featlist:
+        try: 
+            _, idx1, idx2 = fname.split('_')
+            coord1 = idx2coord[idx1]
+            coord2 = idx2coord[idx2]
+            nodes.add(idx1)
+            nodes.add(idx2)
+            edgeinfo.append((idx1, idx2, weight))
+        except KeyError:
+            print(f"Warning: one of the indices {idx1} or {idx2} not in AAL atlas. Skipping")
+
+    nodes = sorted(nodes)
+    n = len(nodes)
+    nodeidx = {node: i for i, node in enumerate(nodes)}
+    adjmatr = np.zeros((n, n))
+    nodecoords = [idx2coord[node] for node in nodes]
+
+    for idx1, idx2, w in edgeinfo:
+        i, j = nodeidx[idx1], nodeidx[idx2]
+        adjmatr[i,j] = w
+        adjmatr[j, i] = w
+
+    plotting.plot_connectome(adjacency_matrix=adjmatr, node_coords=nodecoords, output_file=f"{filename}.png", title="Top Stable Features")
+
 def firsttest():
     df = pd.read_csv('nilearnfeatscomb.csv.gz')
     X = df.iloc[:, 4:]
