@@ -45,7 +45,7 @@ def normalized_laplacian(cov_est, epsilon=4.5e-1, threshold=0):
 
     problem = cp.Problem(objective, constraints)
     problem.solve(solver=cp.SCS)
-    
+    print("completer")
     result = threshold_and_normalize_laplacian(S.value, threshold=threshold)
 
     #print("Step 2 Optimization Status:", problem.status)

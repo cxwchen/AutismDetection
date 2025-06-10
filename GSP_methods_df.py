@@ -38,7 +38,7 @@ def process_feats(
 
     # Convert output_dir to Path
     if output_dir is None:
-        output_dir = Path.home() / 'Documents' / 'abide_multisite_selection'
+        output_dir = Path.home() / 'Documents' / 'abide_parameter_tuning'
     else:
         output_dir = Path(output_dir).expanduser()
 
@@ -99,7 +99,7 @@ def process_feats(
                 processing_info['inf_method'].replace('_', '-'),
                 processing_info['cov_method'],
                 f"{processing_info['ica_components']}ICA",
-                processing_info['feats'],
+                f"alpha{processing_info['alpha']}",
                 f"thr{processing_info['threshold']}"
             ]
             return '_'.join(map(str, filename_parts)) + '.csv'
@@ -109,7 +109,7 @@ def process_feats(
             'cov_method': cov_method,
             'ica_components': n_components,
             'threshold': thresh,
-            'feats': feats
+            'alpha': alpha
         }
         params = {
             'pipeline': pipeline,
@@ -127,18 +127,60 @@ def process_feats(
         return None, None
     
 def main():
-    inf_methods = ['norm_laplacian', 'LADMM']
+    inf_methods = ['norm_laplacian',]
     cov_methods_dict = {
-        'norm_laplacian': ['direct', 'glasso', 'ledoit', 'var'],
+        'norm_laplacian': ['direct'],
         'LADMM': ['direct', 'var']
-    }    
+    }
+    alpha_values = [0.01, 0.025]#np.arange(1e-1,4.6e-1,0.5e-1)
+    thresholds = [0]#np.arange(0.5e-1,5e-1,5e-2)
     n_components = 20
+    
+    results = []
+    
     for inf in inf_methods:
         for cov in cov_methods_dict[inf]:        
-            print(f"Running inf_method={inf}, cov_method={cov}")
-            process_feats(feats='graph', inf_method=inf, cov_method=cov, n_components=n_components, site=None)
+            for alpha in alpha_values:
+                for thresh in thresholds:
+                    print(f"Running inf_method={inf}, cov_method={cov}, alpha={alpha}, thresh={thresh}")
+                    X, y, _ = load_and_process_data(site=None, inf_method=inf, cov_method=cov, alpha=alpha, thresh=thresh)
+                    # Plot the adjacency matrix for subject '0051044' in the current subplot
+                    subject_id_to_plot = '0051044'  # You can change this subject ID if needed
+                    plot_adjacency_matrix(_, subject_id_to_plot)
+                    avg_acc, acc_scores = cross_validate_model(X, y)
+                    results.append((inf, cov, alpha, thresh, avg_acc))
+    
+    # Convert results into a numpy array for easy manipulation
+    results_array = np.array(results, dtype=object)
 
-def cross_validate_model(X, y, classifier, n_splits=5):
+    # Set up the grid for plotting
+    fig, ax = plt.subplots(figsize=(12, 8))
+
+    # Create a grid based on alpha and threshold values
+    grid = np.zeros((len(alpha_values), len(thresholds)))
+
+    for i, alpha in enumerate(alpha_values):
+        for j, thresh in enumerate(thresholds):
+            # Extract the result corresponding to each (alpha, threshold) combination
+            matching_results = results_array[(results_array[:, 2] == alpha) & (results_array[:, 3] == thresh)]
+            if matching_results.size > 0:
+                grid[i, j] = matching_results[0, 4]  # Store average accuracy
+
+    # Plot the grid
+    cax = ax.matshow(grid, cmap='viridis')
+    fig.colorbar(cax)
+    ax.set_xticks(np.arange(len(thresholds)))
+    ax.set_xticklabels([f"{thresh:.2f}" for thresh in thresholds])
+    ax.set_yticks(np.arange(len(alpha_values)))
+    ax.set_yticklabels([f"{alpha:.1f}" for alpha in alpha_values])
+    ax.set_xlabel('Threshold')
+    ax.set_ylabel('Alpha')
+
+    # Title and display
+    ax.set_title("Average Accuracy for Varying Alpha and Thresholds")
+    plt.show()
+            
+def cross_validate_model(X, y, n_splits=5):
     """
     Perform K-Fold cross-validation on the model and return the average accuracy.
     """
@@ -209,16 +251,14 @@ def iterate_and_plot_alphas(sex='all', method='rlogspect', site='NYU', alpha_val
     plt.grid(True)
     plt.show()
 
-def load_and_process_data(sex='all', method='pearson_corr', site='NYU', alpha=5):
+def load_and_process_data(site='NYU', inf_method='pearson_corr', alpha=5, cov_method = 'direct', thresh=0.10):
     """
     Load data and process it for classification.
     """
-    fmri_data, subject_ids, _, _ = load_files(sex=sex, max_files=800, site=site, shuffle=True, var_filt=True, ica=True)
+    full_df, _ = process_feats(inf_method=inf_method, cov_method=cov_method, alpha=alpha, thresh=thresh, site=site)
+    full_df = full_df.sample(frac=1).reset_index(drop=True)  # Shuffle the DataFrame
 
-    full_df = adjacency_df(fmri_data, subject_ids, method=method, alpha=alpha)
-    full_df = full_df.sample(frac=1, random_state=42).reset_index(drop=True)  # Shuffle the DataFrame
-
-    X = full_df.drop(columns=['DX_GROUP', 'subject_id', 'SEX'])
+    X = full_df.drop(columns=['DX_GROUP', 'subject_id', 'SEX', 'AGE_AT_SCAN'])
     y = full_df['DX_GROUP'].map({1: 1, 2: 0})  # 1 ASD, 0 ALL
 
     # Ensure that the data is numeric and handle missing values
@@ -230,6 +270,37 @@ def load_and_process_data(sex='all', method='pearson_corr', site='NYU', alpha=5)
     X = X.fillna(X.median())  # Fill NaN with the median
 
     return X, y, full_df
+
+def plot_adjacency_matrix(df, subject_id, matrix_size=20):
+    """
+    This function takes the dataframe containing the flattened adjacency matrices,
+    extracts the matrix for a specific subject, reshapes it, and plots the adjacency matrix.
+
+    Parameters:
+    - df: DataFrame containing the flattened adjacency matrices.
+    - subject_id: The subject ID for which to plot the adjacency matrix.
+    - matrix_size: The size of the square adjacency matrix (default is 20x20).
+    """
+    # Extract the row for the specific subject_id
+    subject_row = df[df['subject_id'] == subject_id]
+
+    # If the subject is not found in the DataFrame
+    if subject_row.empty:
+        print(f"Subject {subject_id} not found in the DataFrame.")
+        return
+    
+    # Extract the flattened adjacency matrix values
+    adj_values = subject_row.drop(columns=['subject_id', 'DX_GROUP', 'SEX', 'SITE_ID', 'AGE_AT_SCAN']).values.flatten()
+    
+    # Reshape the flattened array back into a square matrix
+    adj_matrix = adj_values.reshape(matrix_size, matrix_size)
+    
+    # Plot the adjacency matrix
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(adj_matrix, cmap="YlGnBu", annot=False, xticklabels=False, yticklabels=False)
+    plt.title(f"Adjacency Matrix for Subject {subject_id}")
+    plt.show()
+
 if __name__ == "__main__":
     main()  # Set to False if you want a single test
 # %%
