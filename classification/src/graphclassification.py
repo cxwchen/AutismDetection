@@ -140,15 +140,16 @@ def JochemClass():
         graphdir = os.getenv('GRAPHS_PATH_JOCHEM')
         if not graphdir:
             raise ValueError("GRAPHS_PATH_JOCHEM is not set.")
-        print(f"Loading {graphdir}")
-        basename = os.path.basename(graphdir)
-        df = pd.read_csv(graphdir)
-        print("Data Loaded. Columns:", df.columns)
-        label = basename.replace("cpac_rois-aal_nogsr_filt_","").replace(".csv","")
+        # print(f"Loading {graphdir}")
+        for fname in sorted(glob.glob(graphdir)):
+            basename = os.path.basename(fname)
+            df = pd.read_csv(fname).sample(frac=1, random_state=42).reset_index(drop=True)
+        # print("Data Loaded. Columns:", df.columns)
+            label = basename.replace("cpac_rois-aal_nogsr_filt_","").replace(".csv","")
         # X = df.iloc[:, 4:]
         # X = X.loc[:, X.var() > 1e-6] 
         # print(X.columns)
-        runGCV(df, ncv=5, label=label)
+            runGCV(df, ncv=5, label=label)
     except Exception as e:
         print("Crash in JochemClass()", e)
         import traceback
@@ -157,5 +158,5 @@ def JochemClass():
 
 if __name__ == "__main__":
     # GordonSingleClassAll()
-    # JochemClass()
-    GordonMultiClassAll()
+    JochemClass()
+    # GordonMultiClassAll()
