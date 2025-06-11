@@ -791,9 +791,11 @@ def Lasso_selection(X, y, alpha=0.000543, max_iter=2000, select_features=None):
     X_scaled = scaler.fit_transform(X_array)
 
     # Fit L1 logistic regression model
-    model = Lasso(alpha=alpha, max_iter=2000, random_state=42)
+    model = LassoCV(alpha=alpha, random_state=42)
     model.fit(X_scaled, y)
     
+    best_alpha = model.alpha_
+    print(best_alpha)
     # Get the selected feature indices
     selected_mask = model.coef_ != 0
     selected_subset_indices = np.where(selected_mask)[0]
@@ -870,15 +872,13 @@ def alpha_lasso_selection(X, y, classifier, min_features=1):
 
     for alpha in alphas:
         try:
-            # Fit Lasso selector on training data only!
-            selector = SelectFromModel(
-                Lasso(alpha=alpha, max_iter=2000, random_state=42),
-                threshold='mean'
-            )
+            selector = Lasso(alpha=alpha, max_iter=2000, random_state=42)
             selector.fit(X_train_scaled, y_train)
-            selected_mask = selector.get_support()
+            selected_mask = selector.coef_ != 0
             selected_indices = np.where(selected_mask)[0]
 
+            print(f"Alpha {alpha:.6f} selected {len(selected_indices)} features")
+            
             if len(selected_indices) < min_features or len(selected_indices) == X_train_scaled.shape[1]:
                 continue  # skip too few or all features
 
