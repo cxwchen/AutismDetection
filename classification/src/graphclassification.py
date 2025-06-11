@@ -67,8 +67,8 @@ def runGCV(df, ncv, label="female", groupeval=True):
 
         Xtrain, Xtest = normalizer(Xtrain, Xtest)
 
-        for cfunc in [applyDummy]:
-        # for cfunc in [applyLogR, applySVM, applyRandForest, applyDT, applyMLP, applyLDA, applyKNN]:
+        # for cfunc in [applyDummy]:
+        for cfunc in [applyLogR, applySVM, applyRandForest, applyDT, applyMLP, applyLDA, applyKNN, applyDummy]:
             clfname = cfunc.__name__.replace("apply", "")
             print(f"\n=== Fold {fold} | {clfname}")
 
@@ -169,7 +169,5 @@ def JochemClass():
 
 if __name__ == "__main__":
     # GordonSingleClassAll()
-    # JochemClass()
+    JochemClass()
     # GordonMultiClassAll()
-    bestdf = pd.read_csv("C:\\Users\\carme\\OneDrive\\Documenten\\AutismDetection\\FeatDFs_Jochem\\cpac_rois-aal_nogsr_filt_rlogspect_window_30-IC_graph_thr0.05.csv")
-    runGCV(bestdf, ncv=5, label="dummy_bestdf")
