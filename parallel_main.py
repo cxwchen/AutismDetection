@@ -15,23 +15,23 @@ from featureselection.src import cluster
 classifiers_to_run = ["SVM", "RandomForest", "LogR", "LDA", "KNN"]
 
 feature_selection_methods = [
-    #("Lasso_selection", Lasso_selection, {"alpha": 0.044984, "max_iter": 2000}, "cv"), #0.044984 for full corr
-    #("HSIC_Lasso", hsiclasso, {"num_feat": 19}, "cv"), #98 for full corr
-    #("mRMR", mRMR, {"num_features_to_select": 100}, "cv"),
-    #("Permutation", Perm_importance, {}, "train"),
+    ("Lasso_selection", Lasso_selection, {"alpha": 0.044984, "max_iter": 2000}, "cv"), #0.044984 for full corr
+    ("HSIC_Lasso", hsiclasso, {"num_feat": 19}, "cv"), #98 for full corr
+    ("mRMR", mRMR, {"num_features_to_select": 100}, "cv"),
+    ("Permutation", Perm_importance, {}, "cv"),
     ("forwards SFS", forwards_SFS, {"n_features_to_select": 20}, "train"),
-    #("backward SFS", backwards_SFS, {"n_features_to_select": 10}, "train")
+    ("backward SFS", backwards_SFS, {"n_features_to_select": 10}, "train")
 ]
 #("ReliefF", reliefF_, {"num_features_to_select": 200}, "cv")
 # ========== SAVE RESULTS ========== #
 
 def save_results(classifier, feature_selection_name, results_dict):
-    os.makedirs(f"results/{classifier}", exist_ok=True)
+    os.makedirs(f"results_full_corr_NYU/{classifier}", exist_ok=True)
     
     # Generate timestamp: YYYYMMDD-HHMMSS
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     
-    filename = f"results/{classifier}/{feature_selection_name}_{timestamp}.json"
+    filename = f"results_full_corr_NYU/{classifier}/{feature_selection_name}_{timestamp}.json"
     
         # Helper function to convert numpy types
     def convert(o):
@@ -54,14 +54,14 @@ def main_for_classifier(classifier):
     print(f"\n\n========== Running pipeline for {classifier} ==========\n")
     
     # Load data
-    X, y = load_full_corr()
+    X, y = load_full_corr(sex='all', site_id='NYU')
 
     # Run raw model just for reference
     X_train, X_test, y_train, y_test = train_and_evaluate(X, y, classifier)
 
     # Use clustered features for Perm / SFS
-    X_clustered = cluster.cluster(X_train, y_train, t=2)
-    X_mRMR = mRMR(X_train, y_train, classifier, num_features_to_select=70)
+    X_clustered = cluster.cluster(X_train, y_train, t=3)
+    X_mRMR = mRMR(X_train, y_train, classifier, num_features_to_select=50)
 
     # Loop over feature selection methods with tqdm per classifier
     for fs_name, fs_func, fs_kwargs, mode in tqdm(feature_selection_methods, desc=f"{classifier} pipeline", position=0, leave=True):
@@ -77,7 +77,7 @@ def main_for_classifier(classifier):
 
         if mode == "cv":
             # Normal cross-validation → capture avg metrics
-            selected_features, selected_feature_names, avg_metrics = cross_validate_model(
+            selected_features, selected_feature_names, avg_metrics, fold_metrics = cross_validate_model(
                 X, y, fs_func, classifier, n_splits=5, return_metrics=True, **fs_kwargs
             )
             print_selected_features(selected_features, selected_feature_names, print_feat=False)
@@ -85,6 +85,7 @@ def main_for_classifier(classifier):
             result["selected_features"] = selected_features
             result["selected_feature_names"] = list(selected_feature_names) if selected_feature_names is not None else []
             result["metrics"] = avg_metrics
+            result["fold_metrics"] = fold_metrics
 
         elif mode == "train":
             # Single run on training data → classify

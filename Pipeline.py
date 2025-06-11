@@ -51,7 +51,7 @@ def load_file(sex='all', method='pearson_corr', alpha=5):
 
     return X, y
 
-def load_full_corr(sex='all'):
+def load_full_corr(sex='all', site_id=None):
 
     fc_female = basicfeatureextraction.extract_fc_features("abide/female-cpac-filtnoglobal-aal", "abide/Phenotypic_V1_0b_preprocessed1.csv")
     fc_male = basicfeatureextraction.extract_fc_features("abide/male-cpac-filtnoglobal-aal", "abide/Phenotypic_V1_0b_preprocessed1.csv")
@@ -63,6 +63,9 @@ def load_full_corr(sex='all'):
         fc = pd.concat([fc_female, fc_male], axis=0, ignore_index=True)
     else:
         print("Use male, female or all as sex")
+
+    if site_id is not None:
+        fc = fc[fc['SITE_ID'] == site_id]
 
     fc = fc.sample(frac=1, random_state=42).reset_index(drop=True)  # Shuffle the DataFrame
     fc = fc.dropna(subset=['DX_GROUP'])
@@ -105,7 +108,12 @@ def load_dataframe(path='multi'):
         folder_path = 'Feature_Dataframes/first_run'
     if path == 'multi':
         folder_path = 'Feature_Dataframes/second_run'
-        file_name = 'cpac_rois-aal_nogsr_filt_LADMM_direct_20ICA_graph_thr0.3.csv'
+        #file_name = 'cpac_rois-aal_nogsr_filt_LADMM_direct_20ICA_graph_thr0.3.csv'
+        file_name = 'cpac_rois-aal_nogsr_filt_LADMM_var_20ICA_graph_thr0.3.csv'
+        #file_name = 'cpac_rois-aal_nogsr_filt_norm-laplacian_direct_20ICA_graph_thr0.3.csv'
+        #file_name = 'cpac_rois-aal_nogsr_filt_norm-laplacian_glasso_20ICA_graph_thr0.3.csv'
+        #file_name = 'cpac_rois-aal_nogsr_filt_norm-laplacian_ledoit_20ICA_graph_thr0.3.csv'
+        #file_name = 'cpac_rois-aal_nogsr_filt_norm-laplacian_var_20ICA_graph_thr0.3.csv'
 
     file_path = os.path.join(folder_path, file_name)
     fc = pd.read_csv(file_path)
@@ -143,7 +151,7 @@ def load_dataframe(path='multi'):
     #    X = correct_site_effects(X, fc['SITE_ID'])
         #print(f"After site correction: {X.shape}")
 
-    #print(f"X: {X}, y: {y}")
+    print(f"X: {X}, y: {y}")
 
     return X, y
 
@@ -401,6 +409,7 @@ def cross_validate_model(X, y, feature_selection, classifier, raw=True, return_m
     recall_scores_raw = []
     F1_scores_raw = []
     AUC_scores_raw= []
+    fold_metrics = []
 
     if classifier is not Perm_importance or backwards_SFS:
         # Convert inputs to numpy arrays once at the beginning
@@ -497,6 +506,14 @@ def cross_validate_model(X, y, feature_selection, classifier, raw=True, return_m
         recall_scores.append(perf["recall"] if perf["recall"] is not None else 0.0)
         F1_scores.append(perf["f1"] if perf["f1"] is not None else 0.0)
         AUC_scores.append(perf["auc"] if perf["auc"] is not None else 0.0)
+
+        fold_metrics.append({
+            "accuracy": acc_scores,
+            "precision": precision_scores,
+            "recall": recall_scores,
+            "f1_score": F1_scores,
+            "auroc": AUC_scores
+        })
 
         print(classifier)
         #print(classification_report(y_test, y_pred, target_names=["Class 0", "Class 1"]))
@@ -599,7 +616,7 @@ def cross_validate_model(X, y, feature_selection, classifier, raw=True, return_m
             print(f"  AUC:       {avg_AUC_raw:.4f}")
 
     if return_metrics:
-        return selected_features, selected_feature_names, avg_metrics
+        return selected_features, selected_feature_names, avg_metrics, fold_metrics
     else:
         selected_features, selected_feature_names
 
