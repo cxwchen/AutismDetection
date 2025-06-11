@@ -108,8 +108,8 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False, numfe
             Xtrain = Xtrain[:, selected_idx]
             Xtest = Xtest[:, selected_idx]
         
-
-        for cfunc in [applyLogR, applySVM, applyRandForest, applyDT, applyMLP, applyLDA, applyKNN]:
+        
+        for cfunc in [applyLogR, applySVM, applyRandForest, applyDT, applyMLP, applyLDA, applyKNN, applyDummy]:
             clfname = cfunc.__name__.replace("apply", "")
             print(f"\n=== Fold {fold} | {clfname}")
 
@@ -308,8 +308,8 @@ def run_multisite_male():
     runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_harmo_nofs", useFS=False, useHarmo=True)
 
 if __name__ == "__main__":
-    # run_singlesite() # To run by Carmen
-    # run_multisite_comb() # To run by Hannah-Rhys
-    # run_multisite_female() # To run by Hannah-Rhys
-    # run_multisite_male() # To run by Carmen
+    run_singlesite() # To run by Carmen
+    run_multisite_comb() # To run by Hannah-Rhys
+    run_multisite_female() # To run by Hannah-Rhys
+    run_multisite_male() # To run by Carmen
     runCVvisu(comb_df, label="skf5_combined_multisite", groupeval=True, ncv=5)
