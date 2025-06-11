@@ -376,14 +376,14 @@ def detect_inf_method(ts_data, inf_method, alpha, thresh, cov_method=None):
         return gr_causality(ts_data)
     elif inf_method == 'norm_laplacian':
         C = sample_covEst(ts_data, method=cov_method)
-        S = normalized_laplacian(C, epsilon=0.45, threshold=0.15)
+        S = normalized_laplacian(C, epsilon=alpha, threshold=thresh)
         return S
     elif inf_method == 'rlogspect':
         C = sample_covEst(ts_data, method=cov_method)
-        return learn_adjacency_rLogSpecT(C, delta_n=15*np.sqrt(np.log(176) / 176), threshold=0.2)
+        return learn_adjacency_rLogSpecT(C, delta_n=alpha*np.sqrt(np.log(176) / 176), threshold=thresh)
     elif inf_method == 'LADMM':
         C = sample_covEst(ts_data, method=cov_method)
-        return learn_adjacency_LADMM(C, delta_n=15*np.sqrt(np.log(176) / 176), threshold=0.2)
+        return learn_adjacency_LADMM(C, delta_n=alpha*np.sqrt(np.log(176) / 176), threshold=thresh)
     else:
         raise ValueError(f"Unknown inference method: {inf_method} (choose: 'sample_cov','partial_corr', 'pearson_corr_binary', 'pearson_corr', 'mutual_info', 'gr_causality', 'norm_laplacian', 'rlogspect').")
 
