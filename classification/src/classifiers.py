@@ -17,6 +17,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.dummy import DummyClassifier
 
 
 def applySVM(feat_train, y, params=None, use_probabilities=True):
@@ -201,5 +202,28 @@ def applyKNN(feat_train, y, params=None):
     
     """
     model = KNeighborsClassifier()
+    model.fit(feat_train, y)
+    return model
+
+def applyDummy(feat_train, y, params=None):
+    """
+    ------------------------------------------------------------------------------------------------
+    This function applies a dummy classifier, which makes predictions that ignore the input features
+    ------------------------------------------------------------------------------------------------
+
+    Parameters
+    ----------
+    feat_train : array-like
+        The training features
+    y : array-like
+        The true labels
+    
+    Returns
+    -------
+    model : object
+        The trained dummy model
+    """
+
+    model = DummyClassifier(strategy='stratified')
     model.fit(feat_train, y)
     return model
