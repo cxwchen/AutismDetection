@@ -306,7 +306,10 @@ if __name__ == "__main__":
     # Quick testing
     # labels, maps, indices = extractaal()
     # firsttest()
-    # plotallsaved()
-    featlist = ["fc_5301_8212", "fc_6302_9160", "fc_2002_8201", "fc_2211_2312", "fc_2332_9021", "fc_2201_5102"]
-    avg_weights = compute_average_importances(featlist)
-    plotCustomConnectomeAvgWeight(featlist, weights=avg_weights, filename="custom_top_feats_weighted")
+    plotallsaved()
+    # featlist = ["fc_5301_8212", "fc_6302_9160", "fc_2002_8201", "fc_2211_2312", "fc_2332_9021", "fc_2201_5102"]
+    # avg_weights = compute_average_importances(featlist)
+    # print("Feature\tAverage Importance")
+    # for feat, weight in avg_weights.items():
+    #     print(f"{feat}\t{weight:.4f}")
+    # plotCustomConnectomeAvgWeight(featlist, weights=avg_weights, filename="custom_top_feats_weighted")
