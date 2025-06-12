@@ -463,6 +463,7 @@ def read_feats(df_out):
     X = X.fillna(X.median())
     return X, y
 
+
 def run_all_combinations():
     inf_methods = ['sample_cov', 'partial_corr', 'pearson_corr',
                    'mutual_info', 'gr_causality', 'rlogspect']
@@ -517,6 +518,7 @@ def run_all_combinations():
                     json.dump(result, f, indent=4)
             except Exception as e:
                 print(f"Failed for {inf} (no cov_method): {e}")
+
 '''
     print("timeseries_shape: ", time_series[0].shape)
 

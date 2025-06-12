@@ -132,7 +132,7 @@ def main():
         'norm_laplacian': ['direct'],
         'LADMM': ['direct', 'var']
     }
-    alpha_values = [0.01, 0.025]#np.arange(1e-1,4.6e-1,0.5e-1)
+    alpha_values = [0.0001, 0.0005]#np.arange(1e-1,4.6e-1,0.5e-1)
     thresholds = [0]#np.arange(0.5e-1,5e-1,5e-2)
     n_components = 20
     

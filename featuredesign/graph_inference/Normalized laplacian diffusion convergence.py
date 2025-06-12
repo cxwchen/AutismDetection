@@ -88,7 +88,7 @@ def simulate_diffused_graph_signals(S, filter, P=100):
         z = np.random.randn(N)
         x = np.zeros(N)
         Sk = np.eye(N)
-        for term in range(filter):
+        for term in filter:
             x += term * Sk @ z
             Sk = Sk @ S
         signals[:, i] = x
@@ -136,15 +136,12 @@ def refine_normalized_laplacian_with_spectrum(V_hat, epsilon=1e-1, alpha=0.5):
     problem = cp.Problem(objective, constraints)
     problem.solve(solver=cp.SCS)
 
-    print("Step 2 Optimization Status:", problem.status)
-    return S.value
+    print("Optimization Status:", problem.status)
+    return S.value, problem.status
 
 def learn_normalized_laplacian(X, epsilon=1e-1, alpha=0.5):
-    print("Step 1: Covariance and Eigendecomposition")
     sample_cov, _ = compute_sample_covariance(X)
     eigvals, V_hat = eigh(sample_cov)
-#   print(V_hat)
-    print("Step 2: Learning Laplacian")
     return refine_normalized_laplacian_with_spectrum(V_hat, epsilon, alpha)
 
 # --------- Evaluation ---------
@@ -187,28 +184,55 @@ def plot_graphs(S_true, S_learned):
     plt.tight_layout()
     plt.show()
 
-# --------- Main Pipeline ---------
-if __name__ == "__main__":
+def threshold_and_normalize_laplacian(adj_matrix, threshold=0):
+    
+    return np.where(np.abs(adj_matrix) >= threshold, adj_matrix, 0)
+
+def find_min_epsilon(simulated_signals, epsilon_values):
+    # Placeholder to store the smallest valid epsilon and corresponding L_learned
+    L_learned_valid = None
+    
+    for epsilon in epsilon_values:
+        # Assuming learn_normalized_laplacian function returns None if it fails
+        L_learned, status = learn_normalized_laplacian(X=simulated_signals, epsilon=epsilon, alpha=0.5)
+
+        if status == 'infeasible':
+            print('limit reached')
+            break  # Exit once a valid L_learned is found
+    
+        L_learned_valid = L_learned
+    return threshold_and_normalize_laplacian(L_learned_valid, 0.05)
+
+def SampleLoop():
     N = 20
-    P_values = np.logspace(1.0, 3.0, num=20)
+    P_values = np.array([100, 200, 500, 1000, 2000, 5000, 10000])
+    epsilon_values = np.linspace(0.01, 0.3, 20)[::-1]  # Test epsilon values from 0.01 to 1
+    p = 0.2
+    filter = [1, 1, 1]
     
     frob_errors = []
     rel_errors = []
     
-    L_true = graph_generator(N, p, type='ER')
-    for P in P_values:   
-        X = simulate_diffused_graph_signals(L_true, P=int(P))
-        L_learned = learn_normalized_laplacian(X, epsilon=0.24, alpha=0.2)
+    # Generate the true normalized Laplacian
+    L_true = compute_normalized_laplacian(graph_generator(N, p, type='ER'))
+    
+    # Find the smallest epsilon for which L_learned is valid (not None)
+    for P in P_values:
+        X = simulate_diffused_graph_signals(L_true, filter=filter, P=int(P))
+        L_learned = find_min_epsilon(X, epsilon_values)      
         mask_offdiag = np.ones_like(L_true) - np.eye(L_true.shape[0])
         L_true_masked = L_true * mask_offdiag
         L_learned_masked = L_learned * mask_offdiag
+        
+        # Compute Frobenius and relative errors
         frob_error = norm(L_true_masked - L_learned_masked, 'fro')
         rel_error = frob_error / norm(L_true_masked, 'fro')
+        
+        # Store the errors
         frob_errors.append(frob_error)
-        rel_errors.append(rel_error)        
+        rel_errors.append(rel_error)
 
-
-    compare_graphs(L_true, L_learned)
+    #compare_graphs(L_true, L_learned)
     plot_graphs(L_true, L_learned)
     plt.figure(figsize=(8, 5))
     plt.plot(P_values, rel_errors, label="Relative Error", marker='s', color='red')
@@ -216,6 +240,50 @@ if __name__ == "__main__":
     plt.xlabel("Number of Samples P")
     plt.ylabel("Error")
     plt.title("Convergence of Learned Laplacian to True Laplacian")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+# --------- Main Pipeline ---------
+if __name__ == "__main__":
+    #N = 20
+    N_values = [10,20,30,40,50]
+    P = 10000
+    #P_values = np.array([100, 200, 500, 1000, 2000, 5000, 10000])
+    epsilon_values = np.linspace(0.01, 0.3, 20)[::-1]  # Test epsilon values from 0.01 to 1
+    p = 0.2
+    filter = [1, 1, 1]
+    
+    frob_errors = []
+    rel_errors = []
+    
+    # Generate the true normalized Laplacian
+    
+    
+    # Find the smallest epsilon for which L_learned is valid (not None)
+    for N in N_values:
+        L_true = compute_normalized_laplacian(graph_generator(N, p, type='ER'))
+        X = simulate_diffused_graph_signals(L_true, filter=filter, P=int(P))
+        L_learned = find_min_epsilon(X, epsilon_values)      
+        mask_offdiag = np.ones_like(L_true) - np.eye(L_true.shape[0])
+        L_true_masked = L_true * mask_offdiag
+        L_learned_masked = L_learned * mask_offdiag
+        
+        # Compute Frobenius and relative errors
+        frob_error = norm(L_true_masked - L_learned_masked, 'fro')
+        rel_error = frob_error / norm(L_true_masked, 'fro')
+        
+        # Store the errors
+        frob_errors.append(frob_error)
+        rel_errors.append(rel_error)
+
+    #compare_graphs(L_true, L_learned)
+    plot_graphs(L_true, L_learned)
+    plt.figure(figsize=(8, 5))
+    plt.plot(N_values, rel_errors, label="Relative Error", marker='s', color='red')
+    plt.xlabel("Number of nodes N")
+    plt.ylabel("Error")
+    plt.title("Relative error of ER graph with N nodes after 10^5 samples")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
