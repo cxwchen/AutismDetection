@@ -81,22 +81,6 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False, numfe
         # --- Harmonization with NeuroHarmonize (Optional) ---
         if useHarmo:
             print("Using NeuroHarmonize...")
-            # site_train = meta['SITE_ID'].iloc[trainidx].reset_index(drop=True)
-            # site_test = meta['SITE_ID'].iloc[testidx].reset_index(drop=True)
-
-            # # NeuroHarmonize relies on Combat which requires sites in test to be seen in train
-            # # Drop test sites absent in train
-            # seen_sites = set(site_train)
-            # mask = site_test.isin(seen_sites)
-            # if (~mask).any(): #if any test site is unseen
-            #     print(f"There are unseen sites. Dropping: {site_test[~mask].unique().tolist()}")
-
-            # Xtest = Xtest[mask]
-            # ytest = ytest[mask]
-            # site_test = site_test[mask].reset_index(drop=True)
-            # meta_test = meta_test[mask].reset_index(drop=True)
-            # site_train = site_train.reset_index(drop=True)
-
             Xtrain, Xtest, ytest = applyHarmo(Xtrain, Xtest, meta_train, meta_test, ytest)
 
         Xtrain, Xtest = normalizer(Xtrain, Xtest)
@@ -107,7 +91,6 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False, numfe
             selected_idx = fs.hsiclasso(Xtrain, ytrain, num_feat=numfeats)
             Xtrain = Xtrain[:, selected_idx]
             Xtest = Xtest[:, selected_idx]
-        
         
         for cfunc in [applyLogR, applySVM, applyRandForest, applyDT, applyMLP, applyLDA, applyKNN, applyDummy]:
             clfname = cfunc.__name__.replace("apply", "")
@@ -256,13 +239,13 @@ def run_singlesite():
     
     # ============ SINGLE SITE WITH FEATURE SELECTION ============================
     # Run skf 5 fold cross-validation with combined data, only NYU, with feature selection
-    runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_combined_onlyNYU_fs", useFS=True, useHarmo=False)
+    # runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_combined_onlyNYU_fs", useFS=True, useHarmo=False)
 
     # Run skf 5 fold cross-validation with female data, only NYU, with feature selection
-    runCV(female_df[female_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_female_onlyNYU_fs", useFS=True, useHarmo=False)
+    # runCV(female_df[female_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_female_onlyNYU_fs", useFS=True, useHarmo=False)
     
     # Run skf 5 fold cross-validation with male data, only NYU, with feature selection
-    runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_male_onlyNYU_fs", useFS=True, useHarmo=False)
+    # runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_male_onlyNYU_fs", useFS=True, useHarmo=False)
 
 def run_multisite_comb():
     # ======================= STRATIFIED CV =================================================
@@ -309,7 +292,7 @@ def run_multisite_male():
 
 if __name__ == "__main__":
     run_singlesite() # To run by Carmen
-    run_multisite_comb() # To run by Hannah-Rhys
-    run_multisite_female() # To run by Hannah-Rhys
-    run_multisite_male() # To run by Carmen
-    runCVvisu(comb_df, label="skf5_combined_multisite", groupeval=True, ncv=5)
+    # run_multisite_comb() # To run by Hannah-Rhys
+    # run_multisite_female() # To run by Hannah-Rhys
+    # run_multisite_male() # To run by Carmen
+    # runCVvisu(comb_df, label="skf5_combined_multisite", groupeval=True, ncv=5)
