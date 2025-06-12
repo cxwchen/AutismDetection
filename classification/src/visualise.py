@@ -301,12 +301,71 @@ def plotCustomConnectomeAvgWeight(featlist, weights=None, tag="", filename="cust
                             black_bg=False,
                             colorbar=True)
 
+def average_weights_for_selected_features(feat_folder, featlist, classifiers=["LogisticRegression", "SVC"], n_folds=5):
+    """
+    Compute average weights per classifier for selected features, averaging only over folds
+    where the feature appears.
+
+    Parameters
+    ----------
+    feat_folder : str
+        Path to folder containing JSON files.
+    featlist : list of str
+        List of feature names to average.
+    classifiers : list of str
+        List of classifier names to look for.
+    n_folds : int
+        Number of folds.
+
+    Returns
+    -------
+    dict
+        {(feature_name, classifier): {"mean": float, "std": float, "count": int}}
+    """
+
+    weights_by_feat_clf = defaultdict(list)
+
+    for clf in classifiers:
+        for fold in range(1, n_folds + 1):
+            filename = f"{clf}_skf5_combined_multisite_Fold{fold}.json"
+            filepath = os.path.join(feat_folder, filename)
+            if not os.path.isfile(filepath):
+                print(f"Warning: File not found {filepath}, skipping")
+                continue
+
+            with open(filepath, "r") as f:
+                data = json.load(f)
+
+            for feat, importance in data:
+                if feat in featlist:
+                    weights_by_feat_clf[(feat, clf)].append(importance)
+
+    avg_weights = {}
+    for (feat, clf), weights in weights_by_feat_clf.items():
+        avg_weights[(feat, clf)] = {
+            "mean": np.mean(weights),
+            "std": np.std(weights),
+            "count": len(weights)
+        }
+
+    return avg_weights
+
 
 if __name__ == "__main__":
+    featlist = ["fc_5301_8212", "fc_6302_9160", "fc_2002_8201", "fc_2211_2312", "fc_2332_9021", "fc_2201_5102"]
+    feat_folder = "features/20250608_173602"
+
+    avg_weights = average_weights_for_selected_features(feat_folder, featlist)
+
+    print("\nAverage Weights for Selected Features per Classifier:")
+    print(f"{'Feature':<20} {'Classifier':<15} {'Mean Weight':>12} {'Std Dev':>10} {'Folds':>6}")
+    print("-" * 65)
+    for (feat, clf), stats in sorted(avg_weights.items()):
+        print(f"{feat:<20} {clf:<15} {stats['mean']:12.4f} {stats['std']:10.4f} {stats['count']:6d}")
     # Quick testing
     # labels, maps, indices = extractaal()
     # firsttest()
-    plotallsaved()
+    # plotallsaved()
     # featlist = ["fc_5301_8212", "fc_6302_9160", "fc_2002_8201", "fc_2211_2312", "fc_2332_9021", "fc_2201_5102"]
     # avg_weights = compute_average_importances(featlist)
     # print("Feature\tAverage Importance")
