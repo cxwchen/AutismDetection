@@ -4,6 +4,7 @@ import glob
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from collections import defaultdict
 from nilearn import plotting
 from nilearnextraction import *
 from featureimportance import *
@@ -230,9 +231,82 @@ def plotallsaved(k=20, timestamp="20250608_173602"):
         print(f"Plotting {filename}...")
         plotConnectomeFromSaved(featfile=filename, k=k, tag=tag, fold=fold, timestamp=timestamp)
 
+def compute_average_importances(featlist, timestamp="20250608_173602"):
+    folder = os.path.join("features", timestamp)
+    json_files = [f for f in os.listdir(folder) if f.endswith(".json")]
+
+    # Dictionary to accumulate importance sums and counts
+    importance_sums = defaultdict(float)
+    importance_counts = defaultdict(int)
+
+    for jf in json_files:
+        filepath = os.path.join(folder, jf)
+        with open(filepath, "r") as f:
+            feats = json.load(f)
+            # feats is list of (feature_name, importance)
+            feat_dict = dict(feats)  # quick lookup
+            
+            for feat in featlist:
+                if feat in feat_dict:
+                    importance_sums[feat] += feat_dict[feat]
+                    importance_counts[feat] += 1
+
+    # Compute averages, if a feature was never found, assign 0 or np.nan
+    avg_importances = {}
+    for feat in featlist:
+        if importance_counts[feat] > 0:
+            avg_importances[feat] = importance_sums[feat] / importance_counts[feat]
+        else:
+            avg_importances[feat] = 0.0  # or np.nan
+
+    return avg_importances
+
+def plotCustomConnectomeAvgWeight(featlist, weights=None, tag="", filename="custom_top_feats", show=True):
+    labels, maps, indices = extractaal()
+    coords = plotting.find_parcellation_cut_coords(maps)
+    idx2coord = {idx: coord for idx, coord in zip(indices, coords)}
+
+    nodes = set()
+    edgeinfo = []
+    
+    for fname in featlist:
+        try:
+            _, idx1, idx2 = fname.split('_')
+            coord1 = idx2coord[idx1]
+            coord2 = idx2coord[idx2]
+            nodes.add(idx1)
+            nodes.add(idx2)
+            w = 1.0  # default weight
+            if weights is not None and fname in weights:
+                w = weights[fname]
+            edgeinfo.append((idx1, idx2, w))
+        except KeyError:
+            print(f"Warning: one of the indices {idx1} or {idx2} not in AAL atlas. Skipping")
+
+    nodes = sorted(nodes)
+    n = len(nodes)
+    nodeidx = {node: i for i, node in enumerate(nodes)}
+    adjmatr = np.zeros((n, n))
+    nodecoords = [idx2coord[node] for node in nodes]
+
+    for idx1, idx2, w in edgeinfo:
+        i, j = nodeidx[idx1], nodeidx[idx2]
+        adjmatr[i, j] = w
+        adjmatr[j, i] = w
+
+    plotting.plot_connectome(adjacency_matrix=adjmatr,
+                            node_coords=nodecoords,
+                            output_file=f"{filename}.png",
+                            title="Top Stable Features",
+                            black_bg=False,
+                            colorbar=True)
+
 
 if __name__ == "__main__":
     # Quick testing
     # labels, maps, indices = extractaal()
     # firsttest()
-    plotallsaved()
+    # plotallsaved()
+    featlist = ["fc_5301_8212", "fc_6302_9160", "fc_2002_8201", "fc_2211_2312", "fc_2332_9021", "fc_2201_5102"]
+    avg_weights = compute_average_importances(featlist)
+    plotCustomConnectomeAvgWeight(featlist, weights=avg_weights, filename="custom_top_feats_weighted")
