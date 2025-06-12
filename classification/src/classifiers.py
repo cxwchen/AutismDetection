@@ -1,8 +1,10 @@
-"""Classifier methods
+"""
+------------------
+Classifier methods
+-------------------
 
-This script blabla
-
-
+This code contains all used classifiers in our research. The functions are responsible
+for the fitting of the model. No prediction is made yet here.
 
 """
 
@@ -15,9 +17,9 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
-from wisardpkg import ClusWisard
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.dummy import DummyClassifier
 
 
 def applySVM(feat_train, y, params=None, use_probabilities=True):
@@ -53,7 +55,7 @@ def applySVM(feat_train, y, params=None, use_probabilities=True):
     return model
 
 
-def applyLogR(feat_train, y):
+def applyLogR(feat_train, y, params=None):
     """
     -----------------------------------------------------------------------------------------
     This function applies Logistic Regression (LR) from sklearn on the training features
@@ -158,12 +160,72 @@ def applyMLP(feat_train, y, params=None):
     model.fit(feat_train, y)
     return model
 
-def applyLDA(feat_train, y):
+def applyLDA(feat_train, y, params=None):
+    """
+    ----------------------------------------------------------------------------------------------
+    This function applies Linear Discriminant Analysis (LDA) from sklearn on the training features
+    ----------------------------------------------------------------------------------------------
+
+    Parameters
+    ----------
+    feat_train : array-like
+        The training features
+    y : array-like
+        The true labels
+    
+    Returns
+    -------
+    model : object
+        The trained LDA model
+    
+    """
+
     model = LinearDiscriminantAnalysis()
     model.fit(feat_train, y)
     return model
 
-def applyKNN(feat_train, y):
+def applyKNN(feat_train, y, params=None):
+    """
+    -------------------------------------------------------------------------------------
+    This function applies K-Nearest Neighbour (KNN) from sklearn on the training features
+    -------------------------------------------------------------------------------------
+
+    Parameters
+    ----------
+    feat_train : array-like
+        The training features
+    y : array-like
+        The true labels
+    
+    Returns
+    -------
+    model : object
+        The trained KNN model
+    
+    """
     model = KNeighborsClassifier()
+    model.fit(feat_train, y)
+    return model
+
+def applyDummy(feat_train, y, params=None):
+    """
+    ------------------------------------------------------------------------------------------------
+    This function applies a dummy classifier, which makes predictions that ignore the input features
+    ------------------------------------------------------------------------------------------------
+
+    Parameters
+    ----------
+    feat_train : array-like
+        The training features
+    y : array-like
+        The true labels
+    
+    Returns
+    -------
+    model : object
+        The trained dummy model
+    """
+
+    model = DummyClassifier(strategy='stratified')
     model.fit(feat_train, y)
     return model
