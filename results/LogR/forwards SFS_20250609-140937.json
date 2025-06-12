@@ -1,0 +1,6 @@
+{
+    "classifier": "LogR",
+    "feature_selection": "forwards SFS",
+    "mode": "train",
+    "selected_features": [
+        

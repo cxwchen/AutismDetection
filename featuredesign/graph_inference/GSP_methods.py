@@ -130,6 +130,50 @@ def adjacency_reweighted(cov_est, tau=1.0, delta=1e-5, epsilon=0.1, max_iter=10,
         
     return S_est
 
+def adjacency(cov_est, epsilon=4.5e-1, threshold=0):
+    """
+    Learns a normalized Laplacian S such that:
+    - S is PSD, symmetric, with 1s on diagonal
+    - Off-diagonal entries in [-1, 0]
+    - S approximates spectral form S' = ∑ λ_k v_k v_kᵀ
+    - S' has smallest eigenvalue (λ₁) = 0, enforced via λ₀ = 0
+    """
+    _, V_hat = eigh(cov_est)
+    N = V_hat.shape[0]
+    S = cp.Variable((N, N), symmetric=True)
+    lambda_vec = cp.Variable(N)
+
+    # S' = V Λ Vᵀ
+    S_prime = sum([lambda_vec[k] * np.outer(V_hat[:, k], V_hat[:, k]) for k in range(N)])
+
+    I = np.eye(N)
+    off_diag_mask = np.ones((N, N)) - I
+    #off_diag_entries = cp.multiply(off_diag_mask, S)
+
+    t1 = cp.Variable()
+    t2 = cp.Variable()
+
+    constraints = [
+        cp.diag(S) == 0,
+        S == S.T,
+        t1 >= cp.norm(S - S_prime, 'fro'),
+        t2 >= cp.abs(cp.sum(S[:, 0]) - 1),
+        cp.norm(cp.hstack([t1, t2]), 2) <= epsilon    
+    ]
+    
+    alpha = 0.5
+    
+    # Objective: sparsity in S
+    objective = cp.Minimize(alpha * cp.norm(S, 1))
+
+    problem = cp.Problem(objective, constraints)
+    problem.solve(solver=cp.SCS)
+    print("complete")
+    result = threshold_and_normalize_adjacency(S.value, threshold=threshold)
+
+    #print("Step 2 Optimization Status:", problem.status)
+    return result
+
 def learn_adjacency_rLogSpecT(cov_est, delta_n):
     """
     Learn adjacency matrix using rLogSpecT formulation without reweighting
@@ -182,7 +226,7 @@ def learn_adjacency_LADMM(cov_est, delta_n, threshold=0):
             
     # Run lADMM
     s, ss, r, rrho = lADMM(cov_est, s0, Z0, q0, lambda20, lambda30, alpha, delta_n, rho, tau1, epsilon, kMax = 10000)
-
+    print("lADMM complete")
     return threshold_and_normalize_adjacency(s, threshold)
 
 def binarize_adjacency_matrix(adj_matrix, threshold=0.15, keep_diagonal=False):

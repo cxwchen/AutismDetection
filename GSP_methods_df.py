@@ -9,8 +9,7 @@ from sklearn.metrics import mean_squared_error, accuracy_score, recall_score, pr
 from classification.src import classifiers as cl, basicfeatureextraction
 from featureselection.src.feature_selection_methods import *
 from featuredesign.graph_inference.AAL_test import *
-import os,json
-
+import os,json,glob,re,random, contextlib, io
 from nilearn.datasets import fetch_abide_pcp
 from dotenv import load_dotenv
 from pathlib import Path
@@ -125,14 +124,15 @@ def process_feats(
         return result_df, data_list
     else:
         return None, None
-    
+
 def main():
-    inf_methods = ['norm_laplacian',]
+    inf_methods = ['LADMM']
     cov_methods_dict = {
+        'rspect': ['direct'],
         'norm_laplacian': ['direct'],
-        'LADMM': ['direct', 'var']
+        'LADMM': ['direct']
     }
-    alpha_values = [0.0001, 0.0005]#np.arange(1e-1,4.6e-1,0.5e-1)
+    alpha_values = [0.01, 0.025]#np.arange(1e-1,4.6e-1,0.5e-1)
     thresholds = [0]#np.arange(0.5e-1,5e-1,5e-2)
     n_components = 20
     
@@ -149,7 +149,8 @@ def main():
                     plot_adjacency_matrix(_, subject_id_to_plot)
                     avg_acc, acc_scores = cross_validate_model(X, y)
                     results.append((inf, cov, alpha, thresh, avg_acc))
-    
+
+
     # Convert results into a numpy array for easy manipulation
     results_array = np.array(results, dtype=object)
 
@@ -205,51 +206,6 @@ def cross_validate_model(X, y, n_splits=5):
 
     avg_acc = np.mean(acc_scores)
     return avg_acc, acc_scores  # return both the average and individual fold scores
-
-def iterate_and_plot_alphas(sex='all', method='rlogspect', site='NYU', alpha_value=0.9, n_splits=5):
-    avg_accuracies = []
-    all_fold_accuracies = []  # Store accuracies from each fold for each alpha
-
-    print(f"Running cross-validation for alpha = {alpha_value}")
-    
-    # Cross-validation for current alpha
-    X, y, _ = load_and_process_data(sex=sex, method=method, site=site, alpha=alpha_value)
-    avg_acc, fold_accuracies = cross_validate_model(X, y, classifier="SVM", n_splits=n_splits)
-    
-    subject_id_to_plot = '0051044'  # You can change this subject ID if needed
-    plot_adjacency_matrix(_, subject_id_to_plot)
-    
-    avg_accuracies.append(avg_acc)
-    all_fold_accuracies.append(fold_accuracies)
-
-    # Plotting cross-validation results
-    plt.figure(figsize=(10, 6))
-
-    # Create the fold numbers (1, 2, ..., n_splits) and their corresponding accuracies
-    fold_numbers = np.arange(1, n_splits + 1)  # Fold numbers: 1, 2, ..., n_splits
-    fold_accuracies_flat = fold_accuracies  # Already flattened from previous code
-
-    # Plot each fold's accuracy
-    plt.scatter(fold_numbers, fold_accuracies_flat, marker='o', color='b', label='Accuracy per fold')
-    
-    # Plot the average accuracy
-    plt.axhline(y=avg_acc, color='r', linestyle='--', label=f'Average Accuracy = {avg_acc:.4f}')
-
-    plt.xlabel('Fold Number')
-    plt.ylabel('Accuracy')
-    plt.title(f'Accuracy per Fold for Alpha = {alpha_value}')
-    plt.grid(True)
-    plt.legend()
-    plt.show()
-
-    # Plot average accuracy vs alpha values
-    plt.figure(figsize=(10, 6))
-    plt.plot([alpha_value], avg_accuracies, marker='o', color='r', linestyle='-', linewidth=2, markersize=8)
-    plt.xlabel('Alpha Value')
-    plt.ylabel('Average Accuracy')
-    plt.title('Average Accuracy vs Alpha Value')
-    plt.grid(True)
-    plt.show()
 
 def load_and_process_data(site='NYU', inf_method='pearson_corr', alpha=5, cov_method = 'direct', thresh=0.10):
     """
