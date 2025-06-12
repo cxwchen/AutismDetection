@@ -3,7 +3,7 @@ import sys
 import glob
 import datetime
 from dotenv import load_dotenv
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, LeaveOneGroupOut
 from sklearn.impute import SimpleImputer
 from classification import *
 from classifiers import *
@@ -120,13 +120,21 @@ def GordonSingleClassAll():
 
 def GordonMultiClassAll():
     load_dotenv()
-    graphdir = os.getenv('GRAPHS_PATH_GORDON_MULTI')
+    graphdir = os.getenv('GRAPHS_PATH_GORDON_MULTI_NEW')
 
     if not graphdir:
-        raise ValueError("GRAPHS_PATH_GORDON_MULTI environment variable is not set.")
+        raise ValueError("GRAPHS_PATH_GORDON_MULTI_NEW environment variable is not set.")
 
+    resume_from = "cpac_rois-aal_nogsr_filt_rspect_direct_20ICA_alpha0.0001_thr0.10.csv"
+    resume = False
     for fname in sorted(glob.glob(graphdir)):
         basename = os.path.basename(fname)
+        if not resume:
+            if basename == resume_from:
+                resume = True
+            else:
+                print(f"Skipping {basename}")
+                continue
         
         df = pd.read_csv(fname).sample(frac=1, random_state=42).reset_index(drop=True)
         label = basename.replace("cpac_rois-aal_nogsr_filt_", "").replace(".csv", "")
@@ -159,8 +167,54 @@ def JochemClass():
         import traceback
         traceback.print_exc()
 
+def GLOGOCV(df, label="female", groupeval=False):
+    df.rename(columns={
+        'AGE_AT_SCAN': 'AGE',
+        'subject_id': 'SUB_ID'
+    }, inplace=True)
+
+    # Define phenotypic columns if they exist
+    pheno_cols = df.columns.intersection(["DX_GROUP", "SEX", "SITE_ID", "SUB_ID", "AGE"])
+    X = df.drop(columns=pheno_cols)
+    y = df['DX_GROUP']
+    if set(y.unique()) == {1, 2}: #make sure true labels are mapped correctly
+        y = y.map({1: 1, 2: 0})
+
+    meta = df[df.columns.intersection(["SITE_ID", "SEX", "AGE"])]
+    df = df['SITE_ID']
+
+    logo = LeaveOneGroupOut()
+    for fold, (trainidx, testidx) in enumerate(logo.split(X, y, groups=sites)):
+        testsite = df['SITE_ID'].iloc[testidx].unique()[0]
+        print(f"\n=== Fold {fold} | Testing on SITE: {testsite}")
+
+        Xtrain, Xtest = X.iloc[trainidx], X.iloc[testidx]
+        ytrain, ytest = y.iloc[trainidx], y.iloc[testidx]
+        meta_test = meta.iloc[testidx].reset_index(drop=True)
+
+        imputer = SimpleImputer(strategy='mean')
+        Xtrain = imputer.fit_transform(Xtrain)
+        Xtest = imputer.transform(Xtest)
+
+        Xtrain, Xtest = normalizer(Xtrain, Xtest)
+
+        svcparams = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, SVC())
+        # rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, RandomForestClassifier())
+        dtparams = bestDT(Xtrain, Xtest, ytrain, ytest, DecisionTreeClassifier())
+        mlpparams = bestMLP(Xtrain, Xtest, ytrain, ytest, MLPClassifier())
+
+        performCA(applyLogR, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, timestamp=timestamp)
+        performCA(applySVM, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, timestamp=timestamp, params = svcparams)
+        performCA(applyRandForest, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, timestamp=timestamp, params = None)
+        performCA(applyDT, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, timestamp=timestamp, params = dtparams)
+        performCA(applyMLP, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, timestamp=timestamp, params = mlpparams)
+        performCA(applyLDA, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, timestamp=timestamp)
+        performCA(applyKNN, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, timestamp=timestamp)
+
 
 if __name__ == "__main__":
-    GordonSingleClassAll()
-    JochemClass()
-    GordonMultiClassAll()
+    # GordonSingleClassAll()
+    # JochemClass()
+    # GordonMultiClassAll()
+    df = pd.read_csv("C:\\Users\\carme\\OneDrive\\Documenten\\AutismDetection\\Feature_Dataframes\\third_run\\cpac_rois-aal_nogsr_filt_rspect_direct_20ICA_alpha0.0001_thr0.10.csv")
+    GLOGOCV(df, label="rspect_direct_20ICA_alpha0.0001_thr0.10")

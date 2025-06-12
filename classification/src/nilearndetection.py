@@ -121,9 +121,16 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False, numfe
 
 
 def runLOGO(df, label="female", useFS=False, groupeval=False, numfeats=100):
-    X = df.iloc[:, 4:]
+    df.rename(columns={
+        'AGE_AT_SCAN': 'AGE',
+        'subject_id': 'SUB_ID'
+    }, inplace=True)
+
+    # Define phenotypic columns if they exist
+    pheno_cols = df.columns.intersection(["DX_GROUP", "SEX", "SITE_ID", "SUB_ID", "AGE"])
+    X = df.drop(columns=pheno_cols)
     y = df['DX_GROUP']
-    meta = df[['SITE_ID', 'SEX', 'AGE']]
+    meta = df[df.columns.intersection(["SITE_ID", "SEX", "AGE"])]
     sites = df['SITE_ID']
 
     logo = LeaveOneGroupOut()

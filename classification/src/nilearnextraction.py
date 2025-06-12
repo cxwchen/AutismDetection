@@ -75,7 +75,6 @@ def extractaal():
     indices = aal.indices
     return labels, maps, indices
 
-
 if __name__ == "__main__":
     data, labels, maps, indices = nilearnextract()
     data.to_csv('nilearnfeatscomb.csv.gz', index=False, compression='gzip')
