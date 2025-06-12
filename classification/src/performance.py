@@ -45,7 +45,6 @@ def plot_confusion_matrix(y_true, y_pred, model, fold=None, tag="", timestamp=""
     if fold is not None:
         title += f' - Fold {fold}'
     plt.title(title)
-    # os.makedirs('plots', exist_ok=True)
     filename = f'plots/{timestamp}/conf_matrix_{model.__class__.__name__}'
     if tag:
         filename += f' - {tag}'
@@ -53,8 +52,6 @@ def plot_confusion_matrix(y_true, y_pred, model, fold=None, tag="", timestamp=""
         filename += f' - Fold {fold}'
     plt.savefig(f'{filename}.png', bbox_inches='tight')
     plt.close()
-    # plt.show(block=False)  # Non-blocking
-    # plt.pause(0.1)
 
 def get_metrics(ytrue, ypred, yprob=None):
     """

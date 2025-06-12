@@ -67,19 +67,16 @@ def runGCV(df, ncv, label="female", groupeval=True):
 
         Xtrain, Xtest = normalizer(Xtrain, Xtest)
 
-        # for cfunc in [applyDummy]:
         for cfunc in [applyLogR, applySVM, applyRandForest, applyDT, applyMLP, applyLDA, applyKNN, applyDummy]:
             clfname = cfunc.__name__.replace("apply", "")
             print(f"\n=== Fold {fold} | {clfname}")
 
             if cfunc == applySVM:
-                # params = {'kernel': 'linear', 'C': 1}
                 params = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, SVC())
             elif cfunc == applyDT:
                 params = bestDT(Xtrain, Xtest, ytrain, ytest, DecisionTreeClassifier())
             elif cfunc == applyMLP:
                 params = bestMLP(Xtrain, Xtest, ytrain, ytest, MLPClassifier())
-        # rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, RandomForestClassifier())
             else:
                 params = None
 
@@ -155,11 +152,7 @@ def JochemClass():
                     print(f"Skipping {basename}")
                     continue
             df = pd.read_csv(fname).sample(frac=1, random_state=42).reset_index(drop=True)
-        # print("Data Loaded. Columns:", df.columns)
             label = basename.replace("cpac_rois-aal_nogsr_filt_","").replace(".csv","")
-        # X = df.iloc[:, 4:]
-        # X = X.loc[:, X.var() > 1e-6] 
-        # print(X.columns)
             runGCV(df, ncv=5, label=label)
     except Exception as e:
         print("Crash in JochemClass()", e)
@@ -168,6 +161,6 @@ def JochemClass():
 
 
 if __name__ == "__main__":
-    # GordonSingleClassAll()
+    GordonSingleClassAll()
     JochemClass()
-    # GordonMultiClassAll()
+    GordonMultiClassAll()

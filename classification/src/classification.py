@@ -25,9 +25,12 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, groupeval=False, fold=
     
     ytest : array-like
         the true labels of the validation set
+
+    groupeval : bool
+        if True the function should perform the evaluations per subgroup.
     
     fold : integer
-        the number of the fold
+        the number of the fold, this can be passed to filenames and plot titles.
     
     tag : string
         Information on the dataset. Female, male, or combined. multisite or singlesite. fs or not. harmo or not

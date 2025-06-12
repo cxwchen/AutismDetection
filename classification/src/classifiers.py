@@ -1,8 +1,10 @@
-"""Classifier methods
+"""
+------------------
+Classifier methods
+-------------------
 
-This script blabla
-
-
+This code contains all used classifiers in our research. The functions are responsible
+for the fitting of the model. No prediction is made yet here.
 
 """
 

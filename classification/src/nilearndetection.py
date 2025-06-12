@@ -102,7 +102,6 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False, numfe
                 params = bestDT(Xtrain, Xtest, ytrain, ytest, DecisionTreeClassifier())
             elif cfunc == applyMLP:
                 params = bestMLP(Xtrain, Xtest, ytrain, ytest, MLPClassifier())
-        # rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, RandomForestClassifier())
             else:
                 params = None
             
@@ -200,7 +199,6 @@ def runCVvisu(df, label="female", groupeval=True, ncv=5):
 
             if cfunc == applySVM:
                 params = params = {'kernel': 'linear', 'C': 1}
-        # rfparams = bestRF(Xtrain, Xtest, ytrain, ytest, RandomForestClassifier())
             else:
                 params = None
             
@@ -292,7 +290,7 @@ def run_multisite_male():
 
 if __name__ == "__main__":
     run_singlesite() # To run by Carmen
-    # run_multisite_comb() # To run by Hannah-Rhys
-    # run_multisite_female() # To run by Hannah-Rhys
-    # run_multisite_male() # To run by Carmen
-    # runCVvisu(comb_df, label="skf5_combined_multisite", groupeval=True, ncv=5)
+    run_multisite_comb() # To run by Hannah-Rhys
+    run_multisite_female() # To run by Hannah-Rhys
+    run_multisite_male() # To run by Carmen
+    runCVvisu(comb_df, label="skf5_combined_multisite", groupeval=True, ncv=5)
