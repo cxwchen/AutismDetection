@@ -513,11 +513,11 @@ def plot_subject_adjacency_across_files(file_paths, subject_id=51044, matrix_siz
         adj_cols = [col for col in df.columns if re.match(r"A_\d+_\d+", col)]
         adj_values = subject_row[adj_cols].values.flatten()
         n = int(np.sqrt(len(adj_cols))) if matrix_size is None else matrix_size
-        adj_matrix = adj_values.reshape(n, n)
+        adj_matrix = normalize_laplacian_neg1_0(adj_values.reshape(n, n))
 
         plt.figure(figsize=(8, 6))
         sns.heatmap(adj_matrix, cmap="YlGnBu", annot=False, xticklabels=False, yticklabels=False)
-        plt.title(f"Adjacency Matrix for Subject {subject_id}\nFile: {os.path.basename(file_path)}")
+        plt.title(f"Adjacency Matrix for Subject {subject_id}")
         plt.show()
         return adj_matrix  # Return the last plotted adjacency matrix for further processing if needed
 
@@ -573,10 +573,19 @@ def plot_subject_covariance_across_files(file_paths, subject_id=51044, matrix_si
         plt.show()
         return cov_matrix  # Return the last plotted covariance matrix for further processing if needed
 
+def normalize_laplacian_neg1_0(L):
+    
+    min_val = np.min(L)
+    max_val = np.max(L)
+    if min_val == 0:
+        print("Warning: Minimum value is 0, normalization skipped.")
+        return L
+    L_norm = (L-max_val) / (max_val-min_val)
+    return L_norm
+
 if __name__ == "__main__":
     file_paths = select_dfs_by_params()
-    adj_matrix = plot_subject_adjacency_across_files(file_paths)
-    plot_normalized_laplacian(adj_matrix)
+    plot_subject_adjacency_across_files(file_paths)
     #file_path = select_multiple_files()
     #plot_subject_covariance_across_files(file_path)
     #results_array=plotting()
