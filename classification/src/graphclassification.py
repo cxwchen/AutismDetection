@@ -181,7 +181,7 @@ def GLOGOCV(df, label="female", groupeval=False):
         y = y.map({1: 1, 2: 0})
 
     meta = df[df.columns.intersection(["SITE_ID", "SEX", "AGE"])]
-    df = df['SITE_ID']
+    sites = df['SITE_ID']
 
     logo = LeaveOneGroupOut()
     for fold, (trainidx, testidx) in enumerate(logo.split(X, y, groups=sites)):
