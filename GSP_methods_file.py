@@ -109,8 +109,8 @@ def parse_filename(file_name):
     # inf is at index 4, cov at 5, alpha at 7, thresh at 8
     inf = parts[4].replace('-', '_')
     cov = parts[5]
-    alpha = float(parts[9].replace('alpha', ''))
-    thresh = float(parts[10].replace('thr', ''))
+    alpha = float(parts[7].replace('alpha', ''))
+    thresh = float(parts[8].replace('thr', ''))
     return inf, cov, alpha, thresh
 
 def plot_adjacency_matrix(df, subject_id, matrix_size=20):
@@ -304,6 +304,76 @@ def compute_subjectwise_adjacency_distances_by_alpha(file_paths):
 
     return sorted_alphas[:-1], avg_distances
 
+def plot_distance_distribution_by_alpha(file_paths):
+    """
+    For each alpha, plot the distribution (boxplot and histogram) of subjectwise adjacency distances
+    between consecutive alpha values.
+    """
+    # Reuse the logic from compute_subjectwise_adjacency_distances_by_alpha to get the distances
+    alpha_to_df = {}
+    for file_path in file_paths:
+        try:
+            inf, cov, alpha, thresh = parse_filename(os.path.basename(file_path))
+        except Exception as e:
+            print(f"Could not parse alpha from {file_path}: {e}")
+            continue
+        df = pd.read_csv(file_path)
+        alpha_to_df[alpha] = df
+
+    sorted_alphas = sorted(alpha_to_df.keys())
+    if not sorted_alphas:
+        print("No valid alpha values found.")
+        return
+
+    subject_sets = [set(df['subject_id']) for df in alpha_to_df.values()]
+    common_subjects = set.intersection(*subject_sets)
+    if not common_subjects:
+        print("No common subjects found across all alpha files.")
+        return
+
+    subject_distances = {alpha: [] for alpha in sorted_alphas[:-1]}
+    adj_col_pattern = re.compile(r"A_\d+_\d+" )
+
+    for subject_id in common_subjects:
+        subject_matrices = []
+        for alpha in sorted_alphas:
+            df = alpha_to_df[alpha]
+            row = df[df['subject_id'] == subject_id]
+            if row.empty:
+                break
+            adj_cols = [col for col in df.columns if adj_col_pattern.match(col)]
+            adj_values = row[adj_cols].values.flatten()
+            n = int(np.sqrt(len(adj_cols)))
+            adj_matrix = adj_values.reshape(n, n)
+            subject_matrices.append(adj_matrix)
+        if len(subject_matrices) == len(sorted_alphas):
+            for i in range(len(sorted_alphas) - 1):
+                alpha1 = sorted_alphas[i]
+                dist = np.linalg.norm(subject_matrices[i] - subject_matrices[i + 1], ord='fro')
+                subject_distances[alpha1].append(dist)
+
+    # Plot boxplots for each alpha
+    plt.figure(figsize=(12, 6))
+    data = [subject_distances[alpha] for alpha in sorted_alphas[:-1]]
+    plt.boxplot(data, labels=[f"{alpha:.4f}" for alpha in sorted_alphas[:-1]])
+    plt.xlabel('Alpha')
+    plt.ylabel('Frobenius Distance (subjectwise)')
+    plt.title('Distribution of Subjectwise Adjacency Distances Between Consecutive Alpha Values')
+    plt.grid(True)
+    plt.show()
+
+    # Optionally, plot histograms for each alpha
+    plt.figure(figsize=(12, 6))
+    for i, alpha in enumerate(sorted_alphas[:-1]):
+        plt.hist(subject_distances[alpha], bins=20, alpha=0.5, label=f"alpha={alpha:.4f}")
+    plt.xlabel('Frobenius Distance')
+    plt.ylabel('Count')
+    plt.title('Histogram of Subjectwise Adjacency Distances for Each Alpha')
+    plt.legend()
+    plt.show()
+
+    return subject_distances
+
 def average_longform_heatmaps_and_plot(file_paths, output_file=None):
     """
     Takes as input multiple CSV files in long-form (alpha, threshold, value),
@@ -355,13 +425,61 @@ def average_longform_heatmaps_and_plot(file_paths, output_file=None):
 
     return heatmap_df
 
+def select_dfs_by_params():
+    """
+    Allows the user to select inf_method, alpha, and thresh (or 'all' for any),
+    then returns a list of matching dataframe file paths.
+    """
+    folder_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "Feature_Dataframes")
+    files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
+    parsed = []
+    for f in files:
+        try:
+            inf, cov, alpha, thresh = parse_filename(f)
+            parsed.append({'file': f, 'inf': inf, 'alpha': alpha, 'thresh': thresh})
+        except Exception:
+            continue
+
+    # Get unique values for each parameter
+    inf_methods = sorted(set(p['inf'] for p in parsed))
+    alphas = sorted(set(p['alpha'] for p in parsed))
+    threshes = sorted(set(p['thresh'] for p in parsed))
+
+    # Prompt user for selection
+    print("Available inf_methods:", inf_methods)
+    inf_choice = input("Select inf_method (or type 'all'): ").strip()
+    print("Available alphas:", alphas)
+    alpha_choice = input("Select alpha (or type 'all'): ").strip()
+    print("Available threshes:", threshes)
+    thresh_choice = input("Select thresh (or type 'all'): ").strip()
+
+    # Convert choices
+    inf_selected = inf_methods if inf_choice.lower() == 'all' else [inf_choice]
+    alpha_selected = alphas if alpha_choice.lower() == 'all' else [float(alpha_choice)]
+    thresh_selected = threshes if thresh_choice.lower() == 'all' else [float(thresh_choice)]
+
+    # Find matching files
+    selected_files = [
+        os.path.join(folder_path, p['file'])
+        for p in parsed
+        if p['inf'] in inf_selected and p['alpha'] in alpha_selected and p['thresh'] in thresh_selected
+    ]
+    if not selected_files:
+        print("No files match the selected criteria.")
+    else:
+        print("Selected files:")
+        for f in selected_files:
+            print(f)
+    return selected_files
+
 # Example usage:
 # file_paths = ['heatmap1.csv', 'heatmap2.csv', 'heatmap3.csv']
 # average_heatmaps_and_plot(file_paths, output_file='average_heatmap.csv')
 
 if __name__ == "__main__":
-    file_paths = load_dfs()
+    file_paths = select_dfs_by_params()
     #results_array=plotting()
+    plot_distance_distribution_by_alpha(file_paths)
     #compute_subjectwise_adjacency_distances_by_alpha(file_paths)
     #plot_distance_distribution_by_alpha(file_paths)
-    average_longform_heatmaps_and_plot(file_paths)
+    #average_longform_heatmaps_and_plot(file_paths)
