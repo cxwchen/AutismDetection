@@ -7,7 +7,7 @@ Created on Wed May 14 10:26:16 2025
 import tkinter as tk
 from tkinter import ttk, filedialog
 from PIL import Image, ImageTk, ImageGrab
-from ctypes import windll
+# from ctypes import windll
 
 from classifiers import *
 from selection_buttons import *
@@ -19,7 +19,7 @@ from nilearndetection import *
 from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 import hyperparametertuning
-import code
+# import code
 import io
 import contextlib
 import platform
@@ -162,10 +162,6 @@ def build_gui(root, X, y, meta, filepath=None):
         command_input.delete(0, "end")  # clear previous input
         command_input.insert(0, f"run()")
         execute_command()
-        log(f"Scanning {context.y.size} samples with {context.classifiers_set}")
-        log(f"Target:\\{context.subjects_sex_set}\\{context.subjects_age_set}\\{context.classifiers_set}\\{context.features_set}\\{context.dataset_fit}\n")
-        runCV(context)
-        log(f"Evaluation completed")
 
     btn_run = tk.Button(toolbar, text="\u23F5 Run", command=run_command) 
     btn_settings = tk.Button(toolbar, text="\U0001F6E0 Settings", command=open_settings) 
@@ -468,7 +464,10 @@ def build_gui(root, X, y, meta, filepath=None):
         root.after(1000, step_loop)
         
     def run():
-        ...
+        log(f"Scanning {context.y.size} samples with {context.classifiers_set}")
+        log(f"Target:\\{context.subjects_sex_set}\\{context.subjects_age_set}\\{context.classifiers_set}\\{context.features_set}\\{context.dataset_fit}\n")
+        runCV(context)
+        log(f"Evaluation completed")
         
     def run_with_context(context):
         log(f"Scanning {context.y.size} samples with {context.classifiers_set}")
@@ -499,7 +498,7 @@ def build_gui(root, X, y, meta, filepath=None):
             print("- log('message')")
         elif topic == "classifier":
             print("Classifier options:")
-            print("- SVM, Logistic Regression, Random Forest, Decision Tree, MLP, ClusWiSARD")
+            print("- SVM, Logistic Regression, Random Forest, Decision Tree, MLP, LDA, KNN")
         elif topic == "data":
             print("Expected dataset format: subjects × features. Use loaddata() to load.")
         elif topic == "export":
@@ -541,20 +540,22 @@ def start():
     root.iconbitmap("logo.ico")
     build_gui(root, X, y, meta)
     
-    # filepath = filedialog.askopenfilename(
-    # title="Select a data file",
-    # filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")])
+    Ask_CSV=False ### <--------------- Set this value to true if you want to import CSV's on start
     
-    # if not filepath:
-    #     print("No file selected.")
-    #     # Start the update loop
-    #     root.mainloop()
-    
-    # root.destroy()
-    # root = tk.Tk()
-    # root.title(f"NASDA – {filepath.split('/')[-1]}") # root.title(f"NASDA – {filepath.split('/')[-1]}")
-    # print(Xtrain.size)
-    # build_gui(root, filepath)
+    if Ask_CSV == True:
+        filepath = filedialog.askopenfilename(
+        title="Select a data file",
+        filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")])
+        
+        if not filepath:
+            print("No file selected.")
+            # Start the update loop
+            root.mainloop()
+        
+        root.destroy()
+        root = tk.Tk()
+        root.title(f"NASDA – {filepath.split('/')[-1]}")
+        build_gui(root, X, y, meta, filepath)
     
     # Start the update loop
     root.mainloop()

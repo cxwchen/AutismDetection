@@ -55,7 +55,7 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, groupeval=False, fold=
         yprob = None
 
     ypred = model.predict(feat_test)
-    yprob = model.predict_proba(feat_test)
+    # yprob = model.predict_proba(feat_test)
 
     metrics = get_metrics(ytest, ypred, yprob)
 
