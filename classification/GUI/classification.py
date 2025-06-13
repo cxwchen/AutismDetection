@@ -55,16 +55,16 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, groupeval=False, fold=
         yprob = None
 
     ypred = model.predict(feat_test)
-    # yprob = model.predict_proba(feat_test)
+    yprob = model.predict_proba(feat_test)
 
-   #  metrics = get_metrics(ytest, ypred, yprob)
+    metrics = get_metrics(ytest, ypred, yprob)
 
     # if timestamp is not None:
         # os.makedirs(f"plots/{timestamp}", exist_ok=True)
 
-    # clf_name = model.__class__.__name__
+    clf_name = model.__class__.__name__
     # plot_confusion_matrix(ytest, ypred, model, fold=fold, tag=tag, timestamp=timestamp)
-    # print_metrics(metrics, clf_name)
+    print_metrics(metrics, clf_name)
     # toCSV(DEFAULT_CSV_PATH, fold, clf_name, tag, "Overall", "ALL", metrics)
 
     # if groupeval and meta is not None:

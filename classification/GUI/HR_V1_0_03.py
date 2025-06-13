@@ -86,7 +86,7 @@ def update_overview_text(context):
         10,
         context.canvas.winfo_height() - 10,
         anchor="sw",
-        text=f"Target:\\{context.subjects_sex_set}\\{context.subjects_age_set}\\{context.classifiers_set}\\{context.features_set}\\{context.dataset_fit}",
+        text=f"Target:\\{context.subjects_sex_set}\\{context.subjects_age_set}\\{context.classifiers_set}\\{context.features_set}\\{context.graph_vs_pearson}\\{context.dataset_fit}",
         fill="white",
         font=("Arial", 9, "italic"),
         tags="overlay_text"
@@ -207,12 +207,13 @@ def build_gui(root, X, y, meta, filepath=None):
     # Features Frame
     features_frame = tk.LabelFrame(left, text="Features", bg="mistyrose")
     features_frame.grid(row=2, column=0, sticky="nsew", padx=5, pady=5)
-    tk.Label(features_frame, text="By Sex", font=("Segoe UI", 9), bg="mistyrose").grid(row=0, column=0, sticky="nw",  padx=(2, 5), pady=(5, 0))
-    selection_buttons.select_btn(features_frame, context).grid(row=1, column=0, sticky="n", padx=(5, 2), pady=5)
+    
+    tk.Label(features_frame, text="Feature Selection Methods", font=("Segoe UI", 9), bg="mistyrose").grid(row=0, column=0, sticky="nw",  padx=(2, 5), pady=(5, 0))
+    select_btn(features_frame, context).grid(row=1, column=0, sticky="n", padx=(5, 2), pady=5)
     
     tk.Label(features_frame, width=2, bg="mistyrose").grid(row=0, column=1)
-    tk.Label(features_frame, text="By Sex", font=("Segoe UI", 9), bg="mistyrose").grid(row=0, column=0, sticky="nw",  padx=(2, 5), pady=(5, 0))
-    selection_buttons.feat_btn(features_frame, context).grid(row=1, column=0, sticky="n", padx=(5, 2), pady=5)
+    tk.Label(features_frame, text="Feature Types", font=("Segoe UI", 9), bg="mistyrose").grid(row=0, column=2, sticky="nw",  padx=(2, 5), pady=(5, 0))
+    graph_vs_pearson_btn(features_frame, context).grid(row=1, column=2, sticky="n", padx=(2, 5), pady=5)
 
     # Right frame (1/3 width initially)
     right = tk.Frame(main_pane, bg="lightgreen")
