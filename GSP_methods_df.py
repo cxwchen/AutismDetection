@@ -125,15 +125,101 @@ def process_feats(
     else:
         return None, None
 
+def process_feats_covariance(
+    post_process=True,
+    output_dir=None,
+    filt=True,
+    gsr=False,
+    pipeline='cpac',
+    derivative='rois_aal',
+    n_components=20,
+    feats='graph',
+    site=None,
+    sex=None  # 'female' or 'male'
+):
+    """
+    Similar to process_feats, but returns a DataFrame of sample covariance matrices for each subject.
+    Each row corresponds to a subject, columns are C_{i}_{j} for the covariance matrix entries.
+    """
+    # Load environment and set paths
+    load_dotenv()
+    abidedir = os.getenv('ABIDE_DIR_PATH')
+
+    # Convert output_dir to Path
+    if output_dir is None:
+        output_dir = Path.home() / 'Documents' / 'abide_parameter_tuning'
+    else:
+        output_dir = Path(output_dir).expanduser()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load ABIDE data
+    data = fetch_abide_pcp(
+        derivatives=derivative,
+        data_dir=abidedir,
+        pipeline=pipeline,
+        band_pass_filtering=filt,
+        global_signal_regression=gsr,
+        quality_checked=True
+    )
+
+    # Convert sex input to ABIDE encoding
+    phenos = data.phenotypic
+    mask = np.ones(len(phenos), dtype=bool)
+
+    if site is not None:
+        mask &= (phenos['SITE_ID'] == site)
+
+    if sex is not None:
+        sex_code = {'female': 2, 'male': 1}.get(sex.lower())
+        if sex_code is None:
+            raise ValueError("Invalid `sex` parameter. Use 'male', 'female', or None.")
+        mask &= (phenos['SEX'] == sex_code)
+
+    filtered_indices = np.where(mask)[0]
+
+    filtered_data = {
+        'rois_aal': [data['rois_aal'][i] for i in filtered_indices],
+        'phenotypic': phenos.iloc[filtered_indices]
+    }
+
+    if post_process:
+        subject_ids = [str(phen.SUB_ID).zfill(7) for phen in filtered_data['phenotypic'].itertuples()]
+        data_list = [ts_file for ts_file in filtered_data['rois_aal'] if isinstance(ts_file, np.ndarray)]
+        if n_components != 116:
+            data_list = ica_smith(data_list, n_components=n_components)  # ICA
+
+        # Compute sample covariance for each subject
+        cov_rows = []
+        for subj_id, ts in zip(subject_ids, data_list):
+            # ts: shape (timepoints, n_components)
+            if ts.shape[1] != n_components:
+                continue  # skip if not expected shape
+            cov = np.cov(ts, rowvar=False)  # shape (n_components, n_components)
+            cov_flat = cov.flatten()
+            cov_rows.append([subj_id] + list(cov_flat))
+
+        # Create column names
+        col_names = ['subject_id'] + [f"C_{i}_{j}" for i in range(n_components) for j in range(n_components)]
+        cov_df = pd.DataFrame(cov_rows, columns=col_names)
+
+        # Optionally save
+        filename = f"covariance_df_{n_components}ICA.csv"
+        output_path = output_dir / filename
+        cov_df.to_csv(str(output_path), index=False)
+
+        return cov_df, data_list
+    else:
+        return None, None
+
 def main():
-    inf_methods = ['rlogspect']
+    inf_methods = ['LADMM']
     cov_methods_dict = {
         'rspect': ['direct'],
         'norm_laplacian': ['direct'],
         'LADMM': ['direct'],
         'rlogspect': ['direct']
     }
-    alpha_values = [0.01]#np.arange(1e-1,4.6e-1,0.5e-1)
+    alpha_values = [1]#np.arange(1e-1,4.6e-1,0.5e-1)
     thresholds = [0]#np.arange(0.5e-1,5e-1,5e-2)
     n_components = 20
     
@@ -259,5 +345,5 @@ def plot_adjacency_matrix(df, subject_id, matrix_size=20):
     plt.show()
 
 if __name__ == "__main__":
-    main()  # Set to False if you want a single test
+    process_feats_covariance()  # Set to False if you want a single test
 # %%

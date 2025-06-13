@@ -53,14 +53,30 @@ def create_random_normal_adjacency(N, mean=0.0, std=1.0):
         A[0, :] = A[:, 0]  # Maintain symmetry on first row as well
     return A
 
-# Parameters
-n = 50
-p = 0.2
-num_samples = 250
+def threshold_and_normalize_adjacency(adj_matrix, threshold=0):
+    """
+    Normalizes the weights of the adjacency matrix to be between 0 and 1 using min-max normalization.
+    
+    Parameters:
+    - adj_matrix: A numpy 2D array representing the adjacency matrix.
+    
+    Returns:
+    - normalized_adj: The adjacency matrix with normalized weights between 0 and 1.
+    """
+    # Find the minimum and maximum values in the adjacency matrix
+    min_val = np.min(adj_matrix)
+    max_val = np.max(adj_matrix)
+    
+    # Apply min-max normalization
+    normalized_adj = (adj_matrix - min_val) / (max_val - min_val)  # Scales the values between 0 and 1
+    
+    # Apply absolute value and then thresholding
+    normalized_adj = np.where(np.abs(normalized_adj) >= threshold, normalized_adj, 0)    
+    return normalized_adj
 
-def sample_graph():
+def sample_graph(num_samples=10000, n=20, p=0.2):
     # Generate ER graph adjacency matrix
-    W = graph_generator(n,p,m0=n,m=n/2,type='ER')
+    
     signals = np.zeros((num_samples, n))
 
     # Generate multiple filtered signals from different random inputs
@@ -82,10 +98,10 @@ def sample_graph():
 
     alpha = 0.5
     rho = 1
-    tau1 = 0.75
+    tau1 = 0.7
     epsilon = 1e-6
-    kMax = 000
-    delta = 20 * sqrt(log(num_samples) / num_samples)
+    kMax = 10000
+    delta = 10 * sqrt(log(num_samples) / num_samples)
 
     # Run lADMM
     s, ss, r, rrho = lADMM(cov_est, s0, Z0, q0, lambda20, lambda30, alpha, delta, rho, tau1, epsilon, kMax)
@@ -115,8 +131,7 @@ def sample_graph():
     plt.tight_layout()
     plt.show()
 
-    plt.tight_layout()
-    plt.show()
+    #return s_binarized
 
 def multiple_graph_avg_F(kMax):
     num_graphs = 10
@@ -356,5 +371,10 @@ def multiple_k():
     plt.grid(True)
     plt.show()
 
-multiple_graph()
+n=20
+p=0.2
+W = graph_generator(n,p,m0=n,m=n/2,type='ER')
+sample_graph()
+#plot_ladmm_relative_error_multiple_samples()
+
 # %%

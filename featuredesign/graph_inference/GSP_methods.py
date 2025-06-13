@@ -212,7 +212,7 @@ def learn_adjacency_rLogSpecT(cov_est, delta_n, threshold):
     return threshold_and_normalize_adjacency(S.value, threshold=threshold)
 
 def learn_adjacency_LADMM(cov_est, delta_n, threshold=0):
-    m = len(cov_est[0])
+    m = 20#len(cov_est[0])
     s0 = np.ones((m, m))
     q0 = s0.dot(np.ones((m, 1)))
     Z0 = s0.copy()
@@ -221,11 +221,11 @@ def learn_adjacency_LADMM(cov_est, delta_n, threshold=0):
     
     alpha = 0.5
     rho = 1.0
-    tau1 = 0.8
-    epsilon = 1e-6
+    tau1 = 0.7
+    epsilon = 1e-5
             
     # Run lADMM
-    s, ss, r, rrho = lADMM(cov_est, s0, Z0, q0, lambda20, lambda30, alpha, delta_n, rho, tau1, epsilon, kMax = 50000)
+    s, ss, r, rrho = lADMM(cov_est, s0, Z0, q0, lambda20, lambda30, alpha, delta_n, rho, tau1, epsilon, kMax = 20000)
     print("lADMM complete")
     return threshold_and_normalize_adjacency(s, threshold)
 

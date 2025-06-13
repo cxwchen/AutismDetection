@@ -40,44 +40,6 @@ def cross_validate_model(X, y, n_splits=5):
     avg_acc = np.mean(acc_scores)
     return avg_acc, acc_scores  # return both the average and individual fold scores
 
-def load_dfs():
-    """
-    Let the user select a range of files from the 'Feature_Dataframes' folder and return their paths.
-    The user can input a single number, a comma-separated list, or a range (e.g., 2-5).
-    """
-    folder_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "Feature_Dataframes")
-    files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
-    
-    if not files:
-        print("No files found in the folder.")
-        return []
-
-    print("Files in folder:")
-    for idx, filename in enumerate(files):
-        print(f"{idx + 1}: {filename}")
-
-    while True:
-        try:
-            choices = input("Enter file numbers to select (e.g. 1,3,5-8): ")
-            indices = []
-            for part in choices.split(','):
-                part = part.strip()
-                if '-' in part:
-                    start, end = part.split('-')
-                    indices.extend(range(int(start), int(end) + 1))
-                elif part:
-                    indices.append(int(part))
-            if all(1 <= idx <= len(files) for idx in indices):
-                selected_files = [os.path.join(folder_path, files[idx - 1]) for idx in indices]
-                print("Selected files:")
-                for f in selected_files:
-                    print(f)
-                return selected_files
-            else:
-                print("Invalid number(s). Try again.")
-        except ValueError:
-            print("Please enter valid numbers, separated by commas or ranges (e.g. 1,3,5-8).")
-
 def load_and_process_data(file_path):
     """
     Load data and process it for classification.
@@ -165,12 +127,11 @@ def apply_threshold_to_file(input_file, output_file, threshold):
 def plotting():
     results = []
 
-    file_paths = load_dfs()
+    file_paths = select_dfs_by_params()
 
     for file_path in file_paths:
         X, y, full_df, file_path = load_and_process_data(file_path)
-        inf, cov, alpha, thresh = parse_filename(file_path)
-        # Plot the adjacency matrix for subject '0051044' in the current subplot
+        inf, cov, alpha, thresh = parse_filename(os.path.basename(file_path))        # Plot the adjacency matrix for subject '0051044' in the current subplot
         subject_id_to_plot = 51044      # You can change this subject ID if needed
         #plot_adjacency_matrix(full_df, subject_id_to_plot)
         avg_acc, acc_scores = cross_validate_model(X, y)
@@ -216,7 +177,7 @@ def batch_apply_thresholds_to_files():
     For each selected file, applies a range of thresholds (0.05 to 0.95 step 0.05)
     to all adjacency matrix columns and saves the result as a new file for each threshold.
     """
-    file_paths = load_dfs()
+    file_paths = select_dfs_by_params()
     if not file_paths:
         print("No files selected.")
         return
@@ -472,14 +433,157 @@ def select_dfs_by_params():
             print(f)
     return selected_files
 
-# Example usage:
-# file_paths = ['heatmap1.csv', 'heatmap2.csv', 'heatmap3.csv']
-# average_heatmaps_and_plot(file_paths, output_file='average_heatmap.csv')
+def select_single_file():
+    """
+    Allows the user to select a single file from all available files in the Feature_Dataframes folder.
+    Returns the selected file path or None if no selection is made.
+    """
+    folder_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "Feature_Dataframes")
+    files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
+    if not files:
+        print("No files found in Feature_Dataframes.")
+        return None
+
+    print("Available files:")
+    for idx, f in enumerate(files):
+        print(f"{idx}: {f}")
+
+    selection = input("Enter the number of the file you want to select: ").strip()
+    try:
+        selection_idx = int(selection)
+        if 0 <= selection_idx < len(files):
+            selected_file = os.path.join(folder_path, files[selection_idx])
+            print(f"Selected file: {selected_file}")
+            return selected_file
+        else:
+            print("Invalid selection.")
+            return None
+    except ValueError:
+        print("Invalid input.")
+        return None
+
+def select_multiple_files():
+    """
+    Allows the user to select multiple files from all available files in the Feature_Dataframes folder.
+    Returns a list of selected file paths.
+    """
+    folder_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "Feature_Dataframes")
+    files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
+    if not files:
+        print("No files found in Feature_Dataframes.")
+        return []
+
+    print("Available files:")
+    for idx, f in enumerate(files):
+        print(f"{idx}: {f}")
+
+    selection = input("Enter the numbers of the files you want to select, separated by commas (e.g., 0,2,5): ").strip()
+    try:
+        indices = [int(idx.strip()) for idx in selection.split(",") if idx.strip().isdigit()]
+        selected_files = []
+        for idx in indices:
+            if 0 <= idx < len(files):
+                selected_files.append(os.path.join(folder_path, files[idx]))
+            else:
+                print(f"Index {idx} is out of range and will be skipped.")
+        if selected_files:
+            print("Selected files:")
+            for f in selected_files:
+                print(f)
+        else:
+            print("No valid files selected.")
+        return selected_files
+    except Exception as e:
+        print(f"Invalid input: {e}")
+        return []
+
+def plot_subject_adjacency_across_files(file_paths, subject_id=51044, matrix_size=20):
+    """
+    For each file in file_paths, plot the adjacency matrix for the given subject_id.
+    """
+    for file_path in file_paths:
+        df = pd.read_csv(file_path)
+        # Extract the row for the specific subject_id
+        subject_row = df[df['subject_id'] == subject_id]
+        if subject_row.empty:
+            print(f"Subject {subject_id} not found in {os.path.basename(file_path)}.")
+            continue
+
+        # Extract adjacency matrix columns (assumes columns named like A_0_0, A_0_1, ...)
+        adj_cols = [col for col in df.columns if re.match(r"A_\d+_\d+", col)]
+        adj_values = subject_row[adj_cols].values.flatten()
+        n = int(np.sqrt(len(adj_cols))) if matrix_size is None else matrix_size
+        adj_matrix = adj_values.reshape(n, n)
+
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(adj_matrix, cmap="YlGnBu", annot=False, xticklabels=False, yticklabels=False)
+        plt.title(f"Adjacency Matrix for Subject {subject_id}\nFile: {os.path.basename(file_path)}")
+        plt.show()
+        return adj_matrix  # Return the last plotted adjacency matrix for further processing if needed
+
+def plot_normalized_laplacian(W):
+    """
+    Compute the normalized Laplacian matrix from an adjacency matrix W,
+    mask out the diagonal, and plot the result.
+    L_norm = I - D^{-1/2} W D^{-1/2}
+    """
+    D = np.diag(W.sum(axis=1))
+    D_inv_sqrt = np.diag(1.0 / np.sqrt(np.maximum(D.diagonal(), 1e-10)))
+    L_norm = np.eye(W.shape[0]) - D_inv_sqrt @ W @ D_inv_sqrt
+
+    np.fill_diagonal(L_norm, 0)
+
+    # Compute the max absolute value in the thresholded matrix
+    max_abs_value = np.max(np.abs(L_norm))
+        
+    # Avoid division by zero if the max absolute value is 0
+    if max_abs_value != 0:
+        L_norm_norm = L_norm / max_abs_value
+    else:
+        print("Warning: Maximum absolute value is 0, normalization skipped.")
+
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(L_norm_norm, cmap="YlGnBu", annot=False, xticklabels=False, yticklabels=False)
+    plt.title("Normalized Laplacian (Diagonal Masked)")
+    plt.show()
+
+def plot_subject_covariance_across_files(file_paths, subject_id=51044, matrix_size=20):
+    """
+    For each file in file_paths, plot the covariance matrix for the given subject_id.
+    Assumes columns are named like C_0_0, C_0_1, ..., C_n_n for covariance entries.
+    """
+
+    for file_path in file_paths:
+        df = pd.read_csv(file_path)
+        # Extract the row for the specific subject_id
+        subject_row = df[df['subject_id'] == subject_id]
+        if subject_row.empty:
+            print(f"Subject {subject_id} not found in {os.path.basename(file_path)}.")
+            continue
+
+        # Extract covariance matrix columns (assumes columns named like C_0_0, C_0_1, ...)
+        cov_cols = [col for col in df.columns if re.match(r"C_\d+_\d+", col)]
+        cov_values = subject_row[cov_cols].values.flatten()
+        n = int(np.sqrt(len(cov_cols))) if matrix_size is None else matrix_size
+        cov_matrix = cov_values.reshape(n, n)
+
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(cov_matrix, cmap="coolwarm", annot=False, xticklabels=False, yticklabels=False)
+        plt.title(f"Covariance Matrix for Subject {subject_id}\nFile: {os.path.basename(file_path)}")
+        plt.show()
+        return cov_matrix  # Return the last plotted covariance matrix for further processing if needed
 
 if __name__ == "__main__":
     file_paths = select_dfs_by_params()
+    adj_matrix = plot_subject_adjacency_across_files(file_paths)
+    plot_normalized_laplacian(adj_matrix)
+    #file_path = select_multiple_files()
+    #plot_subject_covariance_across_files(file_path)
     #results_array=plotting()
-    plot_distance_distribution_by_alpha(file_paths)
+    #batch_apply_thresholds_to_files()
+    #plot_distance_distribution_by_alpha(file_paths)
     #compute_subjectwise_adjacency_distances_by_alpha(file_paths)
     #plot_distance_distribution_by_alpha(file_paths)
     #average_longform_heatmaps_and_plot(file_paths)
+# %%
+
