@@ -8,3 +8,4 @@ scikit-feature/
 !FeatDFs_Jochem/zerovariance/*.csv
 !Feature_Dataframes/first_run/*.csv
 !Feature_Dataframes/second_run/*.csv
+!Feature_Dataframes/third_run/*.csv
