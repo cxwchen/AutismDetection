@@ -1,18 +1,20 @@
-import os
-import sys
-import importlib
+# import os
+# import sys
+# import importlib
 import datetime
-from dotenv import load_dotenv
-import numpy as np
-import pandas as pd
+import MRMR
+# from dotenv import load_dotenv
+# import numpy as np
+# import pandas as pd
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import StratifiedKFold, LeaveOneGroupOut
 from loaddata import *
 from classification import *
 from classifiers import *
+import feature_selection_methods as fs
 from hyperparametertuning import *
 from performance import *
-from visualise import *
+# from visualise import *
 from HR_V1_0_03 import *
 import HR_V1_0_03
 
@@ -49,7 +51,7 @@ import HR_V1_0_03
 # female_df = comb_df[comb_df['SEX'] == 2].sample(frac=1, random_state=42).reset_index(drop=True)
 # male_df = comb_df[comb_df['SEX'] == 1].sample(frac=1, random_state=42).reset_index(drop=True)
 
-def runCV(X, y, meta, label="female", groupeval=True, useFS=False, useHarmo=False, numfeats=100, ncv=5):
+def runCV(context, label="female", groupeval=True, useHarmo=False, numfeats=100, ncv=5):
     # df.rename(columns={
     #     'AGE_AT_SCAN': 'AGE',
     #     'subject_id': 'SUB_ID'
@@ -60,41 +62,77 @@ def runCV(X, y, meta, label="female", groupeval=True, useFS=False, useHarmo=Fals
     # X = df.drop(columns=pheno_cols)
     # y = df['DX_GROUP']
     # meta = df[df.columns.intersection(["SITE_ID", "SEX", "AGE"])]
+    useFS = context.features_set
+    
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     skf = StratifiedKFold(n_splits=ncv, shuffle=True, random_state=42)
-    context.log("Running Stratified KFold Cross-Validation...")
+    print("Running Stratified KFold Cross-Validation...")
 
-    all_ytrue = {}
-    all_yprob = {}
-    all_ypred = {}
-    for fold, (trainidx, testidx) in enumerate(skf.split(X, y), 1):
+    # all_ytrue = {}
+    # all_yprob = {}
+    # all_ypred = {}
+    print(context.y.size)
+    
+    for fold, (trainidx, testidx) in enumerate(skf.split(context.X, context.y), 1):
         print(f"\n=== Fold {fold} | {label.upper()} Data ===")
-        Xtrain, Xtest = X.iloc[trainidx], X.iloc[testidx]
-        ytrain, ytest = y.iloc[trainidx], y.iloc[testidx]
-        ytrain = ytrain.reset_index(drop=True)
-        ytest = ytest.reset_index(drop=True)
-        meta_train = meta.iloc[trainidx].reset_index(drop=True)
-        meta_test = meta.iloc[testidx].reset_index(drop=True)
+        Xtrain, Xtest = context.X.iloc[trainidx], context.X.iloc[testidx]
+        ytrain, ytest = context.y.iloc[trainidx], context.y.iloc[testidx]
+        context.ytrain = ytrain.reset_index(drop=True)
+        context.ytest = ytest.reset_index(drop=True)
+        context.meta_train = context.meta.iloc[trainidx].reset_index(drop=True)
+        context.meta_test = context.meta.iloc[testidx].reset_index(drop=True)
 
         imputer = SimpleImputer(strategy='mean')
+        print(Xtrain.size)
         Xtrain = imputer.fit_transform(Xtrain)
         Xtest = imputer.transform(Xtest)
         
-        # --- Harmonization with NeuroHarmonize (Optional) ---
-        if useHarmo:
-            print("Using NeuroHarmonize...")
-            Xtrain, Xtest, ytest = applyHarmo(Xtrain, Xtest, meta_train, meta_test, ytest)
+        # # --- Harmonization with NeuroHarmonize (Optional) ---
+        # if useHarmo:
+        #     print("Using NeuroHarmonize...")
+        #     Xtrain, Xtest, ytest = applyHarmo(Xtrain, Xtest, meta_train, meta_test, ytest)
 
-        Xtrain, Xtest = normalizer(Xtrain, Xtest)
+        context.Xtrain, context.Xtest = normalizer(Xtrain, Xtest)
 
         # --- Feature Selection (Optional) --- 
-        if useFS:
-            print("Running HSIC Lasso feature selection...")
-            selected_idx = fs.hsiclasso(Xtrain, ytrain, num_feat=numfeats)
-            Xtrain = Xtrain[:, selected_idx]
-            Xtest = Xtest[:, selected_idx]
+        if useFS != "None":
+            classfier = None
+            if context.mod == applySVM:
+                classifier = "SVM"
+            elif context.mod == applyLogR:
+                classifier = "LogR"
+            elif context.mod == applyDT:
+                classifier = "DT"
+            elif context.mod == applyMLP:
+                classifier = "MLP"
+            elif context.mod == applyLDA:
+                classifier = "LDA"
+            else:
+                classifier = "KNN"
+            if useFS == "hsiclasso":
+                print("Running HSIC Lasso feature selection...")
+                selected_idx = fs.hsiclasso(context.Xtrain, context.ytrain, classifier, num_feat=10)
+                context.Xtrain = context.Xtrain[:, selected_idx]
+                context.Xtest = context.Xtest[:, selected_idx]
+            elif useFS == "lasso":
+                print("Running Lars Lasso feature selection...")
+                selected_idx = fs.lars_lasso(context.X_train, context.y_train, alpha=0.1)
+                context.Xtrain = context.Xtrain[:, selected_idx]
+                context.Xtest = context.Xtest[:, selected_idx]
+            elif useFS == "mRMR":
+                print("Running mRMR feature selection...")
+                mRMR_selector = MRMR.mrmr(context.X_train, context.y_train)
+                selected_idx = mRMR_selector[0:num_features_to_select]
+                context.Xtrain = context.Xtrain[:, selected_idx]
+                context.Xtest = context.Xtest[:, selected_idx]
+            elif useFS == "SFS":
+                print("Running SFS feature selection...")
+                selected_idx = fs.backwards_SFS(context.X_train, context.y_train, classifier, 10)
+                context.Xtrain = context.Xtrain[:, selected_idx]
+                context.Xtest = context.Xtest[:, selected_idx]
         
-        for cfunc in [applyLogR, applySVM, applyRandForest, applyDT, applyMLP, applyLDA, applyKNN, applyDummy]:
+        for cfunc in [context.mod]:
             clfname = cfunc.__name__.replace("apply", "")
             print(f"\n=== Fold {fold} | {clfname}")
 
@@ -107,19 +145,19 @@ def runCV(X, y, meta, label="female", groupeval=True, useFS=False, useHarmo=Fals
             else:
                 params = None
             
-            ytrue, ypred, yprob, model = performCA(cfunc, Xtrain, Xtest, ytrain, ytest, groupeval=groupeval, fold=fold, tag=label, meta=meta_test, timestamp=timestamp, params=params)
+            ytrue, ypred, yprob, context.model = performCA(cfunc, context.Xtrain, context.Xtest, context.ytrain, context.ytest, groupeval=groupeval, fold=fold, tag=label, meta=context.meta_test, timestamp=timestamp, params=params)
 
-            all_ytrue.setdefault(clfname, []).append(ytrue)
-            all_ypred.setdefault(clfname, []).append(ypred)
-            if yprob is not None:
-                all_yprob.setdefault(clfname, []).append(yprob)
+            # all_ytrue.setdefault(clfname, []).append(ytrue)
+            # all_ypred.setdefault(clfname, []).append(ypred)
+            # if yprob is not None:
+            #     all_yprob.setdefault(clfname, []).append(yprob)
 
-    for clf in all_ytrue:
-        ytrueAll = np.concatenate(all_ytrue[clf])
-        ypredAll = np.concatenate(all_ypred[clf])
-        pltAggrConfMatr(ytrueAll, ypredAll, modelname=clf, tag=label, timestamp=timestamp)
-        yprobAll = np.concatenate(all_yprob[clf])
-        pltROCCurve(ytrueAll, yprobAll, modelname=clf, tag=label, timestamp=timestamp)
+    # for clf in all_ytrue:
+    #     ytrueAll = np.concatenate(all_ytrue[clf])
+    #     ypredAll = np.concatenate(all_ypred[clf])
+    #     pltAggrConfMatr(ytrueAll, ypredAll, modelname=clf, tag=label, timestamp=timestamp)
+    #     yprobAll = np.concatenate(all_yprob[clf])
+    #     pltROCCurve(ytrueAll, yprobAll, modelname=clf, tag=label, timestamp=timestamp)
 
 
 # def runLOGO(df, label="female", useFS=False, groupeval=False, numfeats=100):

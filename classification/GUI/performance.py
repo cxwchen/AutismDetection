@@ -1,26 +1,23 @@
 import matplotlib.pyplot as plt
 import os
+import csv
+import datetime
 import seaborn as sns
 import numpy as np
-import shap
 from sklearn.metrics import (
     confusion_matrix,
     classification_report,
     precision_recall_fscore_support,
     roc_auc_score,
     accuracy_score,
-    balanced_accuracy_score
+    balanced_accuracy_score,
+    ConfusionMatrixDisplay,
+    RocCurveDisplay
 )
 
-def get_weights(model, X_train, X_test):
-    train_sample = shap.sample(X_train, 10, random_state=42)
-    test_sample = shap.sample(X_test, 5, random_state=42)
-
-    explainer = shap.KernelExplainer(model.predict_proba, train_sample)
-    shap_values = explainer(test_sample)
-    
-    shap.summary_plot(shap_values, test_sample)
-    return shap_values
+# Generate timestamped CSV path at module load time
+_timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+DEFAULT_CSV_PATH = f"results/eval_metrics_{_timestamp}.csv"
 
 def get_specificity(ytrue, ypred):
     cm = confusion_matrix(ytrue, ypred)
@@ -36,7 +33,7 @@ def get_sensitivity(ytrue, ypred):
     tn, fp, fn, tp = cm.ravel()
     return tp / (tp + fn)
 
-def plot_confusion_matrix(y_true, y_pred, model, fold=None, tag=""):
+def plot_confusion_matrix(y_true, y_pred, model, fold=None, tag="", timestamp=""):
     conf_matrix = confusion_matrix(y_true, y_pred)
     plt.figure(figsize=(8, 6))
     sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
@@ -48,16 +45,13 @@ def plot_confusion_matrix(y_true, y_pred, model, fold=None, tag=""):
     if fold is not None:
         title += f' - Fold {fold}'
     plt.title(title)
-    os.makedirs('plots', exist_ok=True)
-    filename = f'plots/conf_matrix_{model.__class__.__name__}'
+    filename = f'plots/{timestamp}/conf_matrix_{model.__class__.__name__}'
     if tag:
         filename += f' - {tag}'
     if fold is not None:
         filename += f' - Fold {fold}'
     plt.savefig(f'{filename}.png', bbox_inches='tight')
     plt.close()
-    # plt.show(block=False)  # Non-blocking
-    # plt.pause(0.1)
 
 def get_metrics(ytrue, ypred, yprob=None):
     """
@@ -137,7 +131,28 @@ def print_metrics(metrics, classifier_name="Classifier"):
     print(f"  Balanced Accuracy:    {balanced_acc:.3f}")
     print("=====================================")
 
-def evaluate_by_group(ytrue, ypred, yprob, meta, group_col, group_name):
+
+def toCSV(csvpath, fold, classifierName, tag, group_col, group_name, metrics):
+    os.makedirs(os.path.dirname(csvpath), exist_ok=True)
+
+    rows = []
+    for metric, value in metrics.items():
+        if isinstance(value, (list, np.ndarray)):
+            for i, v in enumerate(value):
+                label = ['Control', 'Autism'][i] if len(value) == 2 else f"Class{i}"
+                rows.append([fold, classifierName, tag, group_col, group_name, f"{metric}_{label}", v])
+        else:
+            rows.append([fold, classifierName, tag, group_col, group_name, metric, value])
+    
+    header = ['Fold', 'Classifier', 'Dataset', 'GroupType', 'GroupName', 'Metric', 'Value']
+    writeHeader = not os.path.exists(csvpath)
+    with open(csvpath, 'a', newline='') as f:
+        writer = csv.writer(f) 
+        if writeHeader:
+            writer.writerow(header)
+        writer.writerows(rows)
+
+def perGroupEval(ytrue, ypred, yprob, meta, group_col, group_name, fold=None, classifier_name='Classifier', tag="", csv_path=DEFAULT_CSV_PATH):
     print(f"\n=== Metrics by {group_name} ===")
     groups = meta[group_col].unique()
     for group in groups:
@@ -146,10 +161,49 @@ def evaluate_by_group(ytrue, ypred, yprob, meta, group_col, group_name):
         yp = np.array(ypred)[idx]
         yp_prob = np.array(yprob)[idx] if yprob is not None else None
 
+        support = len(yt)
+        unique, counts = np.unique(yt, return_counts=True)
+        labelCts = {f"class_{int(u)}_count": int(c) for u, c in zip(unique, counts)}
+
         if len(np.unique(yt)) < 2:
             print(f"Skipping {group_name} = {group} --> only one class present.")
+            metrics = {
+                "precision_control": float('nan'),
+                "recall_control": float('nan'),
+                "f1_score_control": float('nan'),
+                "support_control": float('nan'),
+                "precision_autism": float('nan'),
+                "recall_autism": float('nan'),
+                "f1_score_autism": float('nan'),
+                "support_autism": float('nan'),
+                "specificity": float('nan'),
+                "sensitivity": float('nan'),
+                "auroc": float('nan'),
+                "accuracy": float('nan'),
+                "balanced_accuracy": float('nan'),
+                "test_size": support,
+                **labelCts
+            }
+            toCSV(csv_path, fold, classifier_name, tag, group_name, group, metrics)
             continue
         
         print(f"\n {group_name}: {group}")
         metrics = get_metrics(yt, yp, yp_prob)
+        metrics["test_size"] = support
+        metrics.update(labelCts)
         print_metrics(metrics, f"{group_name}={group}")
+        toCSV(csv_path, fold, classifier_name, tag, group_name, group, metrics)
+
+def pltAggrConfMatr(ytrue, ypred, modelname, tag="", timestamp=""):
+    cmdisplay = ConfusionMatrixDisplay.from_predictions(ytrue, ypred, cmap=plt.cm.Blues)
+    cmdisplay.ax_.set_title(f"Aggregated Confusion Matrix for {modelname}")
+    savepath = f"plots/{timestamp}/{tag}_{modelname}_aggrconfusion.png"
+    plt.savefig(savepath, bbox_inches='tight')
+    plt.close()
+
+def pltROCCurve(ytrue, yprob, modelname, tag="", timestamp=""):
+    RocCurveDisplay.from_predictions(ytrue, yprob)
+    plt.title(f"ROC Curve for {modelname} ({tag})")
+    savepath = f"plots/{timestamp}/{tag}_{modelname}_roc_curve.png"
+    plt.savefig(savepath, bbox_inches='tight')
+    plt.close()

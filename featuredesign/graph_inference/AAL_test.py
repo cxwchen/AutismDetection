@@ -2,7 +2,8 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
-import os,glob,re,random, contextlib, io
+import os,glob,re,random, contextlib, io,sys
+from dotenv import load_dotenv
 import pandas as pd
 import seaborn as sns
 import networkx.algorithms.community as nx_comm
@@ -26,7 +27,23 @@ from typing import List, Union
 from networkx.linalg.laplacianmatrix import laplacian_matrix
 from sklearn.metrics import adjusted_rand_score
 
-from featuredesign.graph_inference.GSP_methods import *
+load_dotenv()
+
+# Get the directory from .env
+functions_path = os.getenv("FUNCTIONS_JOCHEM")
+
+# Add to system path if it's not already there
+if functions_path and functions_path not in sys.path:
+    sys.path.append(functions_path)
+
+# Now you can import your module
+try:
+    import AAL_testGSP_methods  # This is your .py file: jochem_functions.py
+except ImportError as e:
+    print(f"Failed to import functions: {e}")
+
+print("Loading Jochems functions successfully!")
+# from featuredesign.graph_inference.GSP_methods import *
 
 import warnings
 warnings.filterwarnings("once", category=UserWarning)

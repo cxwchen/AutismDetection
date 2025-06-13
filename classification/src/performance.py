@@ -10,7 +10,9 @@ from sklearn.metrics import (
     precision_recall_fscore_support,
     roc_auc_score,
     accuracy_score,
-    balanced_accuracy_score
+    balanced_accuracy_score,
+    ConfusionMatrixDisplay,
+    RocCurveDisplay
 )
 
 # Generate timestamped CSV path at module load time
@@ -31,7 +33,7 @@ def get_sensitivity(ytrue, ypred):
     tn, fp, fn, tp = cm.ravel()
     return tp / (tp + fn)
 
-def plot_confusion_matrix(y_true, y_pred, model, fold=None, tag=""):
+def plot_confusion_matrix(y_true, y_pred, model, fold=None, tag="", timestamp=""):
     conf_matrix = confusion_matrix(y_true, y_pred)
     plt.figure(figsize=(8, 6))
     sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
@@ -43,16 +45,13 @@ def plot_confusion_matrix(y_true, y_pred, model, fold=None, tag=""):
     if fold is not None:
         title += f' - Fold {fold}'
     plt.title(title)
-    os.makedirs('plots', exist_ok=True)
-    filename = f'plots/conf_matrix_{model.__class__.__name__}'
+    filename = f'plots/{timestamp}/conf_matrix_{model.__class__.__name__}'
     if tag:
         filename += f' - {tag}'
     if fold is not None:
         filename += f' - Fold {fold}'
     plt.savefig(f'{filename}.png', bbox_inches='tight')
     plt.close()
-    # plt.show(block=False)  # Non-blocking
-    # plt.pause(0.1)
 
 def get_metrics(ytrue, ypred, yprob=None):
     """
@@ -194,3 +193,17 @@ def perGroupEval(ytrue, ypred, yprob, meta, group_col, group_name, fold=None, cl
         metrics.update(labelCts)
         print_metrics(metrics, f"{group_name}={group}")
         toCSV(csv_path, fold, classifier_name, tag, group_name, group, metrics)
+
+def pltAggrConfMatr(ytrue, ypred, modelname, tag="", timestamp=""):
+    cmdisplay = ConfusionMatrixDisplay.from_predictions(ytrue, ypred, cmap=plt.cm.Blues)
+    cmdisplay.ax_.set_title(f"Aggregated Confusion Matrix for {modelname}")
+    savepath = f"plots/{timestamp}/{tag}_{modelname}_aggrconfusion.png"
+    plt.savefig(savepath, bbox_inches='tight')
+    plt.close()
+
+def pltROCCurve(ytrue, yprob, modelname, tag="", timestamp=""):
+    RocCurveDisplay.from_predictions(ytrue, yprob)
+    plt.title(f"ROC Curve for {modelname} ({tag})")
+    savepath = f"plots/{timestamp}/{tag}_{modelname}_roc_curve.png"
+    plt.savefig(savepath, bbox_inches='tight')
+    plt.close()

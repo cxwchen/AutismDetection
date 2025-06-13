@@ -8,15 +8,21 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from neuroHarmonize import harmonizationLearn, harmonizationApply
 
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-feature_src = os.path.join(project_root, 'featuredesign', 'graph_inference')
+# Load .env variables
+load_dotenv()
 
-if feature_src not in sys.path:
-    sys.path.append(feature_src)
+# Get the directory from .env
+functions_path = os.getenv("FUNCTIONS_JOCHEM")
 
-# print("sys.path =", sys.path)
+# Add to system path if it's not already there
+if functions_path and functions_path not in sys.path:
+    sys.path.append(functions_path)
 
-AAL_test = importlib.import_module('AAL_test')
+# Now you can import your module
+try:
+    import AAL_test  # This is your .py file: jochem_functions.py
+except ImportError as e:
+    print(f"Failed to import functions: {e}")
 
 # print("Loading Jochems functions successfully!")
 
@@ -114,20 +120,20 @@ def applyHarmo(Xtrain, Xtest, meta_train, meta_test, ytest, ref_batch='NYU'):
 
 # Perform the feature extraction and save in CSV so we won't have to keep reloading for research purposes
 # For the GUI version it is not saved in a CSV but the dataframe is used directly.
-if __name__ == "__main__":
-    load_dotenv()
-    male_path = os.getenv('ABIDE_MALE_PATH')
-    female_path = os.getenv('ABIDE_FEMALE_PATH')
+# if __name__ == "__main__":
+#     load_dotenv()
+#     male_path = os.getenv('ABIDE_MALE_PATH')
+#     female_path = os.getenv('ABIDE_FEMALE_PATH')
 
-    if not male_path or not female_path:
-        raise EnvironmentError(
-            "Please set ABIDE_MALE_PATH and ABIDE_FEMALE_PATH environment variables!"
-        )
+#     if not male_path or not female_path:
+#         raise EnvironmentError(
+#             "Please set ABIDE_MALE_PATH and ABIDE_FEMALE_PATH environment variables!"
+#         )
 
-    print("Male data path:", male_path)
-    print("Female data path:", female_path)
-    female_df = load_data(female_path)
-    female_df_merged = add_phenotypic_info(female_df, save_as="female_df_merged")
+#     print("Male data path:", male_path)
+#     print("Female data path:", female_path)
+#     female_df = load_data(female_path)
+#     female_df_merged = add_phenotypic_info(female_df, save_as="female_df_merged")
 
-    male_df = load_data(male_path)
-    male_df_merged = add_phenotypic_info(male_df, save_as="male_df_merged")
+#     male_df = load_data(male_path)
+#     male_df_merged = add_phenotypic_info(male_df, save_as="male_df_merged")

@@ -9,17 +9,16 @@ from tkinter import ttk, filedialog
 from PIL import Image, ImageTk, ImageGrab
 from ctypes import windll
 
-from classifiersGUI import *
+from classifiers import *
 from selection_buttons import *
 import selection_buttons
 from functionality_buttons import *
-from hyperparametertuningGUI import *
+from hyperparametertuning import *
 from nilearnextraction import *
 from nilearndetection import *
 from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
-import hyperparametertuningGUI
-
+import hyperparametertuning
 import code
 import io
 import contextlib
@@ -55,23 +54,30 @@ X, y = make_classification(
 
 
 class AppContext:
-    def __init__(self, root, canvas, subjects_sex_set, subjects_age_set, classifiers_set, features_set, dataset_fit, X, y, Xtrain, Xtest, ytrain, ytest, filepath):
+    def __init__(self, root, canvas, subjects_sex_set, subjects_age_set, classifiers_set, features_set, graph_vs_pearson, dataset_fit, X, y, meta, filepath):
         self.root = root
+        self.log = None
         self.canvas = canvas
         self.subjects_sex_set = subjects_sex_set
         self.subjects_age_set = subjects_age_set
         self.classifiers_set = classifiers_set
         self.features_set = features_set
+        self.graph_vs_pearson = graph_vs_pearson
         self.dataset_fit = dataset_fit
         self.mod = applySVM
         self.model = None
         self.meta = meta
+        self.meta_train = None
+        self.meta_test = None
+        self.log = None
+        # self.command_input = None
+        # self.console_display = None
         self.X = X
         self.y = y
-        self.Xtrain = Xtrain
-        self.Xtest = Xtest
-        self.ytrain = ytrain
-        self.ytest = ytest
+        self.Xtrain = None
+        self.Xtest = None
+        self.ytrain = None
+        self.ytest = None
         self.filepath = filepath
 
 def update_overview_text(context):
@@ -86,11 +92,11 @@ def update_overview_text(context):
         tags="overlay_text"
     )
 
-def build_gui(root, X, y, meta, Xtrain, Xtest, ytrain, ytest, filepath=None):
+def build_gui(root, X, y, meta, filepath=None):
     # Default stats
     run_stats = []      ##TO DO: Adjust this later to match the other stats
     
-    subjects_sex_set = "All"; subjects_age_set = "All"; classifiers_set = "SVM"; features_set = "none"; dataset_fit = "ABIDE_I";
+    subjects_sex_set = "All"; subjects_age_set = "All"; classifiers_set = "SVM"; features_set = "None"; graph_vs_pearson = "PearsonCorrelationMatrix"; dataset_fit = "ABIDE_I";
     
     context = AppContext(
         root=root,
@@ -99,17 +105,13 @@ def build_gui(root, X, y, meta, Xtrain, Xtest, ytrain, ytest, filepath=None):
         subjects_age_set=subjects_age_set,
         classifiers_set=classifiers_set,
         features_set=features_set,
+        graph_vs_pearson=graph_vs_pearson,
         dataset_fit=dataset_fit,
         meta=meta,
         X=X,
         y=y,
-        Xtrain=Xtrain,
-        Xtest=Xtest,
-        ytrain=ytrain,
-        ytest=ytest,
         filepath=filepath
     )
-    
     # Use the filepath as needed
     if filepath:
         print(f"Loaded file: {filepath}")
@@ -150,15 +152,20 @@ def build_gui(root, X, y, meta, Xtrain, Xtest, ytrain, ytest, filepath=None):
     ###TO DO: make a document structure that can safe the project settings / make projects
     stats = "stats"; steps = 11; acuracy = 76.4; stat2 = 2; stat3 = 3;  # default values for demonstration
 
-    def simulate_run_command():
+    def simulate_run_command(context=context):
         command_input.delete(0, "end")  # clear previous input
         command_input.insert(0, f"runanalysis({stats})")
         execute_command()  # simulate pressing <Return>
+        
     
     def run_command():
         command_input.delete(0, "end")  # clear previous input
         command_input.insert(0, f"run()")
-        execute_command()  # simulate pressing <Return>
+        execute_command()
+        log(f"Scanning {context.y.size} samples with {context.classifiers_set}")
+        log(f"Target:\\{context.subjects_sex_set}\\{context.subjects_age_set}\\{context.classifiers_set}\\{context.features_set}\\{context.dataset_fit}\n")
+        runCV(context)
+        log(f"Evaluation completed")
 
     btn_run = tk.Button(toolbar, text="\u23F5 Run", command=run_command) 
     btn_settings = tk.Button(toolbar, text="\U0001F6E0 Settings", command=open_settings) 
@@ -185,23 +192,27 @@ def build_gui(root, X, y, meta, Xtrain, Xtest, ytrain, ytest, filepath=None):
     subjects_frame = tk.LabelFrame(left, text="Subjects", bg="lightyellow")
     subjects_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
-    tk.Label(subjects_frame, text="By Sex", font=("Segoe UI", 9), bg="lightyellow").grid(row=0, column=0, sticky="nw", pady=(5, 0))
-    subject_sex_btn(subjects_frame, context, Xtrain, ytrain).grid(row=1, column=0, sticky="n", padx=(5, 2), pady=5)
+    tk.Label(subjects_frame, text="By Sex", font=("Segoe UI", 9), bg="lightyellow").grid(row=0, column=0, sticky="nw",  padx=(2, 5), pady=(5, 0))
+    subject_sex_btn(subjects_frame, context).grid(row=1, column=0, sticky="n", padx=(5, 2), pady=5)
     
     tk.Label(subjects_frame, width=2, bg="lightyellow").grid(row=0, column=1)
-    
-    tk.Label(subjects_frame, text="By Age", font=("Segoe UI", 9), bg="lightyellow").grid(row=0, column=2, sticky="nw", pady=(5, 0))
-    subject_age_btn(subjects_frame, context, Xtrain, ytrain).grid(row=1, column=2, sticky="n", padx=(2, 5), pady=5)
+    tk.Label(subjects_frame, text="By Age", font=("Segoe UI", 9), bg="lightyellow").grid(row=0, column=2, sticky="nw",  padx=(2, 5), pady=(5, 0))
+    subject_age_btn(subjects_frame, context).grid(row=1, column=2, sticky="n", padx=(2, 5), pady=5)
 
     # Classifier Frame
     classifier_frame = tk.LabelFrame(left, text="Classifier", bg="lavender")
     classifier_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-    selection_buttons.class_btn(classifier_frame, context, Xtrain, ytrain)
+    selection_buttons.class_btn(classifier_frame, context)
 
     # Features Frame
     features_frame = tk.LabelFrame(left, text="Features", bg="mistyrose")
     features_frame.grid(row=2, column=0, sticky="nsew", padx=5, pady=5)
-    selection_buttons.select_btn(features_frame, context, Xtrain, ytrain)
+    tk.Label(features_frame, text="By Sex", font=("Segoe UI", 9), bg="mistyrose").grid(row=0, column=0, sticky="nw",  padx=(2, 5), pady=(5, 0))
+    selection_buttons.select_btn(features_frame, context).grid(row=1, column=0, sticky="n", padx=(5, 2), pady=5)
+    
+    tk.Label(features_frame, width=2, bg="mistyrose").grid(row=0, column=1)
+    tk.Label(features_frame, text="By Sex", font=("Segoe UI", 9), bg="mistyrose").grid(row=0, column=0, sticky="nw",  padx=(2, 5), pady=(5, 0))
+    selection_buttons.feat_btn(features_frame, context).grid(row=1, column=0, sticky="n", padx=(5, 2), pady=5)
 
     # Right frame (1/3 width initially)
     right = tk.Frame(main_pane, bg="lightgreen")
@@ -310,7 +321,7 @@ def build_gui(root, X, y, meta, Xtrain, Xtest, ytrain, ytest, filepath=None):
     # Function to execute Python code and display output
     def execute_command(event=None):
         global history_index
-        cmd = command_input.get()
+        cmd =  command_input.get()
         command_history.append(cmd)
         history_index = len(command_history)
         
@@ -378,6 +389,7 @@ def build_gui(root, X, y, meta, Xtrain, Xtest, ytrain, ytest, filepath=None):
         console_display.insert("end", text + "\n", tag)
         console_display.see("end")
         console_display.update_idletasks()
+    context.log = log
 
     def type_text(widget, text, delay=30, tag=None):
         def _type(index=0):
@@ -455,13 +467,14 @@ def build_gui(root, X, y, meta, Xtrain, Xtest, ytrain, ytest, filepath=None):
         root.after(1000, step_loop)
         
     def run():
+        ...
+        
+    def run_with_context(context):
         log(f"Scanning {context.y.size} samples with {context.classifiers_set}")
         log(f"Target:\\{context.subjects_sex_set}\\{context.subjects_age_set}\\{context.classifiers_set}\\{context.features_set}\\{context.dataset_fit}")
         runCV(context.X, context.y, context.meta)
-        context.model = context.mod(Xtrain, ytrain)
+        context.model = context.mod(context.Xtrain, context.ytrain)
         log(f"Model fitted")
-
-
 
     # message = tk.Label(root, text="Hello, World!")
     # message.pack()
@@ -481,7 +494,6 @@ def build_gui(root, X, y, meta, Xtrain, Xtest, ytrain, ytest, filepath=None):
         elif topic == "commands":
             print("Available commands:")
             print("- runanalysis(stats) for a demo")
-            print("- run()")
             print("- export_overview_to_png()")
             print("- log('message')")
         elif topic == "classifier":
@@ -522,15 +534,11 @@ def start():
     X = df.drop(columns=pheno_cols)
     y = df['DX_GROUP']
     meta = df[df.columns.intersection(["SITE_ID", "SEX", "AGE"])]
-    # === Split data ===
-    Xtrain, Xtest, ytrain, ytest = train_test_split(X, y, test_size=0.2, random_state=42)
-    
-    svcdefault=SVC()
     
     root = tk.Tk()
     root.title("NASDA")
     root.iconbitmap("logo.ico")
-    build_gui(root, X, y, meta, Xtrain, Xtest, ytrain, ytest)
+    build_gui(root, X, y, meta)
     
     # filepath = filedialog.askopenfilename(
     # title="Select a data file",
