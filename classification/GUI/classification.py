@@ -45,6 +45,7 @@ def performCA(func, feat_train, feat_test, ytrain, ytest, groupeval=False, fold=
         to pass parameters found using hyperparameter tuning. Default: params = None
 
     """
+    
     model = func(feat_train, ytrain, **kwargs)
     
     if hasattr(model, "predict_proba"):

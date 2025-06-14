@@ -52,16 +52,7 @@ import HR_V1_0_03
 # male_df = comb_df[comb_df['SEX'] == 1].sample(frac=1, random_state=42).reset_index(drop=True)
 
 def runCV(context, label="female", groupeval=True, useHarmo=False, numfeats=100, ncv=5):
-    # df.rename(columns={
-    #     'AGE_AT_SCAN': 'AGE',
-    #     'subject_id': 'SUB_ID'
-    # }, inplace=True)
-
-    # # Define phenotypic columns if they exist
-    # pheno_cols = df.columns.intersection(["DX_GROUP", "SEX", "SITE_ID", "SUB_ID", "AGE"])
-    # X = df.drop(columns=pheno_cols)
-    # y = df['DX_GROUP']
-    # meta = df[df.columns.intersection(["SITE_ID", "SEX", "AGE"])]
+    
     useFS = context.features_set
     
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -72,30 +63,24 @@ def runCV(context, label="female", groupeval=True, useHarmo=False, numfeats=100,
     # all_ytrue = {}
     # all_yprob = {}
     # all_ypred = {}
-    print(context.y.size)
     
     for fold, (trainidx, testidx) in enumerate(skf.split(context.X, context.y), 1):
         print(f"\n=== Fold {fold} | {label.upper()} Data ===")
+        
         Xtrain, Xtest = context.X.iloc[trainidx], context.X.iloc[testidx]
         ytrain, ytest = context.y.iloc[trainidx], context.y.iloc[testidx]
         context.ytrain = ytrain.reset_index(drop=True)
         context.ytest = ytest.reset_index(drop=True)
-        context.meta_train = context.meta.iloc[trainidx].reset_index(drop=True)
-        context.meta_test = context.meta.iloc[testidx].reset_index(drop=True)
+        # context.meta_train = context.meta.iloc[trainidx].reset_index(drop=True)
+        # context.meta_test = context.meta.iloc[testidx].reset_index(drop=True)
 
         imputer = SimpleImputer(strategy='mean')
-        print(Xtrain.size)
-        Xtrain = imputer.fit_transform(Xtrain)
-        Xtest = imputer.transform(Xtest)
+        context.Xtrain = imputer.fit_transform(Xtrain)
+        context.Xtest = imputer.transform(Xtest)
+
+    ### =========================================================
+        # --- Feature Selection Methods (Optional) --- 
         
-        # # --- Harmonization with NeuroHarmonize (Optional) ---
-        # if useHarmo:
-        #     print("Using NeuroHarmonize...")
-        #     Xtrain, Xtest, ytest = applyHarmo(Xtrain, Xtest, meta_train, meta_test, ytest)
-
-        context.Xtrain, context.Xtest = normalizer(Xtrain, Xtest)
-
-        # --- Feature Selection (Optional) --- 
         if useFS != "None":
             classfier = None
             if context.mod == applySVM:
@@ -131,6 +116,8 @@ def runCV(context, label="female", groupeval=True, useHarmo=False, numfeats=100,
                 selected_idx = fs.backwards_SFS(context.X_train, context.y_train, classifier, 10)
                 context.Xtrain = context.Xtrain[:, selected_idx]
                 context.Xtest = context.Xtest[:, selected_idx]
+                
+    ### =========================================================
         
         for cfunc in [context.mod]:
             clfname = cfunc.__name__.replace("apply", "")
@@ -258,79 +245,42 @@ def runCV(context, label="female", groupeval=True, useHarmo=False, numfeats=100,
 #         yprobAll = np.concatenate(all_yprob[clf])
 #         pltROCCurve(ytrueAll, yprobAll, modelname=clf, tag=label, timestamp=timestamp)
 
-# def run_singlesite():
-#     # ============ SINGLE SITE NO FEATURE SELECTION ============================
-#     # Run skf 5 fold cross-validation with combined data, only NYU, no feature selection
-#     runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_combined_onlyNYU_nofs", useFS=False, useHarmo=False)
+def run_singlesite(context, site="NYU", useFS=False):
+    # ============ SINGLE SITE ============================
+    # Run skf 5 fold cross-validation with combined data, only {site}
+    if context.graph_vs_pearson == "Graph":
+        df = pd.read_csv(context.GRAPH_FEATURES_PATH)
+        if set(df["DX_GROUP"].unique()) == {1,2}:
+            df["DX_GROUP"] = df["DX_GROUP"].map({1: 1, 2: 0})
+            
+    if context.graph_vs_pearson == "PearsonCorrelationMatrix":
+        df, labels, maps, indices = nilearnextract()
+        
+    df.rename(columns={
+        'AGE_AT_SCAN': 'AGE',
+        'subject_id': 'SUB_ID'
+    }, inplace=True)
+    if context.subjects_sex_set > 0:
+        df = df[df["SEX"] == context.subjects_sex_set]
+        
+    # Define phenotypic columns if they exist
+    pheno_cols = df.columns.intersection(["DX_GROUP", "SEX", "SITE_ID", "SUB_ID", "AGE"])
+    if context.subjects_age_set != "All":
+        if 'AGE' in df.columns:
+            df['AGE_GROUP'] = pd.cut(df['AGE'], bins=[0, 11, 18, 30, 100], labels=["0-11", "12-18", "19-30", "30+"])
+        # if subject_functions[selected] != "All":
+            df = df[df["AGE_GROUP"] == context.subjects_age_set]
 
-#     # Run skf 5 fold cross-validation with female data, only NYU, no feature selection
-#     runCV(female_df[female_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_female_onlyNYU_nofs", useFS=False, useHarmo=False)
+        # Define phenotypic columns if they exist
+        pheno_cols = df.columns.intersection(["DX_GROUP", "SEX", "SITE_ID", "SUB_ID", "AGE", "AGE_GROUP"])
+
+    df = df[df['SITE_ID'] == site].reset_index(drop=True)
     
-#     # Run skf 5 fold cross-validation with male data, only NYU, no feature selection
-#     runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_male_onlyNYU_nofs", useFS=False, useHarmo=False)
+    context.X = df.drop(columns=pheno_cols)
+    context.y = df['DX_GROUP']
 
-#     # Run skf 10 fold cross-validation with combined data, only NYU, no feature selection, no group evaluation
-#     runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf10_combined_onlyNYU_nofs", groupeval=False, useFS=False, useHarmo=False, ncv=10)
+    runCV(context, label=f"skf5_combined_only{site}_nofs", useFS=useFS)
 
-#     # Run skf 10 fold cross-validation with male data, only NYU, no feature selection, no group evaluation
-#     runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf10_male_onlyNYU_nofs", groupeval=False, useFS=False, useHarmo=False, ncv=10)
     
-#     # ============ SINGLE SITE WITH FEATURE SELECTION ============================
-#     # Run skf 5 fold cross-validation with combined data, only NYU, with feature selection
-#     # runCV(comb_df[comb_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_combined_onlyNYU_fs", useFS=True, useHarmo=False)
-
-#     # Run skf 5 fold cross-validation with female data, only NYU, with feature selection
-#     # runCV(female_df[female_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_female_onlyNYU_fs", useFS=True, useHarmo=False)
     
-#     # Run skf 5 fold cross-validation with male data, only NYU, with feature selection
-#     # runCV(male_df[male_df['SITE_ID'] == 'NYU'].reset_index(drop=True), label="skf5_male_onlyNYU_fs", useFS=True, useHarmo=False)
-
-# def run_multisite_comb():
-#     # ======================= STRATIFIED CV =================================================
-#     #Run skf cross-validation with combined data, harmonization=true, feature-selection=true
-#     runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_harmo_fs", useFS=True, useHarmo=True)
-
-#     #Run skf cross-validation with combined data, no harmonization, no feature selection
-#     runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_noharmo_nofs", useFS=False, useHarmo=False)
-
-#     #Run skf cross-validation with combined data, no harmo, with feature selection
-#     runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_noharmo_fs", useFS=True, useHarmo=False)
-
-#     #Run skf cross-validation with combined data, with harmonization, no feature-selection
-#     runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_harmo_nofs", useFS=False, useHarmo=True)
-
-#     # ====================== LOGO CV ==================================================
-#     #Run LOGO cross-validation with combined data, no feature selection
-#     runLOGO(comb_df, label="logo_combined_nofs", useFS=False)
-
-#     #Run LOGO cross-validation with combined data, with feature selection
-#     runLOGO(comb_df, label="logo_combined_fs", useFS=True)
-
-# def run_multisite_female():
-#     # No harmonisation applied due to very low number of entries for female data
-#     # run skf cross-validation with female data, no harmonisation, no feature selection
-#     runCV(female_df, label="skf_female_nofs", useFS=False)
-
-#     # run skf cross-validation with female data, no harmonisation, with feature selection
-#     runCV(female_df, label="skf_female_fs", useFS=True)
-
-# def run_multisite_male():
-#     # REMOVE CMU DUE TO LOW NUMBER OF ENTRIES
-#     #Run skf cross-validation with combined data, harmonization=true, feature-selection=true
-#     runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_harmo_fs", useFS=True, useHarmo=True)
-
-#     #Run skf cross-validation with combined data, no harmonization, no feature selection
-#     runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_noharmo_nofs", useFS=False, useHarmo=False)
-
-#     #Run skf cross-validation with combined data, no harmo, with feature selection
-#     runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_noharmo_fs", useFS=True, useHarmo=False)
-
-#     #Run skf cross-validation with combined data, with harmonization, no feature-selection
-#     runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_harmo_nofs", useFS=False, useHarmo=True)
-
-if __name__ == "__main__":
-    run_singlesite() # To run by Carmen
-    run_multisite_comb() # To run by Hannah-Rhys
-    run_multisite_female() # To run by Hannah-Rhys
-    run_multisite_male() # To run by Carmen
-    runCVvisu(comb_df, label="skf5_combined_multisite", groupeval=True, ncv=5)
+    

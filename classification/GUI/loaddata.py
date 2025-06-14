@@ -8,29 +8,29 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from neuroHarmonize import harmonizationLearn, harmonizationApply
 
-# Load .env variables
-load_dotenv()
+# # Load .env variables
+# load_dotenv()
 
-# Get the directory from .env
-functions_path = os.getenv("FUNCTIONS_JOCHEM")
+# # Get the directory from .env
+# functions_path = os.getenv("FUNCTIONS_JOCHEM")
 
-# Add to system path if it's not already there
-if functions_path and functions_path not in sys.path:
-    sys.path.append(functions_path)
+# # Add to system path if it's not already there
+# if functions_path and functions_path not in sys.path:
+#     sys.path.append(functions_path)
 
-# Now you can import your module
-try:
-    import AAL_test  # This is your .py file: jochem_functions.py
-except ImportError as e:
-    print(f"Failed to import functions: {e}")
+# # Now you can import your module
+# try:
+#     import AAL_test  # This is your .py file: jochem_functions.py
+# except ImportError as e:
+#     print(f"Failed to import functions: {e}")
 
 # print("Loading Jochems functions successfully!")
 
 
-def load_data(filepath):
-    data_arrays, file_paths, subject_ids, institute_names, metadata = AAL_test.load_files(filepath)
-    df = AAL_test.multiset_feats(data_arrays, file_paths, subject_ids)
-    return df
+# def load_data(filepath):
+#     data_arrays, file_paths, subject_ids, institute_names, metadata = AAL_test.load_files(filepath)
+#     df = AAL_test.multiset_feats(data_arrays, file_paths, subject_ids)
+#     return df
 
 def add_phenotypic_info(df, save_as=None):
     load_dotenv()

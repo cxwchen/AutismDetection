@@ -34,7 +34,10 @@ def subject_sex_btn(subjects_frame, context):
                 df["DX_GROUP"] = df["DX_GROUP"].map({1: 1, 2: 0})
                 
         if context.graph_vs_pearson == "PearsonCorrelationMatrix":
-            df, labels, maps, indices = nilearnextract()
+            if context.filepath == None:
+                df, labels, maps, indices = nilearnextract()
+            else:
+                df = pd.read_csv(context.filepath)
             
         df.rename(columns={
             'AGE_AT_SCAN': 'AGE',
@@ -97,7 +100,10 @@ def subject_age_btn(subjects_frame, context):
                 df["DX_GROUP"] = df["DX_GROUP"].map({1: 1, 2: 0})
                 
         if context.graph_vs_pearson == "PearsonCorrelationMatrix":
-            df, labels, maps, indices = nilearnextract()
+            if context.filepath == None:
+                df, labels, maps, indices = nilearnextract()
+            else:
+                df = pd.read_csv(context.filepath)
             
         df.rename(columns={
             'AGE_AT_SCAN': 'AGE',
@@ -227,7 +233,10 @@ def graph_vs_pearson_btn(subjects_frame, context):
                 df["DX_GROUP"] = df["DX_GROUP"].map({1: 1, 2: 0})
                 
         if subject_functions[selected] == "PearsonCorrelationMatrix":
-            df, labels, maps, indices = nilearnextract()
+            if context.filepath == None:
+                df, labels, maps, indices = nilearnextract()
+            else:
+                df = pd.read_csv(context.filepath)
             
         df.rename(columns={
             'AGE_AT_SCAN': 'AGE',
