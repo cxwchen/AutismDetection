@@ -29,7 +29,7 @@ def subject_sex_btn(subjects_frame, context):
         context.subjects_sex_set = selected
         
         if context.graph_vs_pearson == "Graph":
-            df = pd.read_csv("C:/Users/kakis/OneDrive/Documenten/GitHub/AutismDetection/Feature_Dataframes/third_run/cpac_rois-aal_nogsr_filt_rspect_direct_20ICA_alpha0.0001_thr0.10.csv")
+            df = pd.read_csv(context.GRAPH_FEATURES_PATH)
             if set(df["DX_GROUP"].unique()) == {1,2}:
                 df["DX_GROUP"] = df["DX_GROUP"].map({1: 1, 2: 0})
                 
@@ -92,7 +92,7 @@ def subject_age_btn(subjects_frame, context):
         context.subjects_age_set = selected
         
         if context.graph_vs_pearson == "Graph":
-            df = pd.read_csv("C:/Users/kakis/OneDrive/Documenten/GitHub/AutismDetection/Feature_Dataframes/third_run/cpac_rois-aal_nogsr_filt_rspect_direct_20ICA_alpha0.0001_thr0.10.csv")
+            df = pd.read_csv(context.GRAPH_FEATURES_PATH)
             if set(df["DX_GROUP"].unique()) == {1,2}:
                 df["DX_GROUP"] = df["DX_GROUP"].map({1: 1, 2: 0})
                 
@@ -222,7 +222,7 @@ def graph_vs_pearson_btn(subjects_frame, context):
         ### Start of the new data extraction
         
         if subject_functions[selected] == "Graph":
-            df = pd.read_csv("C:/Users/kakis/OneDrive/Documenten/GitHub/AutismDetection/Feature_Dataframes/third_run/cpac_rois-aal_nogsr_filt_rspect_direct_20ICA_alpha0.0001_thr0.10.csv")
+            df = pd.read_csv(context.GRAPH_FEATURES_PATH)
             if set(df["DX_GROUP"].unique()) == {1,2}:
                 df["DX_GROUP"] = df["DX_GROUP"].map({1: 1, 2: 0})
                 

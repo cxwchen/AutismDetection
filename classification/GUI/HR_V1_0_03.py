@@ -58,6 +58,7 @@ class AppContext:
         self.root = root
         self.log = None
         self.canvas = canvas
+        self.GRAPH_FEATURES_PATH = "C:/Users/kakis/OneDrive/Documenten/GitHub/AutismDetection/Feature_Dataframes/third_run/cpac_rois-aal_nogsr_filt_rspect_direct_20ICA_alpha0.0001_thr0.10.csv"
         self.subjects_sex_set = subjects_sex_set
         self.subjects_age_set = subjects_age_set
         self.classifiers_set = classifiers_set
@@ -92,7 +93,7 @@ def update_overview_text(context):
         tags="overlay_text"
     )
 
-def build_gui(root, X, y, meta, filepath=None):
+def build_gui(root, X, y, meta=None, filepath=None):
     # Default stats
     run_stats = []      ##TO DO: Adjust this later to match the other stats
     
@@ -164,7 +165,7 @@ def build_gui(root, X, y, meta, filepath=None):
         execute_command()
 
     btn_run = tk.Button(toolbar, text="\u23F5 Run", command=run_command) 
-    btn_settings = tk.Button(toolbar, text="\U0001F6E0 Settings", command=open_settings) 
+    btn_settings = tk.Button(toolbar, text="\U0001F6E0 Settings", command=lambda: open_settings(context)) 
     # Pack buttons in toolbar
     btn_open.pack(side="left", padx=5, pady=5)
     btn_save.pack(side="left", padx=5, pady=5)
@@ -205,11 +206,11 @@ def build_gui(root, X, y, meta, filepath=None):
     features_frame.grid(row=2, column=0, sticky="nsew", padx=5, pady=5)
     
     tk.Label(features_frame, text="Feature Selection Methods", font=("Segoe UI", 9), bg="mistyrose").grid(row=0, column=0, sticky="nw",  padx=(2, 5), pady=(5, 0))
-    select_btn(features_frame, context).grid(row=1, column=0, sticky="n", padx=(5, 2), pady=5)
+    select_btn(features_frame, context).grid(row=1, column=0, sticky="wn", padx=(5, 2), pady=5)
     
     tk.Label(features_frame, width=2, bg="mistyrose").grid(row=0, column=1)
     tk.Label(features_frame, text="Feature Types", font=("Segoe UI", 9), bg="mistyrose").grid(row=0, column=2, sticky="nw",  padx=(2, 5), pady=(5, 0))
-    graph_vs_pearson_btn(features_frame, context).grid(row=1, column=2, sticky="n", padx=(2, 5), pady=5)
+    graph_vs_pearson_btn(features_frame, context).grid(row=1, column=2, sticky="wn", padx=(2, 5), pady=5)
 
     # Right frame (1/3 width initially)
     right = tk.Frame(main_pane, bg="lightgreen")
@@ -259,6 +260,8 @@ def build_gui(root, X, y, meta, filepath=None):
             export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
             expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)  # top-right, left of export
             print(f"Saved to {filepath}")
+            
+        globals()["export_overview_to_png"] = export_overview_to_png
 
         root.canvas = tk.Canvas(overview_frame, bg="#030e3a", highlightthickness=0)
         root.canvas.pack(expand=True, fill="both")
@@ -432,6 +435,8 @@ def build_gui(root, X, y, meta, filepath=None):
     perf_output = tk.Text(performance_tab, height=5, bg="#fefefe", state="disabled")
     perf_output.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=10, pady=5)
     
+    open_settings(context) ### <---------- Opens the Settings window right at the start
+    
     def runanalysis(stats):
             
         log(f"Analysing: {stats}")
@@ -468,17 +473,10 @@ def build_gui(root, X, y, meta, filepath=None):
         log(f"Target:\\{context.subjects_sex_set}\\{context.subjects_age_set}\\{context.classifiers_set}\\{context.features_set}\\{context.dataset_fit}\n")
         runCV(context)
         log(f"Evaluation completed")
-        
-    def run_with_context(context):
-        log(f"Scanning {context.y.size} samples with {context.classifiers_set}")
-        log(f"Target:\\{context.subjects_sex_set}\\{context.subjects_age_set}\\{context.classifiers_set}\\{context.features_set}\\{context.dataset_fit}")
-        runCV(context.X, context.y, context.meta)
-        context.model = context.mod(context.Xtrain, context.ytrain)
-        log(f"Model fitted")
 
     # message = tk.Label(root, text="Hello, World!")
     # message.pack()
-
+    
     def set_initial_sash_position():
         root.update_idletasks()
         total_width = main_pane.winfo_width()
@@ -493,6 +491,8 @@ def build_gui(root, X, y, meta, filepath=None):
             print("- help('export') – How to export results")
         elif topic == "commands":
             print("Available commands:")
+            print("- run()")
+            print("- settings()")
             print("- runanalysis(stats) for a demo")
             print("- export_overview_to_png()")
             print("- log('message')")
@@ -509,12 +509,16 @@ def build_gui(root, X, y, meta, filepath=None):
     # Bind to window resize
     root.after(100, set_initial_sash_position)
     root.after(100, set_min_height_relative_to_right)
+    def settings():
+        open_settings(context)
+    
     globals()["stats"] = stats
     globals()["steps"] = steps
     globals()["acuracy"] = acuracy
     globals()["stat2"] = stat2
     globals()["stat3"] = stat3
     globals()["runanalysis"] = runanalysis
+    globals()["settings"] = settings
     globals()["run"] = run
     globals()["log"] = log
     globals()["help"] = help
@@ -552,10 +556,22 @@ def start():
             # Start the update loop
             root.mainloop()
         
+        df = pd.read_csv(filepath)
+        
+        df.rename(columns={
+            'AGE_AT_SCAN': 'AGE',
+            'subject_id': 'SUB_ID'
+        }, inplace=True)
+     
+        # Define phenotypic columns if they exist
+        pheno_cols = df.columns.intersection(["DX_GROUP", "SEX", "SITE_ID", "SUB_ID", "AGE"])
+        X = df.drop(columns=pheno_cols)
+        y = df['DX_GROUP']
+        
         root.destroy()
         root = tk.Tk()
         root.title(f"NASDA – {filepath.split('/')[-1]}")
-        build_gui(root, X, y, meta, filepath)
+        build_gui(root, X, y, filepath)
     
     # Start the update loop
     root.mainloop()
