@@ -42,7 +42,7 @@ def defaultSVM(Xtrain, Xtest, ytrain, ytest):
     plt.title('Confusion Matrix')
     plt.show()
 
-def bestSVM_GS(Xtrain, Xtest, ytrain, ytest, svcdefault=SVC()):
+def bestSVM_GS(Xtrain, Xtest, ytrain, ytest, svcdefault):
     param_grid = [
         {   'kernel': ['linear'], 'C': [0.1, 1, 10, 100]}, #Here I didn't use gamma, because gamma is not used for the linear kernel
         {   'kernel': ['rbf'], 'C': [0.1, 1, 10, 100], 'gamma': [1, 0.1, 0.01, 0.001]},
@@ -65,7 +65,7 @@ def weighted_recall(y_true, y_pred):
     # Adjust weights as you prefer
     return 0.7 * recall_pos + 0.3 * recall_neg
 
-def bestSVM_RS(Xtrain, Xtest, ytrain, ytest, svcdefault=SVC()):
+def bestSVM_RS(Xtrain, Xtest, ytrain, ytest, svcdefault):
     param_grid = [
         {   'kernel': ['linear'], 'C': [0.1, 1, 10, 100]}, #Here I didn't use gamma, because gamma is not used for the linear kernel
         {   'kernel': ['rbf'], 'C': [0.1, 1, 10, 100], 'gamma': [1, 0.1, 0.01, 0.001]},

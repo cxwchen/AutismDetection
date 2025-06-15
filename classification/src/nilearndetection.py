@@ -121,9 +121,16 @@ def runCV(df, label="female", groupeval=True, useFS=False, useHarmo=False, numfe
 
 
 def runLOGO(df, label="female", useFS=False, groupeval=False, numfeats=100):
-    X = df.iloc[:, 4:]
+    df.rename(columns={
+        'AGE_AT_SCAN': 'AGE',
+        'subject_id': 'SUB_ID'
+    }, inplace=True)
+
+    # Define phenotypic columns if they exist
+    pheno_cols = df.columns.intersection(["DX_GROUP", "SEX", "SITE_ID", "SUB_ID", "AGE"])
+    X = df.drop(columns=pheno_cols)
     y = df['DX_GROUP']
-    meta = df[['SITE_ID', 'SEX', 'AGE']]
+    meta = df[df.columns.intersection(["SITE_ID", "SEX", "AGE"])]
     sites = df['SITE_ID']
 
     logo = LeaveOneGroupOut()
@@ -248,13 +255,13 @@ def run_singlesite():
 def run_multisite_comb():
     # ======================= STRATIFIED CV =================================================
     #Run skf cross-validation with combined data, harmonization=true, feature-selection=true
-    runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_harmo_fs", useFS=True, useHarmo=True)
+    # runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_harmo_fs", useFS=True, useHarmo=True)
 
     #Run skf cross-validation with combined data, no harmonization, no feature selection
     runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_noharmo_nofs", useFS=False, useHarmo=False)
 
     #Run skf cross-validation with combined data, no harmo, with feature selection
-    runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_noharmo_fs", useFS=True, useHarmo=False)
+    # runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_noharmo_fs", useFS=True, useHarmo=False)
 
     #Run skf cross-validation with combined data, with harmonization, no feature-selection
     runCV(comb_df[comb_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf_combined_harmo_nofs", useFS=False, useHarmo=True)
@@ -264,7 +271,7 @@ def run_multisite_comb():
     runLOGO(comb_df, label="logo_combined_nofs", useFS=False)
 
     #Run LOGO cross-validation with combined data, with feature selection
-    runLOGO(comb_df, label="logo_combined_fs", useFS=True)
+    # runLOGO(comb_df, label="logo_combined_fs", useFS=True)
 
 def run_multisite_female():
     # No harmonisation applied due to very low number of entries for female data
@@ -272,25 +279,25 @@ def run_multisite_female():
     runCV(female_df, label="skf_female_nofs", useFS=False)
 
     # run skf cross-validation with female data, no harmonisation, with feature selection
-    runCV(female_df, label="skf_female_fs", useFS=True)
+    # runCV(female_df, label="skf_female_fs", useFS=True)
 
 def run_multisite_male():
     # REMOVE CMU DUE TO LOW NUMBER OF ENTRIES
     #Run skf cross-validation with combined data, harmonization=true, feature-selection=true
-    runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_harmo_fs", useFS=True, useHarmo=True)
+    # runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_harmo_fs", useFS=True, useHarmo=True)
 
     #Run skf cross-validation with combined data, no harmonization, no feature selection
     runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_noharmo_nofs", useFS=False, useHarmo=False)
 
     #Run skf cross-validation with combined data, no harmo, with feature selection
-    runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_noharmo_fs", useFS=True, useHarmo=False)
+    # runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_noharmo_fs", useFS=True, useHarmo=False)
 
     #Run skf cross-validation with combined data, with harmonization, no feature-selection
     runCV(male_df[male_df['SITE_ID'] != 'CMU'].reset_index(drop=True), label="skf5_male_harmo_nofs", useFS=False, useHarmo=True)
 
 if __name__ == "__main__":
-    run_singlesite() # To run by Carmen
+    # run_singlesite() # To run by Carmen
     run_multisite_comb() # To run by Hannah-Rhys
-    run_multisite_female() # To run by Hannah-Rhys
-    run_multisite_male() # To run by Carmen
-    runCVvisu(comb_df, label="skf5_combined_multisite", groupeval=True, ncv=5)
+    # run_multisite_female() # To run by Hannah-Rhys
+    # run_multisite_male() # To run by Carmen
+    # runCVvisu(comb_df, label="skf5_combined_multisite", groupeval=True, ncv=5)

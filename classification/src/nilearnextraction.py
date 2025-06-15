@@ -11,7 +11,7 @@ import seaborn as sns
 def nilearnextract():
     """
     ----------------------------------------------------------------------
-    This function extracts the full correlation between ROIs using Nilearn
+    This function extracts the Pearson correlation between ROIs using Nilearn
     ----------------------------------------------------------------------
 
     Returns
@@ -74,7 +74,6 @@ def extractaal():
     maps = aal.maps
     indices = aal.indices
     return labels, maps, indices
-
 
 if __name__ == "__main__":
     data, labels, maps, indices = nilearnextract()
