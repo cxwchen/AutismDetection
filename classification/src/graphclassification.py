@@ -66,7 +66,6 @@ def runGCV(df, ncv, label="female", groupeval=True):
         Xtest = imputer.transform(Xtest)
 
         Xtrain, Xtest = normalizer(Xtrain, Xtest)
-
         for cfunc in [applyLogR, applySVM, applyRandForest, applyDT, applyMLP, applyLDA, applyKNN, applyDummy]:
             clfname = cfunc.__name__.replace("apply", "")
             print(f"\n=== Fold {fold} | {clfname}")
@@ -213,8 +212,8 @@ def GLOGOCV(df, label="female", groupeval=False):
 
 
 if __name__ == "__main__":
-    # GordonSingleClassAll()
-    # JochemClass()
-    # GordonMultiClassAll()
+    GordonSingleClassAll()
+    JochemClass()
+    GordonMultiClassAll()
     df = pd.read_csv("C:\\Users\\carme\\OneDrive\\Documenten\\AutismDetection\\Feature_Dataframes\\third_run\\cpac_rois-aal_nogsr_filt_rspect_direct_20ICA_alpha0.0001_thr0.10.csv")
     GLOGOCV(df, label="rspect_direct_20ICA_alpha0.0001_thr0.10")
