@@ -244,7 +244,7 @@ def compute_average_importances(featlist, timestamp="20250608_173602"):
         with open(filepath, "r") as f:
             feats = json.load(f)
             # feats is list of (feature_name, importance)
-            feat_dict = dict(feats)  # quick lookup
+            feat_dict = dict(feats)  
             
             for feat in featlist:
                 if feat in feat_dict:
@@ -355,20 +355,21 @@ if __name__ == "__main__":
     featlist = ["fc_5301_8212", "fc_6302_9160", "fc_2002_8201", "fc_2211_2312", "fc_2332_9021", "fc_2201_5102"]
     feat_folder = "features/20250608_173602"
 
-    avg_weights = average_weights_for_selected_features(feat_folder, featlist)
+    avg_weights_perclassifier = average_weights_for_selected_features(feat_folder, featlist)
 
     print("\nAverage Weights for Selected Features per Classifier:")
     print(f"{'Feature':<20} {'Classifier':<15} {'Mean Weight':>12} {'Std Dev':>10} {'Folds':>6}")
     print("-" * 65)
-    for (feat, clf), stats in sorted(avg_weights.items()):
+    for (feat, clf), stats in sorted(avg_weights_perclassifier.items()):
         print(f"{feat:<20} {clf:<15} {stats['mean']:12.4f} {stats['std']:10.4f} {stats['count']:6d}")
+
+    featlist = ["fc_5301_8212", "fc_6302_9160", "fc_2002_8201", "fc_2211_2312", "fc_2332_9021", "fc_2201_5102"]
+    avg_weights = compute_average_importances(featlist)
+    print("Feature\tAverage Importance")
+    for feat, weight in avg_weights.items():
+        print(f"{feat}\t{weight:.4f}")
+    plotCustomConnectomeAvgWeight(featlist, weights=avg_weights, filename="custom_top_feats_weighted_test")
     # Quick testing
     # labels, maps, indices = extractaal()
     # firsttest()
     # plotallsaved()
-    # featlist = ["fc_5301_8212", "fc_6302_9160", "fc_2002_8201", "fc_2211_2312", "fc_2332_9021", "fc_2201_5102"]
-    # avg_weights = compute_average_importances(featlist)
-    # print("Feature\tAverage Importance")
-    # for feat, weight in avg_weights.items():
-    #     print(f"{feat}\t{weight:.4f}")
-    # plotCustomConnectomeAvgWeight(featlist, weights=avg_weights, filename="custom_top_feats_weighted")
