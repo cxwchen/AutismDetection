@@ -1,26 +1,9 @@
 # Classification
 This folder contains all files used by the Classification subgroup.
-It is split in 2 folders: `src` and `GUI`. 
-## `src`
-### `classifiers.py`
-This file contains the implementation of all classifiers:
-- `applyLogR`
-- `applySVM`
-- `applyDT`
-- `applyRandForest`
-- `applyMLP`
-- `applyLDA`
-- `applyKNN`
-- `applyDummy`
+It is split into 2 folders: `src` and `GUI`. 
 
-The models are only fitted here. No predictions yet.
-### `hyperparametertuning.py`
-This file contains the implementation of our hyperparameter tuning for the models SVM, Decision Tree, and MLP.
-### `classification.py`
-This file performs the prediction and evaluation in `performCA()`.
-### `performance.py`
-This file contains all functions to calculate the performance metrics to evaluate the performance of our classifiers.
+`src` contains all files used to implement and evaluate our models. 
 
-These functions are called by the `performCA()` function in `classification.py`.
+`GUI` contains all files to develop our tool NASDA (Neuroimaging Autism Spectrum Disorder Analyser).
 
 
