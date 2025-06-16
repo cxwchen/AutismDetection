@@ -3,6 +3,7 @@ import json
 import glob
 import numpy as np
 import seaborn as sns
+import cmcrameri.cm as cmc
 import matplotlib.pyplot as plt
 from collections import defaultdict
 from nilearn import plotting
@@ -116,7 +117,7 @@ def plotCustomConnectome(featlist, weight=1.0, tag="", filename="custom_top_feat
         adjmatr[i,j] = w
         adjmatr[j, i] = w
 
-    plotting.plot_connectome(adjacency_matrix=adjmatr, node_coords=nodecoords, output_file=f"{filename}.png", title="Top Stable Features")
+    plotting.plot_connectome(adjacency_matrix=adjmatr, node_coords=nodecoords, edge_cmap=cmc.hawaii, output_file=f"{filename}.png", title="Top Stable Features")
 
 def firsttest():
     df = pd.read_csv('nilearnfeatscomb.csv.gz')
@@ -206,6 +207,7 @@ def plotConnectomeFromSaved(featfile, k, tag="", fold=None, timestamp="20250608_
 
     plotting.plot_connectome(adjacency_matrix=adjmatr,
                             node_coords=nodecoords,
+                            edge_cmap = cmc.hawaii,
                             output_file=f'{filename}.png',
                             title="Top 20 Most Important Connections (Signed)",
                             black_bg=False,
@@ -296,6 +298,7 @@ def plotCustomConnectomeAvgWeight(featlist, weights=None, tag="", filename="cust
 
     plotting.plot_connectome(adjacency_matrix=adjmatr,
                             node_coords=nodecoords,
+                            edge_cmap=cmc.hawaii,
                             output_file=f"{filename}.png",
                             title="Top Stable Features",
                             black_bg=False,
@@ -372,4 +375,4 @@ if __name__ == "__main__":
     # Quick testing
     # labels, maps, indices = extractaal()
     # firsttest()
-    # plotallsaved()
+    plotallsaved()
