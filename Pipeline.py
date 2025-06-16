@@ -51,6 +51,130 @@ def load_file(sex='all', method='pearson_corr', alpha=5):
 
     return X, y
 
+def load_graph_csv(method, sex='all', site_id=None):
+    # Load data
+    if method == 'laplacian':
+        data = pd.read_csv('cpac_rois-aal_nogsr_filt_norm-laplacian_direct_20ICA_alpha0.0001_thr0.25.csv', encoding='ISO-8859-1')
+    elif method == 'rspect':  
+        data = pd.read_csv('cpac_rois-aal_nogsr_filt_rspect_direct_20ICA_alpha0.0001_thr0.10.csv', encoding='ISO-8859-1') 
+    else:
+        print("use laplacian or rspect as method")
+    data = data[data['DX_GROUP'].notna()]
+
+    # Separate by sex
+    fc_female = data[data['SEX'] == 2]
+    fc_male = data[data['SEX'] == 1]
+
+    if sex == 'female':
+        fc = fc_female
+    elif sex == 'male':
+        fc = fc_male
+    elif sex == 'all':
+        fc = pd.concat([fc_female, fc_male], axis=0, ignore_index=True)
+    else:
+        print("Use male, female or all as sex")
+
+    if site_id is not None:
+        fc = fc[fc['SITE_ID'] == site_id]
+
+    fc = fc.sample(frac=1, random_state=42).reset_index(drop=True)  # Shuffle the DataFrame
+    fc = fc.dropna(subset=['DX_GROUP'])
+
+    X = fc.drop(columns=['DX_GROUP', 'SEX', 'SITE_ID', 'subject_id', 'AGE_AT_SCAN'])
+    y = fc['DX_GROUP']
+
+    # Making sure the data is numeric
+    X = X.apply(pd.to_numeric, errors='coerce')
+    X = X.dropna(axis=1,how='all')
+    non_nan_ratio = X.notna().mean()
+    X = X.loc[:, non_nan_ratio > 0.8]  # Keep columns with more than 50% non-NaN values
+    # Making sure there is no 0 var data for the hsic algorithm
+    X = X.loc[:, X.var() > 1e-4]
+    # NaN values are filled with the median of the column
+    X = X.fillna(X.median())
+
+    # Remove extremely correlated features
+    X = correlation_filter(X, threshold=0.9)    
+    print(f"After outlier removal: {X.shape}")
+    # Remove extreme outliers
+    X = remove_extreme_outliers(X, threshold=3.5)
+    #print(f"After outlier removal: {X.shape}")
+
+    # Apply feature transformations for better distributions
+    X = apply_feature_transformations(X)
+    #print(f"After transformation: {X.shape}")
+
+    # Site effect correction
+    if 'SITE_ID' in fc.columns:
+        X = correct_site_effects(X, fc['SITE_ID'])
+        #print(f"After site correction: {X.shape}")
+
+    #print(f"X: {X}, y: {y}")
+
+    return X, y
+    
+def load_graph(sex='all', site_id=None, method="norm_laplacian", cov="ledoit"):
+
+    fmri_data_f, subject_ids_f, _, _ = load_files(sex='Female', max_files=800, site=site_id, shuffle=True, var_filt=True, ica=True)
+    fmri_data_m, subject_ids_m, _, _ = load_files(sex='Male', max_files=800, site=site_id, shuffle=True, var_filt=True, ica=True)
+
+    fc_female = multiset_feats(fmri_data_f, subject_ids_f, inf_method=method, cov_method=cov,
+                   thresh=0.1, n_jobs=-1, feats="graph")
+    fc_male = multiset_feats(fmri_data_m, subject_ids_m, inf_method=method, cov_method=cov,
+                   thresh=0.1, n_jobs=-1, feats="graph")
+    if sex == 'female':
+        fc = fc_female
+    elif sex == 'male':
+        fc = fc_male
+    elif sex == 'all':
+        fc = pd.concat([fc_female, fc_male], axis=0, ignore_index=True)
+    else:
+        print("Use male, female or all as sex")
+
+    if site_id is not None:
+        fc = fc[fc['SITE_ID'] == site_id]
+
+    fc = fc.sample(frac=1, random_state=42).reset_index(drop=True)  # Shuffle the DataFrame
+    fc = fc.dropna(subset=['DX_GROUP'])
+
+    X = fc.drop(columns=['DX_GROUP', 'SEX', 'SITE_ID', 'subject_id'])
+    y = fc['DX_GROUP']
+
+    if X.empty or X.shape[1] < 10:
+        raise ValueError("❌ Not enough usable features extracted from multiset_feats")
+
+    #X.to_csv('laplacian_prefilter_ledoit.csv', index=False)
+
+    # Making sure the data is numeric
+    X = X.apply(pd.to_numeric, errors='coerce')
+    X = X.dropna(axis=1,how='all')
+    non_nan_ratio = X.notna().mean()
+    X = X.loc[:, non_nan_ratio > 0.8]  # Keep columns with more than 50% non-NaN values
+    # Making sure there is no 0 var data for the hsic algorithm
+    X = X.loc[:, X.var() > 1e-4]
+    # NaN values are filled with the median of the column
+    X = X.fillna(X.median())
+
+    # Remove extremely correlated features
+    X = correlation_filter(X, threshold=0.9)    
+    print(f"After outlier removal: {X.shape}")
+    # Remove extreme outliers
+    X = remove_extreme_outliers(X, threshold=3.5)
+    #print(f"After outlier removal: {X.shape}")
+
+    # Apply feature transformations for better distributions
+    X = apply_feature_transformations(X)
+    #print(f"After transformation: {X.shape}")
+
+    # Site effect correction
+    if 'SITE_ID' in fc.columns:
+        X = correct_site_effects(X, fc['SITE_ID'])
+        #print(f"After site correction: {X.shape}")
+
+    #X.to_csv('laplacian_ledoit.csv', index=False)
+
+    return X, y
+
 def load_full_corr(sex='all', site_id=None):
 
     fc_female = basicfeatureextraction.extract_fc_features("abide/female-cpac-filtnoglobal-aal", "abide/Phenotypic_V1_0b_preprocessed1.csv")
@@ -641,36 +765,38 @@ def select_model(classifier):
     
     return model
 
-def main(classifier="LogR"):
+def main():
+
+    X, y = load_graph(sex='all', site_id='NYU')
 
     #Choose method: partial_corr_LF|partial_corr_glasso|pearson_corr_binary|pearson_corr|mutual_info|norm_laplacian|rlogspect
     #X, y = load_file(sex='all', method='pearson_corr', max_files=None)
-    X, y = load_dataframe()
+    #X, y = load_dataframe()
 
     # Choose from SVM, RandomForest, LogR, LDA, KNN
 
-    X_train, X_test, y_train, y_test = train_and_evaluate(X, y, classifier)
+    #X_train, X_test, y_train, y_test = train_and_evaluate(X, y, classifier)
 
-    X_clustered = cluster.cluster(X_train, y_train, t=3)  # Clustering to select features
-    X_clustered_big = cluster.cluster(X, y, t=1)
-    print(f"Features selected by clustering({X_clustered.shape[1]}):", X_clustered)
-    print(f"features selected by clustering big({X_clustered_big.shape[1]})")
-    X_mRMR = mRMR(X_train, y_train, classifier, num_features_to_select=100)
-    X_mRMR_big = mRMR(X, y, classifier, num_features_to_select=300)
-    print(f"Features selected by mRMR({len(X_mRMR)}):", X_mRMR)
-    print(f"features selected by mRMR big({len(X_mRMR_big)})")
+    #X_clustered = cluster.cluster(X_train, y_train, t=3)  # Clustering to select features
+    #X_clustered_big = cluster.cluster(X, y, t=1)
+    #print(f"Features selected by clustering({X_clustered.shape[1]}):", X_clustered)
+    #print(f"features selected by clustering big({X_clustered_big.shape[1]})")
+    #X_mRMR = mRMR(X_train, y_train, classifier, num_features_to_select=100)
+    #X_mRMR_big = mRMR(X, y, classifier, num_features_to_select=300)
+    #print(f"Features selected by mRMR({len(X_mRMR)}):", X_mRMR)
+    #print(f"features selected by mRMR big({len(X_mRMR_big)})")
     
-    alpha_results_lasso = alpha_lasso_selection(X, y, classifier) #0.002812 with 98 features
-    best_alpha = alpha_results_lasso['best_alpha']
-    print(f"alpha lasso: {best_alpha}")
-    num_feat_hsic = hsiclasso(X, y, classifier, verbose=False)
-    print(f"num feat hsic: {num_feat_hsic}")
+    #alpha_results_lasso = alpha_lasso_selection(X, y, classifier) #0.002812 with 98 features
+    #best_alpha = alpha_results_lasso['best_alpha']
+    #print(f"alpha lasso: {best_alpha}")
+    #num_feat_hsic = hsiclasso(X, y, classifier, verbose=False)
+    #print(f"num feat hsic: {num_feat_hsic}")
     #best_alpha = 0.002812
     #Cross-validation with feature selection
-    selected_features_lasso_cv, selected_feature_names_lasso_cv = cross_validate_model(X, y, Lasso_selection, classifier, alpha=best_alpha, max_iter=2000)
-    print("Cross-validated L1 Logistic Regression selected features:")
-    print_selected_features(selected_features_lasso_cv, selected_feature_names_lasso_cv, print_feat=True)
-    print("\n\n")
+    #selected_features_lasso_cv, selected_feature_names_lasso_cv = cross_validate_model(X, y, Lasso_selection, classifier, alpha=best_alpha, max_iter=2000)
+    #print("Cross-validated L1 Logistic Regression selected features:")
+    #print_selected_features(selected_features_lasso_cv, selected_feature_names_lasso_cv, print_feat=True)
+    #print("\n\n")
 
     #Cross-validation with feature selection
     #selected_features_lasso_cl, selected_feature_names_lasso_cl = cross_validate_model(X, y, Lasso_selection, classifier, alpha=best_alpha, max_iter=2000, selected_features=X_clustered_big)
@@ -684,11 +810,11 @@ def main(classifier="LogR"):
     #print_selected_features(selected_features_lasso_mr, selected_feature_names_lasso_mr, print_feat=True)
     #print("\n\n")
 
-    num_feat_hsic = hsiclasso(X, y, classifier, verbose=False)
-    selected_features_hsiclasso_cv, selected_feature_names_hsiclasso_cv = cross_validate_model(X, y, hsiclasso, classifier, num_feat=98) #92,
-    print("Cross-validated HSIC Lasso selected features:")
-    print_selected_features(selected_features_hsiclasso_cv, selected_feature_names_hsiclasso_cv, print_feat=True)
-    print("\n\n")
+    #num_feat_hsic = hsiclasso(X, y, classifier, verbose=False)
+    #selected_features_hsiclasso_cv, selected_feature_names_hsiclasso_cv = cross_validate_model(X, y, hsiclasso, classifier, num_feat=98) #92,
+    #print("Cross-validated HSIC Lasso selected features:")
+    #print_selected_features(selected_features_hsiclasso_cv, selected_feature_names_hsiclasso_cv, print_feat=True)
+    #print("\n\n")
 
     #selected_features_lars_cv, selected_feature_names_lars_cv = cross_validate_model(X, y, lars_lasso, classifier)
     #print("Cross-validated LARS Lasso selected features:")
@@ -700,15 +826,15 @@ def main(classifier="LogR"):
     #print_selected_features(selected_features_LAND_cv, selected_feature_names_LAND_cv, print_feat=True)
     #print("\n\n")
 
-    selected_features_mRMR_cv, selected_feature_names_mRMR_cv = cross_validate_model(X, y, mRMR, classifier, n_splits=5, num_features_to_select=200)
-    print("Cross-validated mRMR selected features:")
-    print_selected_features(selected_features_mRMR_cv, selected_feature_names_mRMR_cv, print_feat=True)
-    print("\n\n")
+    #selected_features_mRMR_cv, selected_feature_names_mRMR_cv = cross_validate_model(X, y, mRMR, classifier, n_splits=5, num_features_to_select=200)
+    #print("Cross-validated mRMR selected features:")
+    #print_selected_features(selected_features_mRMR_cv, selected_feature_names_mRMR_cv, print_feat=True)
+    #print("\n\n")
 
-    selected_features_reliefF_cv, selected_feature_names_reliefF_cv = cross_validate_model(X, y, reliefF_, classifier, n_splits=5, num_features_to_select=200)
-    print("Cross-validated reliefF selected features:")
-    print_selected_features(selected_features_reliefF_cv, selected_feature_names_reliefF_cv, print_feat=True)
-    print("\n\n")
+    #selected_features_reliefF_cv, selected_feature_names_reliefF_cv = cross_validate_model(X, y, reliefF_, classifier, n_splits=5, num_features_to_select=200)
+    #print("Cross-validated reliefF selected features:")
+    #print_selected_features(selected_features_reliefF_cv, selected_feature_names_reliefF_cv, print_feat=True)
+    #print("\n\n")
 
     #selected_features_perm_cl, selected_feature_names_perm_cl = cross_validate_model(X, y, Perm_importance, classifier, n_splits=5, select_features=X_clustered)
     #print("Cross-validated mRMR selected features:")
@@ -720,28 +846,28 @@ def main(classifier="LogR"):
     #print_selected_features(selected_features_perm_cl, selected_feature_names_perm_cl, print_feat=True)
     #print("\n\n")
 
-    selected_features_sfs = failsafe_feature_selection(backwards_SFS, X_train, y_train, min_features=10, classifier=classifier, select_features=X_clustered, n_features_to_select=20)
-    print("Sequential Feature Selection (SFS) selected features:")
-    selected_features_names_sfs = classify(X_train, X_test, y_train, y_test, selected_features_sfs, classifier)
-    print_selected_features(selected_features_sfs, selected_features_names_sfs, print_feat=True)
-    print("\n\n")
+    #selected_features_sfs = failsafe_feature_selection(backwards_SFS, X_train, y_train, min_features=10, classifier=classifier, select_features=X_clustered, n_features_to_select=20)
+    #print("Sequential Feature Selection (SFS) selected features:")
+    #selected_features_names_sfs = classify(X_train, X_test, y_train, y_test, selected_features_sfs, classifier)
+    #print_selected_features(selected_features_sfs, selected_features_names_sfs, print_feat=True)
+    #print("\n\n")
 
-    selected_features_sfs_mRMR = failsafe_feature_selection(backwards_SFS, X_train, y_train, min_features=10, classifier=classifier, select_features=X_mRMR, n_features_to_select=20)
-    print("Sequential Feature Selection (SFS) selected features mRMR:")
-    selected_features_names_sfs_mRMR = classify(X_train, X_test, y_train, y_test, selected_features_sfs_mRMR, classifier)
-    print_selected_features(selected_features_sfs_mRMR, selected_features_names_sfs_mRMR, print_feat=True)
+    #selected_features_sfs_mRMR = failsafe_feature_selection(backwards_SFS, X_train, y_train, min_features=10, classifier=classifier, select_features=X_mRMR, n_features_to_select=20)
+    #print("Sequential Feature Selection (SFS) selected features mRMR:")
+    #selected_features_names_sfs_mRMR = classify(X_train, X_test, y_train, y_test, selected_features_sfs_mRMR, classifier)
+    #print_selected_features(selected_features_sfs_mRMR, selected_features_names_sfs_mRMR, print_feat=True)
 
-    selected_features_permutation_cl = failsafe_feature_selection(Perm_importance, X_train, y_train, classifier=classifier, select_features=X_clustered)
-    print("Permutation Importance selected features mRMR")
-    selected_features_names_perm_cl = classify(X_train, X_test, y_train, y_test, selected_features_permutation_cl, classifier)
-    print_selected_features(selected_features_permutation_cl, selected_features_names_perm_cl, print_feat=True)
-    print("\n\n")
+    #selected_features_permutation_cl = failsafe_feature_selection(Perm_importance, X_train, y_train, classifier=classifier, select_features=X_clustered)
+    #print("Permutation Importance selected features mRMR")
+    #selected_features_names_perm_cl = classify(X_train, X_test, y_train, y_test, selected_features_permutation_cl, classifier)
+    #print_selected_features(selected_features_permutation_cl, selected_features_names_perm_cl, print_feat=True)
+    #print("\n\n")
 
-    selected_features_permutation_mRMR = failsafe_feature_selection(Perm_importance, X_train, y_train, classifier=classifier, select_features=X_mRMR)
-    print("Permutation Importance selected features mRMR")
-    selected_features_names_perm_mRMR = classify(X_train, X_test, y_train, y_test, selected_features_permutation_mRMR, classifier)
-    print_selected_features(selected_features_permutation_mRMR, selected_features_names_perm_mRMR, print_feat=True)
-    print("\n\n")
+    #selected_features_permutation_mRMR = failsafe_feature_selection(Perm_importance, X_train, y_train, classifier=classifier, select_features=X_mRMR)
+    #print("Permutation Importance selected features mRMR")
+    #selected_features_names_perm_mRMR = classify(X_train, X_test, y_train, y_test, selected_features_permutation_mRMR, classifier)
+    #print_selected_features(selected_features_permutation_mRMR, selected_features_names_perm_mRMR, print_feat=True)
+    #print("\n\n")
 
     # X_train_scaled = fs.low_variance(X_train_scaled, threshold=0.01)
     # X_test_scaled = fs.low_variance(X_test_scaled, threshold=0.01)
