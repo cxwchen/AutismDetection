@@ -15,6 +15,18 @@ def open_new_window():
     if not filepath:
         print("No file selected.")
         return  # User canceled
+    
+    df = pd.read_csv(filepath)
+    
+    df.rename(columns={
+        'AGE_AT_SCAN': 'AGE',
+        'subject_id': 'SUB_ID'
+    }, inplace=True)
+ 
+    # Define phenotypic columns if they exist
+    pheno_cols = df.columns.intersection(["DX_GROUP", "SEX", "SITE_ID", "SUB_ID", "AGE"])
+    X = df.drop(columns=pheno_cols)
+    y = df['DX_GROUP']
 
     # Create a new window after selection
     new_win = tk.Toplevel()
@@ -33,9 +45,9 @@ def open_new_window():
     # Apply the geometry
     new_win.geometry(f'{width}x{height}+{x}+{y}')
     new_win.iconbitmap("logo.ico")
-    HR_V1_0_03.build_gui(new_win, filepath)
+    HR_V1_0_03.build_gui(new_win, X, y, filepath)
     
-def open_settings():
+def open_settings(context):
     
     # Create a new window after selection
     settings = tk.Toplevel()
@@ -62,8 +74,24 @@ def open_settings():
     settings_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
     # Optional: add content
-    tk.Label(settings_frame, text="Option 1:").grid(row=0, column=0, sticky="w")
-    tk.Entry(settings_frame).grid(row=0, column=1, sticky="ew")
+    tk.Label(settings_frame, text="Graph Features File Path:").grid(row=0, column=0, sticky="w")
+    
+    path_var = tk.StringVar(value=context.GRAPH_FEATURES_PATH)
+    path_entry = tk.Entry(settings_frame, textvariable=path_var)
+    path_entry.grid(row=0, column=1, sticky="ew")
+
+    # Make the entry expand with the window
+    settings_frame.columnconfigure(1, weight=1)
+
+    # Save button
+    def save_settings():
+        settings.withdraw()
+        context.GRAPH_FEATURES_PATH = path_var.get().strip()
+        settings.destroy()  # optional: close window after saving
+
+    save_btn = tk.Button(settings_frame, text="Save", command=save_settings)
+    save_btn.grid(row=1, column=0, columnspan=2, pady=10)
+    settings.bind("<Return>", lambda event: save_settings())
     
 def expand_overview(context):
     

@@ -7,18 +7,19 @@ Created on Wed May 14 10:26:16 2025
 import tkinter as tk
 from tkinter import ttk, filedialog
 from PIL import Image, ImageTk, ImageGrab
-from ctypes import windll
+# from ctypes import windll
 
-from classifiersGUI import *
+from classifiers import *
 from selection_buttons import *
 import selection_buttons
 from functionality_buttons import *
-from hyperparametertuningGUI import *
+from hyperparametertuning import *
+from nilearnextraction import *
+from nilearndetection import *
 from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
-import hyperparametertuningGUI
-
-import code
+import hyperparametertuning
+# import code
 import io
 import contextlib
 import platform
@@ -43,24 +44,41 @@ X, y = make_classification(
 )
 
 # === Split data ===
-Xtrain, Xtest, ytrain, ytest = train_test_split(X, y, test_size=0.2, random_state=42)
-svcdefault=SVC()
+# Xtrain, Xtest, ytrain, ytest = train_test_split(X, y, test_size=0.2, random_state=42)
+# svcdefault=SVC()
 
-params = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, hyperparametertuningGUI.param_grid, svcdefault)
+# params = bestSVM_RS(Xtrain, Xtest, ytrain, ytest, hyperparametertuningGUI.param_grid, svcdefault)
 
-model = applySVM(Xtrain, ytrain, params)
+# model = applySVM(Xtrain, ytrain, params)
 #======================================================
 
 
 class AppContext:
-    def __init__(self, root, canvas, subjects_set, classifiers_set, features_set, dataset_fit, filepath):
+    def __init__(self, root, canvas, subjects_sex_set, subjects_age_set, classifiers_set, features_set, graph_vs_pearson, dataset_fit, X, y, meta, filepath):
         self.root = root
+        self.log = None
         self.canvas = canvas
-        self.subjects_set = subjects_set
+        self.GRAPH_FEATURES_PATH = "C:/Users/kakis/OneDrive/Documenten/GitHub/AutismDetection/Feature_Dataframes/third_run/cpac_rois-aal_nogsr_filt_rspect_direct_20ICA_alpha0.0001_thr0.10.csv"
+        self.subjects_sex_set = subjects_sex_set
+        self.subjects_age_set = subjects_age_set
         self.classifiers_set = classifiers_set
         self.features_set = features_set
+        self.graph_vs_pearson = graph_vs_pearson
         self.dataset_fit = dataset_fit
+        self.mod = applySVM
         self.model = None
+        self.meta = meta
+        self.meta_train = None
+        self.meta_test = None
+        self.log = None
+        # self.command_input = None
+        # self.console_display = None
+        self.X = X
+        self.y = y
+        self.Xtrain = None
+        self.Xtest = None
+        self.ytrain = None
+        self.ytest = None
         self.filepath = filepath
 
 def update_overview_text(context):
@@ -69,28 +87,32 @@ def update_overview_text(context):
         10,
         context.canvas.winfo_height() - 10,
         anchor="sw",
-        text=f"Target:\\{context.subjects_set}\\{context.classifiers_set}\\{context.features_set}\\{context.dataset_fit}",
+        text=f"Target:\\{context.subjects_sex_set}\\{context.subjects_age_set}\\{context.classifiers_set}\\{context.features_set}\\{context.graph_vs_pearson}\\{context.dataset_fit}",
         fill="white",
         font=("Arial", 9, "italic"),
         tags="overlay_text"
     )
 
-def build_gui(root, filepath=None):
+def build_gui(root, X, y, meta=None, filepath=None):
     # Default stats
-    print(Xtrain.size)
     run_stats = []      ##TO DO: Adjust this later to match the other stats
-    subjects_set = "subjects_set"; classifiers_set = "SVM"; features_set = "features_set"; dataset_fit = "dataset_fit";
+    
+    subjects_sex_set = "All"; subjects_age_set = "All"; classifiers_set = "SVM"; features_set = "None"; graph_vs_pearson = "PearsonCorrelationMatrix"; dataset_fit = "ABIDE_I";
     
     context = AppContext(
         root=root,
         canvas=None,  # canvas is created later
-        subjects_set=subjects_set,
+        subjects_sex_set=subjects_sex_set,
+        subjects_age_set=subjects_age_set,
         classifiers_set=classifiers_set,
         features_set=features_set,
+        graph_vs_pearson=graph_vs_pearson,
         dataset_fit=dataset_fit,
+        meta=meta,
+        X=X,
+        y=y,
         filepath=filepath
     )
-    
     # Use the filepath as needed
     if filepath:
         print(f"Loaded file: {filepath}")
@@ -131,13 +153,19 @@ def build_gui(root, filepath=None):
     ###TO DO: make a document structure that can safe the project settings / make projects
     stats = "stats"; steps = 11; acuracy = 76.4; stat2 = 2; stat3 = 3;  # default values for demonstration
 
-    def simulate_run_command():
+    def simulate_run_command(context=context):
         command_input.delete(0, "end")  # clear previous input
         command_input.insert(0, f"runanalysis({stats})")
         execute_command()  # simulate pressing <Return>
+        
+    
+    def run_command():
+        command_input.delete(0, "end")  # clear previous input
+        command_input.insert(0, f"run()")
+        execute_command()
 
-    btn_run = tk.Button(toolbar, text="\u23F5 Run", command=simulate_run_command) 
-    btn_settings = tk.Button(toolbar, text="\U0001F6E0 Settings", command=open_settings) 
+    btn_run = tk.Button(toolbar, text="\u23F5 Run", command=run_command) 
+    btn_settings = tk.Button(toolbar, text="\U0001F6E0 Settings", command=lambda: open_settings(context)) 
     # Pack buttons in toolbar
     btn_open.pack(side="left", padx=5, pady=5)
     btn_save.pack(side="left", padx=5, pady=5)
@@ -161,14 +189,28 @@ def build_gui(root, filepath=None):
     subjects_frame = tk.LabelFrame(left, text="Subjects", bg="lightyellow")
     subjects_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
+    tk.Label(subjects_frame, text="By Sex", font=("Segoe UI", 9), bg="lightyellow").grid(row=0, column=0, sticky="nw",  padx=(2, 5), pady=(5, 0))
+    subject_sex_btn(subjects_frame, context).grid(row=1, column=0, sticky="n", padx=(5, 2), pady=5)
+    
+    tk.Label(subjects_frame, width=2, bg="lightyellow").grid(row=0, column=1)
+    tk.Label(subjects_frame, text="By Age", font=("Segoe UI", 9), bg="lightyellow").grid(row=0, column=2, sticky="nw",  padx=(2, 5), pady=(5, 0))
+    subject_age_btn(subjects_frame, context).grid(row=1, column=2, sticky="n", padx=(2, 5), pady=5)
+
     # Classifier Frame
     classifier_frame = tk.LabelFrame(left, text="Classifier", bg="lavender")
     classifier_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-    selection_buttons.class_btn(classifier_frame, context, Xtrain, ytrain)
+    selection_buttons.class_btn(classifier_frame, context)
 
     # Features Frame
     features_frame = tk.LabelFrame(left, text="Features", bg="mistyrose")
     features_frame.grid(row=2, column=0, sticky="nsew", padx=5, pady=5)
+    
+    tk.Label(features_frame, text="Feature Selection Methods", font=("Segoe UI", 9), bg="mistyrose").grid(row=0, column=0, sticky="nw",  padx=(2, 5), pady=(5, 0))
+    select_btn(features_frame, context).grid(row=1, column=0, sticky="wn", padx=(5, 2), pady=5)
+    
+    tk.Label(features_frame, width=2, bg="mistyrose").grid(row=0, column=1)
+    tk.Label(features_frame, text="Feature Types", font=("Segoe UI", 9), bg="mistyrose").grid(row=0, column=2, sticky="nw",  padx=(2, 5), pady=(5, 0))
+    graph_vs_pearson_btn(features_frame, context).grid(row=1, column=2, sticky="wn", padx=(2, 5), pady=5)
 
     # Right frame (1/3 width initially)
     right = tk.Frame(main_pane, bg="lightgreen")
@@ -218,6 +260,8 @@ def build_gui(root, filepath=None):
             export_button.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
             expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)  # top-right, left of export
             print(f"Saved to {filepath}")
+            
+        globals()["export_overview_to_png"] = export_overview_to_png
 
         root.canvas = tk.Canvas(overview_frame, bg="#030e3a", highlightthickness=0)
         root.canvas.pack(expand=True, fill="both")
@@ -226,7 +270,7 @@ def build_gui(root, filepath=None):
         # Load and place image
         size = set_min_height_relative_to_right()
         default_img = Image.open("Brain_background.png").resize((size, size))
-        default_photo = ImageTk.PhotoImage(default_img)
+        default_photo = ImageTk.PhotoImage(default_img, master=root)
         root.canvas.create_image(root.canvas.winfo_reqwidth() // 2, 0, anchor="n", image=default_photo)
         root.canvas.image = default_photo  # keep reference
         
@@ -240,7 +284,7 @@ def build_gui(root, filepath=None):
         expand_button = tk.Button(overview_frame, text=" ⛶ ", command=lambda: expand_overview(context))
         expand_button.place(relx=0.96, rely=0.0, anchor="ne", x=-30, y=5)  # top-right, left of export
 
-    root.after(100, load_default_image)
+    root.after_idle(load_default_image)
 
     # Tabs for Command / Logs / Dataset / Performance
     style = ttk.Style()
@@ -277,7 +321,7 @@ def build_gui(root, filepath=None):
     # Function to execute Python code and display output
     def execute_command(event=None):
         global history_index
-        cmd = command_input.get()
+        cmd =  command_input.get()
         command_history.append(cmd)
         history_index = len(command_history)
         
@@ -345,6 +389,7 @@ def build_gui(root, filepath=None):
         console_display.insert("end", text + "\n", tag)
         console_display.see("end")
         console_display.update_idletasks()
+    context.log = log
 
     def type_text(widget, text, delay=30, tag=None):
         def _type(index=0):
@@ -390,6 +435,8 @@ def build_gui(root, filepath=None):
     perf_output = tk.Text(performance_tab, height=5, bg="#fefefe", state="disabled")
     perf_output.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=10, pady=5)
     
+    open_settings(context) ### <---------- Opens the Settings window right at the start
+    
     def runanalysis(stats):
             
         log(f"Analysing: {stats}")
@@ -420,14 +467,16 @@ def build_gui(root, filepath=None):
             progress.pack_forget()
 
         root.after(1000, step_loop)
-
-    def run(stats=stats):
-        runanalysis(stats)
-
+        
+    def run():
+        log(f"Scanning {context.y.size} samples with {context.classifiers_set}")
+        log(f"Target:\\{context.subjects_sex_set}\\{context.subjects_age_set}\\{context.classifiers_set}\\{context.features_set}\\{context.dataset_fit}\n")
+        runCV(context)
+        log(f"Evaluation completed")
 
     # message = tk.Label(root, text="Hello, World!")
     # message.pack()
-
+    
     def set_initial_sash_position():
         root.update_idletasks()
         total_width = main_pane.winfo_width()
@@ -442,12 +491,14 @@ def build_gui(root, filepath=None):
             print("- help('export') – How to export results")
         elif topic == "commands":
             print("Available commands:")
-            print("- runanalysis(stats) or run() for a demo")
+            print("- run()")
+            print("- settings()")
+            print("- runanalysis(stats) for a demo")
             print("- export_overview_to_png()")
             print("- log('message')")
         elif topic == "classifier":
             print("Classifier options:")
-            print("- SVM, Logistic Regression, Random Forest, Decision Tree, MLP, ClusWiSARD")
+            print("- SVM, Logistic Regression, Random Forest, Decision Tree, MLP, LDA, KNN")
         elif topic == "data":
             print("Expected dataset format: subjects × features. Use loaddata() to load.")
         elif topic == "export":
@@ -458,12 +509,16 @@ def build_gui(root, filepath=None):
     # Bind to window resize
     root.after(100, set_initial_sash_position)
     root.after(100, set_min_height_relative_to_right)
+    def settings():
+        open_settings(context)
+    
     globals()["stats"] = stats
     globals()["steps"] = steps
     globals()["acuracy"] = acuracy
     globals()["stat2"] = stat2
     globals()["stat3"] = stat3
     globals()["runanalysis"] = runanalysis
+    globals()["settings"] = settings
     globals()["run"] = run
     globals()["log"] = log
     globals()["help"] = help
@@ -471,23 +526,52 @@ def build_gui(root, filepath=None):
     
     
 def start():
+    df, labels, maps, indices = nilearnextract()
+    
+    df.rename(columns={
+        'AGE_AT_SCAN': 'AGE',
+        'subject_id': 'SUB_ID'
+    }, inplace=True)
+ 
+    # Define phenotypic columns if they exist
+    pheno_cols = df.columns.intersection(["DX_GROUP", "SEX", "SITE_ID", "SUB_ID", "AGE"])
+    X = df.drop(columns=pheno_cols)
+    y = df['DX_GROUP']
+    meta = df[df.columns.intersection(["SITE_ID", "SEX", "AGE"])]
+    
     root = tk.Tk()
     root.title("NASDA")
-    build_gui(root)
-    filepath = filedialog.askopenfilename(
-    title="Select a data file",
-    filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")])
+    root.iconbitmap("logo.ico")
+    build_gui(root, X, y, meta)
     
-    if not filepath:
-        print("No file selected.")
-        # Start the update loop
-        root.mainloop()
+    Ask_CSV=False ### <--------------- Set this value to true if you want to import CSV's on start
     
-    root.destroy()
-    root = tk.Tk()
-    root.title(f"NASDA – {filepath.split('/')[-1]}")
-    print(Xtrain.size)
-    build_gui(root, filepath)
+    if Ask_CSV == True:
+        filepath = filedialog.askopenfilename(
+        title="Select a data file",
+        filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")])
+        
+        if not filepath:
+            print("No file selected.")
+            # Start the update loop
+            root.mainloop()
+        
+        df = pd.read_csv(filepath)
+        
+        df.rename(columns={
+            'AGE_AT_SCAN': 'AGE',
+            'subject_id': 'SUB_ID'
+        }, inplace=True)
+     
+        # Define phenotypic columns if they exist
+        pheno_cols = df.columns.intersection(["DX_GROUP", "SEX", "SITE_ID", "SUB_ID", "AGE"])
+        X = df.drop(columns=pheno_cols)
+        y = df['DX_GROUP']
+        
+        root.destroy()
+        root = tk.Tk()
+        root.title(f"NASDA – {filepath.split('/')[-1]}")
+        build_gui(root, X, y, filepath)
     
     # Start the update loop
     root.mainloop()
@@ -508,8 +592,8 @@ def check():
 
 # Start Calling the system
 
-check()
+# check()
 
-if __name__ == "__main__":
-    start()
+# if __name__ == "__main__":
+#     start()
     
