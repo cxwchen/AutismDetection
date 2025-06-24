@@ -3,6 +3,9 @@
 # import importlib
 import datetime
 import MRMR
+from collections import defaultdict
+from featureimportance import getimportanceK
+from visualise import plotCustomConnectomeAvgWeight_to_image
 # from dotenv import load_dotenv
 # import numpy as np
 # import pandas as pd
@@ -63,6 +66,9 @@ def runCV(context, label="female", groupeval=True, useHarmo=False, numfeats=100,
     # all_ytrue = {}
     # all_yprob = {}
     # all_ypred = {}
+    feature_counts = defaultdict(int)
+    feature_weights = defaultdict(list)
+    context.featnames = context.X.columns
     
     for fold, (trainidx, testidx) in enumerate(skf.split(context.X, context.y), 1):
         print(f"\n=== Fold {fold} | {label.upper()} Data ===")
@@ -133,7 +139,26 @@ def runCV(context, label="female", groupeval=True, useHarmo=False, numfeats=100,
                 params = None
             
             ytrue, ypred, yprob, context.model = performCA(cfunc, context.Xtrain, context.Xtest, context.ytrain, context.ytest, groupeval=groupeval, fold=fold, tag=label, meta=context.meta_test, timestamp=timestamp, params=params)
+            
+            if cfunc == applyLogR:
+                featnames = context.featnames
+                top_feats = getimportanceK(context.model, featnames=featnames, k=20)
+                for fname, weight in top_feats:
+                    feature_counts[fname] += 1
+                    feature_weights[fname].append(weight)
 
+    top5feats = sorted(feature_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+    top5featnames = [f for f, _ in top5feats]
+    avg_weights = {f: sum(feature_weights[f]) / len(feature_weights[f]) for f in top5featnames}
+    img = plotCustomConnectomeAvgWeight_to_image(top5featnames, weights=avg_weights)
+
+    # size = set_min_height_relative_to_right()
+    img = img.resize((500,300))
+    photo = ImageTk.PhotoImage(img)
+
+    context.canvas.delete("all")
+    context.canvas.create_image(context.canvas.winfo_width() // 2, 0, anchor="n", image=photo)
+    context.canvas.image = photo
             # all_ytrue.setdefault(clfname, []).append(ytrue)
             # all_ypred.setdefault(clfname, []).append(ypred)
             # if yprob is not None:

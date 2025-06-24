@@ -4,6 +4,8 @@ import glob
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from io import BytesIO
+from PIL import Image
 from collections import defaultdict
 from nilearn import plotting
 from nilearnextraction import *
@@ -300,6 +302,49 @@ def plotCustomConnectomeAvgWeight(featlist, weights=None, tag="", filename="cust
                             title="Top Stable Features",
                             black_bg=False,
                             colorbar=True)
+    
+def plotCustomConnectomeAvgWeight_to_image(featlist, weights=None):
+    labels, maps, indices = extractaal()
+    coords = plotting.find_parcellation_cut_coords(maps)
+    idx2coord = {idx: coord for idx, coord in zip(indices, coords)}
+
+    nodes = set()
+    edgeinfo = []
+
+    for fname in featlist:
+        try:
+            _, idx1, idx2 = fname.split('_')
+            coord1 = idx2coord[idx1]
+            coord2 = idx2coord[idx2]
+            nodes.add(idx1)
+            nodes.add(idx2)
+            w = weights.get(fname, 1.0) if weights else 1.0
+            edgeinfo.append((idx1, idx2, w))
+        except KeyError:
+            print(f"Warning: Skipping invalid feature: {fname}")
+            continue
+
+    nodes = sorted(nodes)
+    nodeidx = {node: i for i, node in enumerate(nodes)}
+    nodecoords = [idx2coord[node] for node in nodes]
+    adjmatr = np.zeros((len(nodes), len(nodes)))
+
+    for idx1, idx2, w in edgeinfo:
+        i, j = nodeidx[idx1], nodeidx[idx2]
+        adjmatr[i, j] = w
+        adjmatr[j, i] = w
+
+    # Create the figure using nilearn
+    display = plotting.plot_connectome(adjacency_matrix=adjmatr, node_coords=nodecoords,
+                                        black_bg=False, colorbar=True)
+
+    # Save to in-memory buffer
+    buf = BytesIO()
+    display.savefig(buf)
+    display.close()
+
+    buf.seek(0)
+    return Image.open(buf)
 
 def average_weights_for_selected_features(feat_folder, featlist, classifiers=["LogisticRegression", "SVC"], n_folds=5):
     """
@@ -349,6 +394,8 @@ def average_weights_for_selected_features(feat_folder, featlist, classifiers=["L
         }
 
     return avg_weights
+
+
 
 
 if __name__ == "__main__":
