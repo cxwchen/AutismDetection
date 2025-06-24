@@ -336,7 +336,7 @@ def plotCustomConnectomeAvgWeight_to_image(featlist, weights=None):
 
     # Create the figure using nilearn
     display = plotting.plot_connectome(adjacency_matrix=adjmatr, node_coords=nodecoords,
-                                        black_bg=False, colorbar=True)
+                                        black_bg=True, colorbar=True)
 
     # Save to in-memory buffer
     buf = BytesIO()

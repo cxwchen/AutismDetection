@@ -153,7 +153,8 @@ def runCV(context, label="female", groupeval=True, useHarmo=False, numfeats=100,
     img = plotCustomConnectomeAvgWeight_to_image(top5featnames, weights=avg_weights)
 
     # size = set_min_height_relative_to_right()
-    img = img.resize((500,300))
+    size = context.size
+    img = img.resize((size,size))
     photo = ImageTk.PhotoImage(img)
 
     context.canvas.delete("all")

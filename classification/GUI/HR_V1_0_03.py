@@ -54,7 +54,7 @@ X, y = make_classification(
 
 
 class AppContext:
-    def __init__(self, root, canvas, subjects_sex_set, subjects_age_set, classifiers_set, features_set, graph_vs_pearson, dataset_fit, X, y, meta, filepath):
+    def __init__(self, root, canvas, subjects_sex_set, subjects_age_set, classifiers_set, features_set, graph_vs_pearson, dataset_fit, X, y, meta, filepath, size):
         self.root = root
         self.log = None
         self.canvas = canvas
@@ -80,6 +80,7 @@ class AppContext:
         self.ytrain = None
         self.ytest = None
         self.filepath = filepath
+        self.size = None
 
 def update_overview_text(context):
     context.canvas.delete("overlay_text")
@@ -111,7 +112,8 @@ def build_gui(root, X, y, meta=None, filepath=None):
         meta=meta,
         X=X,
         y=y,
-        filepath=filepath
+        filepath=filepath,
+        size=None
     )
     # Use the filepath as needed
     if filepath:
@@ -273,7 +275,8 @@ def build_gui(root, X, y, meta=None, filepath=None):
         default_photo = ImageTk.PhotoImage(default_img, master=root)
         root.canvas.create_image(root.canvas.winfo_reqwidth() // 2, 0, anchor="n", image=default_photo)
         root.canvas.image = default_photo  # keep reference
-        
+        context.size = size
+
         # Add text overlay
         update_overview_text(context)
         #root.canvas.create_text(10, size - 10, anchor="sw", text=f"Target:\{subjects_set}\{classifiers_set}\{features_set}\{dataset_fit}",
